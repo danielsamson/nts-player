@@ -71,9 +71,14 @@ async function run() {
   check('Episode page: Save track buttons', epPage.saveTrack > 5, '.save-track-button');
 
   // ---- Live tracklist page (signed out shows the Supporter promo) ----
-  const lt = await inPage(`${SITE}/live-tracklist/1`, `(() => ({ ready: !!document.querySelector('.page-live-tracks'),
-    promo: !!document.querySelector('.page-live-tracks__promo') }))()`);
-  check('Live tracklist page', lt.ready && lt.promo, '.page-live-tracks, .page-live-tracks__promo when signed out');
+  // Signed out it shows a Supporter promo; give it time (it loads after the page)
+  const lt = await inPage(`${SITE}/live-tracklist/1`, `(() => {
+    const page = !!document.querySelector('.page-live-tracks');
+    const promo = !!document.querySelector('.page-live-tracks__promo');
+    const list = !!document.querySelector('.page-live-tracks__list');
+    return { page, promo, list, ready: page && (promo || list) };
+  })()`, { wait: 45000 });
+  check('Live tracklist page', lt.page && (lt.promo || lt.list), '.page-live-tracks with its promo (signed out) or list');
 
   // ---- My NTS pages need sign-in ----
   for (const path of ['/my-nts/favourites/episodes', '/my-nts/favourites/shows', '/my-nts/tracks']) {

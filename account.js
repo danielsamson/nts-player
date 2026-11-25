@@ -28,8 +28,14 @@ function ensureWindow() {
   if (win && !win.isDestroyed()) return win;
   win = new BrowserWindow({
     show: false, width: 1280, height: 900, title: 'My NTS (debug view)',
-    webPreferences: { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
+    webPreferences: {
+      partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
+      // Render the page as if it were on screen (into memory, never shown). A plain hidden
+      // window isn't painted, and NTS only loads My NTS lists once they're on screen.
+      offscreen: !DEBUG
+    }
   });
+  if (!DEBUG) win.webContents.setFrameRate(4);   // it only needs to load, not animate
   win.webContents.setAudioMuted(true);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   if (DEBUG) {

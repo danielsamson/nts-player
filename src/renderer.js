@@ -841,16 +841,45 @@ const Stage = (() => {
     }));
   }
 
-  function paint({ label, context, img, kicker, title, artist, album, next, linkItems, square, keepSave }) {
+  // Artwork: the old picture stays until the new one has loaded, then cross-fades in.
+  // whitelabel: no cover found for this track, so show a plain sleeve and white label.
+  let artToken = 0;
+  function setArt({ img, square, whitelabel, track, keep }) {
+    if (keep) return;
+    const my = ++artToken;
+    const art = $('stageArt');
+    const apply = () => {
+      if (my !== artToken) return;
+      const im = $('stageArtImg');
+      if (img) im.src = img; else im.removeAttribute('src');
+      art.classList.toggle('stage__art--wide', !square);
+      art.classList.toggle('stage__art--album', !!square && (!!img || !!whitelabel));
+      art.classList.toggle('stage__art--whitelabel', !!whitelabel);
+      art.classList.toggle('stage__art--empty', !img && !whitelabel);
+      $('stageRecordLabel').style.backgroundImage = img && square ? `url("${img}")` : '';
+      $('wlArtist').textContent = whitelabel ? track?.artist || '' : '';
+      $('wlTitle').textContent = whitelabel ? track?.title || '' : '';
+      art.classList.remove('stage__art--swapping');
+    };
+    if (img && $('stageArtImg').getAttribute('src') !== img) {
+      const pre = new Image();
+      pre.onload = () => {
+        if (my !== artToken) return;
+        art.classList.add('stage__art--swapping');            // quick fade out…
+        setTimeout(apply, 140);                                // …swap, fade back in
+      };
+      pre.onerror = () => { if (my === artToken) setArt({ square, whitelabel: square, track }); };
+      pre.src = img;
+    } else {
+      apply();
+    }
+  }
+
+  function paint({ label, context, img, kicker, title, artist, album, next, linkItems, square, keepSave, keepArt, whitelabel, track }) {
     if (!keepSave) $('stageSave').replaceChildren();
     $('stageLabel').textContent = label;
     $('stageContext').textContent = context || '';
-    const im = $('stageArtImg');
-    if (img) { if (im.getAttribute('src') !== img) im.src = img; } else im.removeAttribute('src');
-    $('stageArt').classList.toggle('stage__art--wide', !square);
-    $('stageArt').classList.toggle('stage__art--album', !!square && !!img);
-    $('stageArt').classList.toggle('stage__art--empty', !img);
-    $('stageRecordLabel').style.backgroundImage = img && square ? `url("${img}")` : '';
+    setArt({ img, square, whitelabel, track, keep: keepArt });
     $('stageKicker').textContent = kicker || '';
     $('stageTitle').textContent = title || '';
     $('stageTitle').classList.toggle('stage__title--long', (title || '').length > 26);
@@ -911,13 +940,15 @@ const Stage = (() => {
         next: nt ? `Up next ${fmtOffset(nt.offset ?? nt.offset_estimate)} · ${nt.artist} – ${nt.title}` : 'Last track in the tracklist',
         square: true
       };
-      paint({ ...base, img: '', linkItems: links(t, null) });
+      // keep the previous cover on screen while this track's cover is looked up
+      paint({ ...base, keepArt: true, linkItems: links(t, null) });
       paintSave(ep, t, my);
       // Art (and the Deezer link) first; the exact Apple Music link follows when found
       const appleP = window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null);
       const art = await Art.get(t, 'high');
       if (my !== token) return;
-      const full = { ...base, img: art?.large || ep.img, square: !!art,
+      // No cover found: a white label, not the show's photo
+      const full = { ...base, img: art?.large || '', square: true, whitelabel: !art, track: t,
         album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '' };
       paint({ ...full, linkItems: links(t, art), keepSave: true });
       const appleUrl = await appleP;

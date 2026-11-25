@@ -783,3 +783,34 @@ body.playing .track__art { background: var(--grey-1); }
 @media (prefers-reduced-motion: reduce) {
   .stage__art.is-tracking .stage__tilt { transform: none; }
 }
+
+/* ---- Cover swap: brief cross-fade instead of a grey flash ---- */
+@media (min-width: 720px) {
+  .stage__cover img { transition: opacity .14s linear; }
+  .stage__art--swapping .stage__cover img { opacity: 0; }
+
+  /* ---- White label: plain black paper sleeve, centre hole, white label inside ---- */
+  .stage__whitelabel { display: none; position: absolute; inset: 0; }
+  .stage__art--whitelabel .stage__whitelabel {
+    display: grid; place-items: center;
+    background:
+      radial-gradient(circle at 50% 50%, transparent 0 17.5%, rgba(0, 0, 0, .55) 17.6% 18.2%, transparent 18.4%),
+      linear-gradient(135deg, #1d1d1d, #111 60%, #181818);
+  }
+  /* the hole in the sleeve shows the record's white label */
+  .stage__wl-label {
+    width: 38%; aspect-ratio: 1; border-radius: 50%; position: relative;
+    background: radial-gradient(circle, #111 0 3.2%, #f2efe8 3.3%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25), inset 0 0 18px rgba(0, 0, 0, .12);
+    /* artist above the spindle hole, title below it */
+    display: grid; grid-template-rows: 1fr 14% 1fr; justify-items: center;
+    padding: 0 9%; text-align: center; color: #222; overflow: hidden;
+  }
+  .stage__wl-artist, .stage__wl-title {
+    max-width: 100%; font-size: clamp(7px, .8vw, 12px); line-height: 1.15; text-transform: uppercase;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; hyphens: none;
+  }
+  .stage__wl-artist { grid-row: 1; align-self: end; font-weight: 700; }
+  .stage__wl-title { grid-row: 3; align-self: start; }
+  .stage__art--whitelabel .stage__record-label { background: radial-gradient(circle, #111 0 3.5%, #f2efe8 3.6%) !important; }
+}

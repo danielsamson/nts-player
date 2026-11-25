@@ -78,7 +78,14 @@
       <div class="stage__art" id="stageArt">
         <div class="stage__tilt" id="stageTilt">
           <div class="stage__record" aria-hidden="true"><span class="stage__record-label" id="stageRecordLabel"></span></div>
-          <div class="stage__cover"><img id="stageArtImg" alt=""><span class="stage__wear"></span><span class="stage__shine"></span></div>
+          <div class="stage__cover">
+            <img id="stageArtImg" alt="">
+            <!-- No cover found: a plain sleeve with a white label showing through the centre hole -->
+            <div class="stage__whitelabel" aria-hidden="true">
+              <span class="stage__wl-label"><span class="stage__wl-artist" id="wlArtist"></span><span class="stage__wl-title" id="wlTitle"></span></span>
+            </div>
+            <span class="stage__wear"></span><span class="stage__shine"></span>
+          </div>
           <span class="stage__edge stage__edge--right" aria-hidden="true"></span>
           <span class="stage__edge stage__edge--bottom" aria-hidden="true"></span>
         </div>

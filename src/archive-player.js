@@ -17,6 +17,17 @@ const ArchivePlayer = (() => {
   let widget = null;
   let volume = 0.8;
   let pendingSeek = null;
+  // A seek requested before the audio is ready can be ignored by SoundCloud's player,
+  // so keep asking until its position confirms it (or give up after a few tries)
+  let seekTarget = null;
+  let seekTries = 0;
+  let seekLastTry = 0;
+  function trySeek() {
+    if (seekTarget == null || !widget) return;
+    seekTries++;
+    seekLastTry = Date.now();
+    widget.seekTo(seekTarget);
+  }
   let primed = null;   // { episode, startMs }: shown as paused, loaded when you press play
 
   const emit = () => listeners.forEach((fn) => fn(state));
@@ -36,12 +47,24 @@ const ArchivePlayer = (() => {
     widget.bind(E.PLAY, () => {
       state.playing = true; state.loading = false; state.error = null;
       widget.getDuration((d) => { state.duration = d || state.duration; emit(); });
-      if (pendingSeek != null) { widget.seekTo(pendingSeek); pendingSeek = null; }
+      if (pendingSeek != null) { seekTarget = pendingSeek; seekTries = 0; pendingSeek = null; trySeek(); }
       emit();
     });
     widget.bind(E.PAUSE, () => { state.playing = false; emit(); });
     widget.bind(E.FINISH, () => { state.playing = false; state.position = state.duration; emit(); });
-    widget.bind(E.PLAY_PROGRESS, (e) => { state.position = e.currentPosition; emit(); });
+    widget.bind(E.PLAY_PROGRESS, (e) => {
+      if (seekTarget != null) {
+        if (Math.abs(e.currentPosition - seekTarget) < 4000 || seekTries >= 12) seekTarget = null;   // landed (or give up)
+        else {
+          if (Date.now() - seekLastTry > 600) trySeek();
+          state.position = seekTarget;      // show where we're going, not 0:00
+          emit();
+          return;
+        }
+      }
+      state.position = e.currentPosition;
+      emit();
+    });
     widget.bind(E.ERROR, () => {
       state.playing = false; state.loading = false;
       state.error = 'This episode could not be played.';
@@ -52,6 +75,7 @@ const ArchivePlayer = (() => {
   // Load an episode and start playing, optionally from a position in ms
   function load(episode, startMs = 0) {
     primed = null;
+    seekTarget = null;
     state.episode = episode;
     state.playing = false;
     state.loading = true;

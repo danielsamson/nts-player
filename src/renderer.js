@@ -44,7 +44,6 @@ function render() {
   document.querySelectorAll('.tab').forEach((b) =>
     b.classList.toggle('active', Number(b.dataset.ch) === channel));
   document.body.classList.toggle('playing', playing);
-  $('topLabel').textContent = playing ? `Playing NTS ${channel + 1}` : 'Live now';
   $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
   document.querySelectorAll('.tab').forEach((b) => {
     const ch = Number(b.dataset.ch);
@@ -54,8 +53,6 @@ function render() {
   $('iconPlay').toggleAttribute('hidden', playing);
   $('iconPause').toggleAttribute('hidden', !playing);
   $('play').setAttribute('aria-label', playing ? 'Stop' : 'Play');
-  $('chIcon').textContent = channel + 1;
-  $('nextLabel').textContent = `Next on ${channel + 1}`;
 
   const results = live?.results;
   if (!results) return;
@@ -79,7 +76,7 @@ function render() {
   $('time').textContent = info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : '';
   if ($('art').getAttribute('src') !== info.img) $('art').setAttribute('src', info.img);
   $('next').textContent = info.next?.broadcast_title
-    ? `${fmtTime(info.next.start_timestamp)} ${info.next.broadcast_title}` : '';
+    ? `Next ${fmtTime(info.next.start_timestamp)} · ${info.next.broadcast_title}` : '';
   document.title = `NTS ${channel + 1} · ${info.title}`;
 
   if ('mediaSession' in navigator) {
@@ -258,10 +255,22 @@ function setChannel(ch) {
 $('play').addEventListener('click', () => (playing ? stop() : play()));
 document.querySelectorAll('.tab').forEach((b) =>
   b.addEventListener('click', () => setChannel(Number(b.dataset.ch))));
+// Mute toggles between silent and your last volume
+const VOL_ON = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z';
+const VOL_OFF = 'M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z';
+const paintMute = () => {
+  $('volIcon').setAttribute('d', audio.muted || audio.volume === 0 ? VOL_OFF : VOL_ON);
+  $('mute').setAttribute('aria-label', audio.muted ? 'Unmute' : 'Mute');
+};
+$('mute').addEventListener('click', () => { audio.muted = !audio.muted; paintMute(); });
+paintMute();
+
 $('volume').addEventListener('input', (e) => {
   audio.volume = Number(e.target.value);
   localStorage.setItem('volume', audio.volume);
   paintVolume();
+  if (audio.muted) audio.muted = false;
+  paintMute();
 });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); playing ? stop() : play(); }

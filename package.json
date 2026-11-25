@@ -2,12 +2,15 @@
   "name": "nts-player",
   "productName": "NTS Player",
   "version": "1.0.0",
-  "description": "A tiny desktop player for NTS Radio's live channels",
+  "description": "A small desktop player for NTS Radio: live channels and the archive",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "debug": "electron . --nts-debug",
-    "dist": "electron-builder --win portable nsis"
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -16,9 +19,68 @@
   "build": {
     "appId": "local.ntsplayer",
     "productName": "NTS Player",
-    "files": ["main.js", "preload.js", "art.js", "account.js", "src/**/*", "build/icon.png"],
-    "win": { "target": ["portable", "nsis"], "icon": "build/icon.png" },
-    "portable": { "artifactName": "NTS-Player-portable.exe" },
-    "nsis": { "oneClick": true, "artifactName": "NTS-Player-Setup.exe" }
-  }
+    "files": [
+      "main.js",
+      "preload.js",
+      "art.js",
+      "account.js",
+      "src/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "NTS-Player-portable.exe"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "NTS-Player-Setup.exe"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.music",
+      "artifactName": "NTS-Player-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "NTS Player"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Audio",
+      "synopsis": "Desktop player for NTS Radio",
+      "maintainer": "NTS Player contributors",
+      "artifactName": "NTS-Player-${version}-linux-${arch}.${ext}"
+    }
+  },
+  "homepage": "https://github.com/danielsamson/nts-player",
+  "author": "Daniel Samson"
 }

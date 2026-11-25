@@ -1,8 +1,7 @@
 # NTS Player
 
 A small desktop player for [NTS Radio](https://www.nts.live): both live channels and the
-archive, in one compact window. Built for Windows, where there's no NTS app, but it runs
-anywhere Electron does.
+archive, in one compact window. Runs on Windows, macOS and Linux.
 
 <img src="docs/screenshot.png" alt="NTS Player showing channel 1 live" width="320"> <img src="docs/archive.png" alt="An archive episode playing, with the current track highlighted" width="320">
 
@@ -102,19 +101,30 @@ npm install
 npm start
 ```
 
-## Build a Windows .exe
+## Build the app
 
 ```bash
 npm run dist
 ```
 
-This puts two files in `dist/`:
+This builds for the system you're on and puts the files in `dist/`. To pick one:
+`npm run dist:win`, `npm run dist:mac` or `npm run dist:linux`.
 
-- `NTS-Player-portable.exe`: a single file you can run directly, no install needed
-- `NTS-Player-Setup.exe`: an installer that adds a Start-menu shortcut
+| System | Files |
+| ------ | ----- |
+| Windows | `NTS-Player-portable.exe` (runs directly) and `NTS-Player-Setup.exe` (installer) |
+| macOS | `.dmg` and `.zip`, for Apple Silicon (`arm64`) and Intel (`x64`). Build on a Mac. |
+| Linux | `.AppImage` (runs on most distributions) and `.deb` (Ubuntu, Debian) |
 
-The app isn't code-signed, so Windows SmartScreen may warn you the first time you run
-it. Click **More info**, then **Run anyway**.
+**Build all three on GitHub:** the **Build** workflow in the Actions tab builds every
+version and attaches the files to the run. It also runs when you push a version tag,
+like `v1.0.0`.
+
+The builds aren't code-signed, so the first launch needs a click past a warning:
+
+- **Windows:** SmartScreen, click **More info**, then **Run anyway**.
+- **macOS:** right-click the app, choose **Open**, then **Open** again.
+- **Linux (AppImage):** make it executable first: `chmod +x NTS-Player-*.AppImage`.
 
 ## How it works
 

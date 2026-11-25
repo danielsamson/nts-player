@@ -56,7 +56,15 @@ function createWindow() {
     params.partition = NTS_PARTITION;
     if (!params.src.startsWith(LIVE_TRACKLIST_URL)) event.preventDefault();
   });
-  Menu.setApplicationMenu(null);
+  // No menu bar on Windows/Linux. macOS keeps the standard app menu, which is where
+  // Cmd+Q, Cmd+C/V (e.g. in the search box) and the other shortcuts live.
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }
+    ]));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
   win.loadFile(path.join(__dirname, 'src', 'index.html'));
 
   // Open any links (e.g. show pages) in the normal browser

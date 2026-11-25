@@ -924,12 +924,21 @@ const Stage = (() => {
     setArt({ img, square, whitelabel, track, keep: keepArt });
     $('stageKicker').textContent = kicker || '';
     $('stageTitle').textContent = title || '';
-    $('stageTitle').classList.toggle('stage__title--long', (title || '').length > 26);
+    const len = (title || '').length;
+    $('stageTitle').classList.toggle('stage__title--long', len > 26 && len <= 42);
+    $('stageTitle').classList.toggle('stage__title--xlong', len > 42);
     $('stageArtist').textContent = artist || '';
     $('stageAlbum').textContent = album || '';
     $('stageNext').textContent = next || '';
     paintLinks(linkItems || []);
   }
+
+  // Size the artwork around the text: measure the info block and leave exactly that room
+  const fitInfo = () => {
+    const h = $('stageInfo').offsetHeight;
+    if (h) $('stage').style.setProperty('--info-h', `${h}px`);
+  };
+  new ResizeObserver(fitInfo).observe($('stageInfo'));
 
   // Bookmark for the track on the stage (saved to My NTS)
   async function paintSave(ep, t, my) {
@@ -965,8 +974,8 @@ const Stage = (() => {
       const ep = a.episode;
       const cur = TrackNotify.currentTrack();
       const tracks = ep.tracks || [];
-      const label = a.playing || a.loading ? 'Now playing' : 'Paused';
-      const context = `Archive · ${ep.title}${ep.date ? ' · ' + ep.date : ''}`;
+      const label = '';
+      const context = '';
       if (!cur) {
         paint({ label, context, img: ep.img, kicker: '',
           title: ep.title, artist: [ep.location, ep.date].filter(Boolean).join(' · '),
@@ -991,7 +1000,7 @@ const Stage = (() => {
       if (my !== token) return;
       // No cover found: a white label, not the show's photo
       const full = { ...base, img: art?.large || '', square: true, whitelabel: !art, track: t,
-        album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '' };
+        context: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : (art?.year || ''), album: '' };
       paint({ ...full, linkItems: links(t, art), keepSave: true });
       const appleUrl = await appleP;
       if (my !== token || !appleUrl) return;
@@ -1004,8 +1013,8 @@ const Stage = (() => {
     if (!r) { paint({ label: 'NTS Radio', title: 'Loading…' }); return; }
     const info = showInfo(r);
     paint({
-      label: playing ? 'Now playing' : `NTS ${channel + 1}`,
-      context: `Live on ${channel + 1}${info.location ? ' · ' + info.location : ''}`,
+      label: '',
+      context: [info.location, info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : ''].filter(Boolean).join(' · '),
       img: info.img, square: false,
       kicker: '',
       title: info.title,

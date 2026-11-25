@@ -74,6 +74,7 @@
 
   <!-- Wide view: the stage. Big album art and the full track details -->
   <aside class="stage" id="stage" aria-label="Now playing">
+    <div class="stage__save" id="stageSave"></div>
     <div class="stage__body">
       <div class="stage__art" id="stageArt">
         <div class="stage__tilt" id="stageTilt">
@@ -90,7 +91,7 @@
           <span class="stage__edge stage__edge--bottom" aria-hidden="true"></span>
         </div>
       </div>
-      <div class="stage__info">
+      <div class="stage__info" id="stageInfo">
         <p class="stage__eyebrow">
           <span class="stage__label" id="stageLabel">Now playing</span>
           <span class="stage__context" id="stageContext"></span>
@@ -99,7 +100,6 @@
         <h2 class="stage__title" id="stageTitle"></h2>
         <p class="stage__artist" id="stageArtist"></p>
         <p class="stage__album" id="stageAlbum"></p>
-        <div class="stage__save" id="stageSave"></div>
         <p class="stage__next" id="stageNext"></p>
         <nav class="stage__links" aria-label="Find this track elsewhere">
           <span class="stage__links-label" id="stageLinksLabel">Find it on</span>

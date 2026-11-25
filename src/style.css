@@ -835,3 +835,17 @@ body.playing .track__art { background: var(--grey-1); }
   .stage { --info-h: 180px; }
 }
 .episode-autoplay { display: flex; margin: 12px auto 0; }
+
+/* ---- Stage: text sized to fit, save button top right ---- */
+@media (min-width: 720px) {
+  .stage { position: relative; }
+  .stage__info { max-height: none; }
+  .stage__label:empty { display: none; }
+  .stage__eyebrow:has(.stage__context:empty) { display: none; }
+  .stage__context { color: var(--grey-1); }
+  .stage__title--xlong { font-size: 24px; line-height: 27px; }
+  .stage__save { position: absolute; top: 16px; right: 16px; margin: 0; z-index: 3; }
+  /* art fills what the measured text leaves (set from JS as --info-h) */
+  .stage__art { --size: min(calc(100vh - 45px - var(--bar) - 56px - 22px - var(--info-h, 200px)), 60%, 720px); }
+  .stage__art--wide { --size: min(calc((100vh - 45px - var(--bar) - 56px - 22px - var(--info-h, 200px)) * 16 / 9), 80%); }
+}

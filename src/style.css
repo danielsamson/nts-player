@@ -144,7 +144,7 @@ body.playing .broadcast-description { color: var(--grey-4); }
 body:not(.pane-tracks) .channel { overflow-y: auto; }
 
 /* Tracklist: artwork hidden, title on one line, the list gets the space */
-body.pane-tracks .picture-wrap { display: none; }
+body.pane-tracks .channel .picture-wrap { display: none; }
 body.pane-tracks .broadcast-heading { -webkit-line-clamp: 1; font-size: 20px; line-height: 24px; }
 body.pane-tracks .channel__details { flex: 1; min-height: 0; }
 body.pane-tracks #pane-tracks { flex: 1; min-height: 0; overflow-y: auto; }
@@ -463,7 +463,7 @@ body.playing .track__art { background: var(--grey-1); }
     grid-column: 2; grid-row: 2; display: grid; min-width: 0; min-height: 0;
     grid-template-rows: minmax(0, 1fr);
     background: var(--black); color: var(--white); overflow: hidden;
-    --info-h: 230px;   /* room kept under the artwork for the track info */
+    --info-h: 280px;   /* room kept under the artwork for the track info */
   }
 
   /* The artwork is the feature: big and centred, info underneath */
@@ -598,7 +598,7 @@ body.playing .track__art { background: var(--grey-1); }
 
 /* Short windows: smaller title so the cover keeps its size */
 @media (min-width: 720px) and (max-height: 700px) {
-  .stage { --info-h: 190px; }
+  .stage { --info-h: 240px; }
   .stage__title { font-size: 28px; line-height: 31px; }
   .stage__title--long { font-size: 24px; line-height: 27px; }
   .stage__body { gap: 20px; padding-top: 20px; }
@@ -714,3 +714,6 @@ body.playing .track__art { background: var(--grey-1); }
 .track-page__plays { margin: 0 -12px; border-top: 1px solid var(--grey-4); }
 .track-page__plays .item__pic { display: none; }
 .track-page .loader { padding: 4px 0; }
+
+/* Stage info lines keep their height; if space runs out the links go first, not the title */
+.stage__info > * { flex-shrink: 0; }

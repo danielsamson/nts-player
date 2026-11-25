@@ -12,6 +12,9 @@
 const { BrowserWindow } = require('electron');
 
 const PARTITION = 'persist:nts';
+// `npm run debug`: show the hidden window with its console, and log every step
+const DEBUG = process.argv.includes('--nts-debug');
+const log = (...a) => { if (DEBUG) console.log('[my-nts]', ...a); };
 const SITE = 'https://www.nts.live';
 let win = null;
 let currentUrl = '';
@@ -22,11 +25,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function ensureWindow() {
   if (win && !win.isDestroyed()) return win;
   win = new BrowserWindow({
-    show: false, width: 1280, height: 900,
+    show: DEBUG, width: 1280, height: 900, title: 'My NTS (debug)',
     webPreferences: { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
   win.webContents.setAudioMuted(true);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  if (DEBUG) {
+    win.webContents.openDevTools({ mode: 'detach' });
+    win.webContents.on('console-message', (_e, level, message) => { if (level >= 2) log('page console:', message.slice(0, 300)); });
+    win.webContents.on('did-navigate', (_e, url) => log('navigated to', url));
+    win.webContents.on('did-navigate-in-page', (_e, url) => log('in-page navigation to', url));
+  }
   win.on('closed', () => { win = null; currentUrl = ''; });
   return win;
 }
@@ -43,7 +52,8 @@ async function open(path, force = false) {
   const url = SITE + path;
   if (!force && currentUrl === url) return w;
   currentUrl = url;
-  await w.loadURL(url);
+  log('opening', url);
+  try { await w.loadURL(url); } catch (e) { log('load failed:', e.message); }
   return w;
 }
 
@@ -63,9 +73,14 @@ const signedOutUrl = () => /\/sign-in/.test(win?.webContents.getURL() || '');
 
 // ---- Reading an episode page ----
 // Everything is looked up inside #episode-container, never the live header above it.
+// NTS sets window.NTS.isAuthenticated (true/false) once it knows whether you're signed in;
+// until then it's undefined, so wait for it.
+const AUTH_KNOWN = `(window.NTS && typeof window.NTS.isAuthenticated === 'boolean')`;
+const SIGNED_IN = `(window.NTS.isAuthenticated === true || window.NTS.userIsAuthenticated === true)`;
+
 const READ_EPISODE = `(() => {
   const root = document.querySelector('#episode-container');
-  if (!root) return null;
+  if (!root || !${AUTH_KNOWN}) return null;
   const saveBtn = root.querySelector('.bio__header button[title*="Episode" i], .bio__header button[aria-label*="Episode" i]');
   const followBtn = root.querySelector('.bio__footer .follow-button') || root.querySelector('.follow-button');
   if (!saveBtn && !followBtn) return null;
@@ -80,7 +95,7 @@ const READ_EPISODE = `(() => {
     saved: !!t.querySelector('.save-track-button--saved')
   }));
   return {
-    signedIn: !!(window.NTS && window.NTS.isAuthenticated && window.NTS.isAuthenticated()),
+    signedIn: ${SIGNED_IN},
     saved: saveBtn ? /remove/i.test(label(saveBtn)) : null,
     following: followBtn ? (followBtn.classList.contains('follow-button--favourited') || /unfollow/i.test(label(followBtn))) : null,
     tracks
@@ -90,10 +105,11 @@ const READ_EPISODE = `(() => {
 async function readEpisode(show, episode, force) {
   await open(`/shows/${encodeURIComponent(show)}/episodes/${encodeURIComponent(episode)}`, force);
   let state = await waitFor(READ_EPISODE);
-  if (!state) return { available: false };
+  if (!state) { log('episode buttons not found on', win?.webContents.getURL()); return { available: false }; }
   // Your saved state arrives a moment after the page; read again once it settles
   await sleep(1500);
   state = (await js(READ_EPISODE).catch(() => null)) || state;
+  log('episode state', JSON.stringify({ signedIn: state.signedIn, saved: state.saved, following: state.following, tracks: state.tracks.length, savedTracks: state.tracks.filter((t) => t.saved).length }));
   return { available: true, ...state };
 }
 
@@ -115,6 +131,7 @@ function toggle({ show, episode, kind, artist, title, want }) {
       const t = state.tracks.find((x) => norm(x.title) === norm(title));
       return t ? t.saved : null;
     };
+    log('toggle', kind, 'want', want, 'current', current(), kind === 'track' ? `"${title}"` : '');
     if (current() === null) return { ...state, error: 'not-found' };
     if (current() === want) return state;
 
@@ -134,6 +151,7 @@ function toggle({ show, episode, kind, artist, title, want }) {
       btn.click();
       return true;
     })()`).catch(() => false);
+    log(clicked ? 'clicked NTS button' : 'button to click not found');
     if (!clicked) return { ...state, error: 'not-found' };
 
     // Wait for NTS to confirm (the button flips)
@@ -142,8 +160,9 @@ function toggle({ show, episode, kind, artist, title, want }) {
       const s = await js(READ_EPISODE).catch(() => null);
       if (!s) continue;
       state = { available: true, ...s };
-      if (current() === want) return state;
+      if (current() === want) { log('confirmed by NTS'); return state; }
     }
+    log('NTS did not confirm within 9 s; button still reads', current(), 'url', win?.webContents.getURL());
     return { ...state, error: 'timeout' };
   });
 }
@@ -179,13 +198,22 @@ function getList(kind) {
   return run(async () => {
     await open(LIST_PATHS[kind] || LIST_PATHS.episodes, true);
     await sleep(500);
-    if (signedOutUrl()) return { signedIn: false };
+    if (signedOutUrl()) { log('My NTS redirected to sign-in: not signed in'); return { signedIn: false }; }
     // Wait for the list (or an empty My NTS page) to render
     let res = await waitFor(`(() => { const r = ${READ_LIST}; return r && (r.items.length || r.tracks.length || r.ready) ? r : null; })()`, 12000);
     if (signedOutUrl()) return { signedIn: false };
-    if (!res) return { signedIn: true, available: false };
+    if (!res) {
+      log('My NTS list not recognised on', win?.webContents.getURL());
+      if (DEBUG) log('page text:', (await js('document.body.innerText.slice(0, 600)').catch(() => '')).replace(/\n+/g, ' | '));
+      return { signedIn: true, available: false };
+    }
     await sleep(1200);      // let the rest of the list arrive
     res = (await js(READ_LIST).catch(() => null)) || res;
+    log(`My NTS ${kind}:`, res.items.length, 'items,', res.tracks.length, 'tracks');
+    if (DEBUG && !res.items.length && !res.tracks.length) {
+      log('page text:', (await js('document.body.innerText.slice(0, 600)').catch(() => '')).replace(/\n+/g, ' | '));
+      log('list classes seen:', await js(`[...new Set([...document.querySelectorAll('[class]')].map((e) => String(e.className).split(' ')[0]).filter((c) => /list|item|card|track|episode|show|favourite/i.test(c)))].slice(0, 40).join(' ')`).catch(() => ''));
+    }
     return { signedIn: true, available: true, items: res.items, tracks: res.tracks };
   });
 }

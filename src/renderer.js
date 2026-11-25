@@ -90,8 +90,68 @@ function render() {
   }
 }
 
+// ---- Album art for tracks (looked up in the main process, see art.js) ----
+const Art = (() => {
+  const memo = new Map();
+  const key = (t) => `${t.artist}|${t.title}`;
+  function get(t) {
+    if (!t?.artist || !t?.title) return Promise.resolve(null);
+    const k = key(t);
+    if (!memo.has(k)) {
+      memo.set(k, window.nts.art({ artist: t.artist, title: t.title, isrc: t.isrc_id, deezer: t.deezer_track_id }).catch(() => null));
+    }
+    return memo.get(k);
+  }
+  // Load art only when a row scrolls into view
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      const t = e.target._track;
+      get(t).then((art) => {
+        if (!art) { e.target.classList.add('track__art--none'); return; }
+        const img = new Image();
+        img.alt = '';
+        img.onload = () => e.target.replaceChildren(img);
+        img.src = art.small;
+      });
+    });
+  }, { rootMargin: '200px' });
+  function attach(box, t) { box._track = t; io.observe(box); }
+  return { get, attach };
+})();
+
+// One tracklist row: album art, time, artist, title, copy button
+function trackRow(t, { onClick, title } = {}) {
+  const li = document.createElement('li');
+  li.className = 'track';
+  li.title = title || 'Click to copy';
+  const art = document.createElement('span'); art.className = 'track__art';
+  Art.attach(art, t);
+  const text = document.createElement('span'); text.className = 'track__text';
+  const top = document.createElement('span'); top.className = 'track__top';
+  const time = document.createElement('span'); time.className = 'track__time';
+  time.textContent = fmtOffset(t.offset ?? t.offset_estimate);
+  const artist = document.createElement('span'); artist.className = 'track__artist'; artist.textContent = t.artist;
+  top.append(time, artist);
+  const name = document.createElement('span'); name.className = 'track__title'; name.textContent = t.title;
+  text.append(top, name);
+  const copy = document.createElement('button'); copy.className = 'track__copy'; copy.textContent = '⧉'; copy.title = 'Copy track';
+  copy.addEventListener('click', (e) => { e.stopPropagation(); copyTrack(`${t.artist} - ${t.title}`); });
+  li.append(art, text, copy);
+  li.addEventListener('click', onClick || (() => copyTrack(`${t.artist} - ${t.title}`)));
+  return li;
+}
+
 // ---- Now-playing bar: live radio or an archive episode ----
 let nextText = '';
+let nowArtUrl = '';
+function setNowArt(url) {
+  nowArtUrl = url || '';
+  const img = $('nowArtImg');
+  if (url) img.src = url; else img.removeAttribute('src');
+  renderNowbar();
+}
 const fmtMs = (ms) => fmtOffset(Math.max(0, Math.floor((ms || 0) / 1000)));
 
 function renderNowbar() {
@@ -109,9 +169,11 @@ function renderNowbar() {
     $('nowLabel').textContent = a.episode.title;
     $('next').textContent = a.error || (a.loading ? 'Loading…' : `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}${a.episode.date ? ' · ' + a.episode.date : ''}`);
     $('seekFill').style.width = a.duration ? `${Math.min(100, (a.position / a.duration) * 100)}%` : '0%';
+    $('nowArt').hidden = !nowArtUrl;
     document.title = `NTS Archive · ${a.episode.title}`;
   } else {
     $('nowKind').textContent = '';
+    $('nowArt').hidden = true;
     $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
     $('next').textContent = nextText;
     const t = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
@@ -123,6 +185,7 @@ function renderNowbar() {
 function playArchive(info, startMs = 0) {
   if (playing) stop();
   source = 'archive';
+  setNowArt('');
   ArchivePlayer.load(info, startMs);
   ArchivePlayer.setVolume(audio.muted ? 0 : audio.volume);
   if ('mediaSession' in navigator) {
@@ -157,9 +220,6 @@ const TrackNotify = (() => {
   const enabled = () => localStorage.getItem('trackNotify') !== '0';
 
   async function setEnabled(on) {
-    if (on && 'Notification' in window && Notification.permission === 'default') {
-      try { await Notification.requestPermission(); } catch {}
-    }
     try { localStorage.setItem('trackNotify', on ? '1' : '0'); } catch {}
   }
 
@@ -172,21 +232,22 @@ const TrackNotify = (() => {
     return idx >= 0 ? { idx, track: tracks[idx] } : null;
   }
 
-  function announce(ep, { idx, track }) {
+  async function announce(ep, { idx, track }) {
     const total = ep.tracks.length;
+    // Album art if we can find it quickly; otherwise the episode artwork
+    const art = await Promise.race([Art.get(track), new Promise((r) => setTimeout(() => r(null), 2500))]);
+    if (lastKey !== `${ep.show}/${ep.episode}#${idx}`) return;   // moved on meanwhile
+    setNowArt(art?.small || '');
+    const cover = art?.large || ep.img;
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: track.title, artist: track.artist, album: `NTS Archive · ${ep.title}`,
-        artwork: ep.img ? [{ src: ep.img, sizes: '512x512' }] : []
+        artwork: cover ? [{ src: cover, sizes: '512x512' }] : []
       });
     }
-    if (!enabled() || !('Notification' in window) || Notification.permission === 'denied') return;
-    const n = new Notification(`${track.artist} – ${track.title}`, {
-      body: `${ep.title} · track ${idx + 1} of ${total}`,
-      silent: true,
-      tag: 'nts-track'          // replaces the previous one instead of stacking
-    });
-    n.onclick = () => window.nts.focus?.();
+    if (!enabled()) return;
+    // Shown by the main process (one at a time, with the album art as its picture)
+    window.nts.notify({ title: `${track.artist} – ${track.title}`, body: `${ep.title} · track ${idx + 1} of ${total}`, art: cover });
   }
 
   ArchivePlayer.onChange((a) => {
@@ -196,7 +257,7 @@ const TrackNotify = (() => {
     if (key === lastKey) return;
     lastKey = key;
     clearTimeout(timer);
-    if (!cur) return;
+    if (!cur) { setNowArt(''); return; }
     const ep = a.episode;
     timer = setTimeout(() => {
       if (lastKey === key && ArchivePlayer.state.playing) announce(ep, cur);
@@ -262,8 +323,8 @@ function renderTracks(info) {
   const tl = tracklists.get(key);
   const note = $('tracksNote');
   const list = $('tracks');
-  if (!info.episode) { note.textContent = 'No tracklist for this broadcast.'; list.replaceChildren(); return; }
-  if (!tl) { note.textContent = 'Loading tracklist…'; list.replaceChildren(); loadTracklist(info); return; }
+  if (!info.episode) { note.textContent = 'No tracklist for this broadcast.'; list.replaceChildren(); list.dataset.key = ''; return; }
+  if (!tl) { note.textContent = 'Loading tracklist…'; list.replaceChildren(); list.dataset.key = ''; loadTracklist(info); return; }
   if (tl.source === 'live') note.textContent = '';
   else if (tl.source === 'previous' && tl.tracks.length) {
     note.replaceChildren(
@@ -273,18 +334,11 @@ function renderTracks(info) {
   } else if (tl.source === 'error') note.textContent = 'Could not load the tracklist.';
   else note.textContent = 'No tracklist published for this show yet.';
 
-  list.replaceChildren(...tl.tracks.map((t) => {
-    const li = document.createElement('li');
-    li.className = 'track';
-    li.title = 'Click to copy';
-    const time = document.createElement('span'); time.className = 'track__time';
-    time.textContent = fmtOffset(t.offset ?? t.offset_estimate);
-    const artist = document.createElement('span'); artist.className = 'track__artist'; artist.textContent = t.artist;
-    const title = document.createElement('span'); title.className = 'track__title'; title.textContent = t.title;
-    li.append(time, artist, title);
-    li.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
-    return li;
-  }));
+  const shownKey = `${key}:${tl.tracks.length}`;
+  if (list.dataset.key !== shownKey) {      // don't rebuild (and re-fetch art) every refresh
+    list.dataset.key = shownKey;
+    list.replaceChildren(...tl.tracks.map((t) => trackRow(t)));
+  }
 }
 
 // ---- NTS Supporter live tracklist (NTS's own page, in your NTS session) ----

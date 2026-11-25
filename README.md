@@ -24,6 +24,10 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
   and clicking a track jumps straight to it. Media keys skip between tracks. When the
   mix moves to a new track you get a Windows notification and the media overlay shows
   the track (switch it off with **Notify on track change** above the tracklist).
+- **Album artwork for tracks.** Tracklists show each track's album cover, and so do
+  the now-playing bar, the Windows media overlay and track-change notifications. Covers
+  come from Deezer (by the track's Deezer ID or ISRC from NTS, or a search) and iTunes
+  Search as a fallback. Only artist and title are sent; results are cached locally.
 - **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.
@@ -78,6 +82,7 @@ it. Click **More info**, then **Run anyway**.
 | Tracklists  | `https://www.nts.live/api/v2/shows/{show}/episodes/{episode}/tracklist` |
 | Archive     | `https://www.nts.live/api/v2/collections/recently-added`, `/api/v2/search`, `/api/v2/shows/...` |
 | Archive audio | NTS's SoundCloud uploads, played through SoundCloud's official embed player and its Widget API |
+| Album art   | `api.deezer.com` (track ID, ISRC, search), `itunes.apple.com/search` |
 | Live tracks | `https://www.nts.live/live-tracklist/{1,2}` (NTS Supporters, shown in an embedded view) |
 
 ```
@@ -87,6 +92,7 @@ src/index.html   Player UI
 src/renderer.js  Live playback, channel switching, now-playing bar, media keys
 src/archive.js   Archive: recently added, search, show and episode pages
 src/archive-player.js  Plays archive episodes via SoundCloud's embed player
+art.js           Album art lookup and cache (main process)
 src/style.css    Styling (design tokens at the top)
 src/fonts/       Roboto Condensed (SIL Open Font License)
 build/icon.png   App icon

@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session } = require('electron');
+const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage } = require('electron');
+const { getArt } = require('./art');
 const path = require('path');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
@@ -125,6 +126,33 @@ app.on('web-contents-created', (_e, contents) => {
     return { action: 'deny' };
   });
   contents.on('will-navigate', (event, url) => { if (!isNts(url)) event.preventDefault(); });
+});
+
+// Album art for a tracklist entry (see art.js)
+ipcMain.handle('art:lookup', (_e, track) => getArt(track && {
+  artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200),
+  isrc: track.isrc ? String(track.isrc).slice(0, 20) : null,
+  deezer: track.deezer ? String(track.deezer).slice(0, 20) : null
+}));
+
+// Track-change notifications, shown from here so they can carry the album art on Windows
+let lastNote = null;
+ipcMain.handle('notify', async (_e, { title, body, art } = {}) => {
+  if (!Notification.isSupported()) return;
+  let icon = path.join(__dirname, 'build', 'icon.png');
+  if (typeof art === 'string' && /^https:\/\//.test(art)) {
+    try {
+      const res = await net.fetch(art);
+      if (res.ok) {
+        const img = nativeImage.createFromBuffer(Buffer.from(await res.arrayBuffer()));
+        if (!img.isEmpty()) icon = img.resize({ width: 256, height: 256 });
+      }
+    } catch {}
+  }
+  lastNote?.close();
+  lastNote = new Notification({ title: String(title || '').slice(0, 200), body: String(body || '').slice(0, 300), icon, silent: true });
+  lastNote.on('click', () => { if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } });
+  lastNote.show();
 });
 
 ipcMain.handle('win:focus', () => {

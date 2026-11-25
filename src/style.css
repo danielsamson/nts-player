@@ -398,3 +398,29 @@ body.source-archive .nowbar { border-top-color: transparent; }
 .notify-toggle--on { color: var(--white); }
 .notify-toggle--on::before { background: var(--white); box-shadow: inset 0 0 0 2px var(--black); }
 .notify-toggle:hover { color: var(--white); }
+
+/* ---- Tracklist rows with album art ---- */
+.track, .archive-tracks .track {
+  display: grid; grid-template-columns: 40px 1fr 24px; gap: 0 10px; align-items: center;
+}
+.track__art {
+  width: 40px; height: 40px; background: var(--grey-4); overflow: hidden; position: relative;
+}
+.track__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* No art found: a quiet record-like placeholder */
+.track__art--none::after {
+  content: ""; position: absolute; inset: 11px; border-radius: 50%;
+  border: 1px solid var(--grey-3); box-shadow: inset 0 0 0 6px var(--grey-4), inset 0 0 0 7px var(--grey-3);
+}
+body.playing .track__art { background: var(--grey-1); }
+.track__text { display: flex; flex-direction: column; min-width: 0; }
+.track__top { display: flex; gap: 8px; min-width: 0; }
+.track__top .track__artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track__time { flex-shrink: 0; }
+.track__title { grid-column: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track__copy { grid-column: 3; grid-row: auto; }
+.track--now .track__art { outline: 1px solid var(--black); }
+
+/* Album art of the current archive track in the now-playing bar */
+.nowbar__art { width: var(--bar); flex-shrink: 0; border-right: var(--rule); background: var(--grey-4); }
+.nowbar__art img { width: 100%; height: 100%; object-fit: cover; display: block; }

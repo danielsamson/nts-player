@@ -237,20 +237,17 @@ const Archive = (() => {
 
       const list = el('ol', 'tracks archive-tracks');
       tracks.forEach((t, i) => {
-        const li = el('li', 'track');
         const offset = t.offset ?? t.offset_estimate;
-        li.dataset.index = i;
-        li.append(el('span', 'track__time', fmtOffset(offset)), el('span', 'track__artist', t.artist), el('span', 'track__title', t.title));
-        li.title = url && offset != null ? 'Play from here' : 'Click to copy';
-        li.addEventListener('click', () => {
-          if (!url || offset == null) { copyTrack(`${t.artist} - ${t.title}`); return; }
-          if (ArchivePlayer.isLoaded(show, episode)) { switchToArchive(); ArchivePlayer.seek(offset * 1000); }
-          else playArchive(info, offset * 1000);
+        const playable = url && offset != null;
+        const li = trackRow(t, {
+          title: playable ? 'Play from here' : 'Click to copy',
+          onClick: () => {
+            if (!playable) { copyTrack(`${t.artist} - ${t.title}`); return; }
+            if (ArchivePlayer.isLoaded(show, episode)) { switchToArchive(); ArchivePlayer.seek(offset * 1000); }
+            else playArchive(info, offset * 1000);
+          }
         });
-        const copy = el('button', 'track__copy', '⧉');
-        copy.title = 'Copy track';
-        copy.addEventListener('click', (e) => { e.stopPropagation(); copyTrack(`${t.artist} - ${t.title}`); });
-        li.append(copy);
+        li.dataset.index = i;
         list.append(li);
       });
 

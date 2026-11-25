@@ -15,7 +15,7 @@
   "build": {
     "appId": "local.ntsplayer",
     "productName": "NTS Player",
-    "files": ["main.js", "preload.js", "src/**/*", "build/icon.png"],
+    "files": ["main.js", "preload.js", "art.js", "src/**/*", "build/icon.png"],
     "win": { "target": ["portable", "nsis"], "icon": "build/icon.png" },
     "portable": { "artifactName": "NTS-Player-portable.exe" },
     "nsis": { "oneClick": true, "artifactName": "NTS-Player-Setup.exe" }

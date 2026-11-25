@@ -49,6 +49,7 @@ const Archive = (() => {
     else if (current.type === 'episode') renderEpisode(current.show, current.episode);
     else if (current.type === 'mynts') renderMyNts(current.kind);
     else if (current.type === 'schedule') renderSchedule(current.channel);
+    else if (current.type === 'history') renderHistory();
     else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
   }
 
@@ -60,7 +61,15 @@ const Archive = (() => {
     return bar;
   }
 
-  function sectionTitle(text) { return el('h2', 'archive__section', text); }
+  function sectionTitle(text, linkText, onLink) {
+    const h = el('h2', 'archive__section', text);
+    if (linkText) {
+      const a = el('button', 'archive__see', `${linkText} ›`);
+      a.addEventListener('click', onLink);
+      h.append(a);
+    }
+    return h;
+  }
 
   // A failed load: the message and a Try again button (offline-aware)
   function failed(message) {
@@ -113,35 +122,88 @@ const Archive = (() => {
   }
 
   // ---- History (newest first): progress for archive episodes, and shows heard live ----
-  function historySection() {
-    const items = History.all().slice(0, 8);
-    if (!items.length) return [];
-    const head = sectionTitle('History');
-    const clear = el('button', 'archive__clear', 'Clear');
-    clear.addEventListener('click', () => { History.clear(); render(); });
-    head.append(clear);
-    const list = el('div', 'items');
-    items.forEach((h) => {
-      let meta;
-      if (h.kind === 'archive' && h.duration) {
-        meta = h.finished ? 'Played' : `${fmtOffset(Math.floor(h.position / 1000))} of ${fmtOffset(Math.floor(h.duration / 1000))}`;
-        if (h.date) meta += ` · ${h.date}`;
-      } else {
-        meta = `Heard live${h.channel ? ' on ' + h.channel : ''}${h.date ? ' · ' + h.date : ''}`;
-      }
-      const r = row({
-        img: h.img, title: h.title, meta,
-        playing: ArchivePlayer.isLoaded(h.show, h.episode),
-        onClick: () => go({ type: 'episode', show: h.show, episode: h.episode })
-      });
-      if (h.kind === 'archive' && h.duration && !h.finished) {
-        const bar = el('span', 'item__progress');
-        bar.style.setProperty('--p', `${Math.min(100, (h.position / h.duration) * 100)}%`);
-        r.querySelector('.item__pic').append(bar);
-      }
-      list.append(r);
+  function historyRow(h) {
+    let meta;
+    if (h.kind === 'archive' && h.duration) {
+      meta = h.finished ? 'Played' : `${fmtOffset(Math.floor(h.position / 1000))} of ${fmtOffset(Math.floor(h.duration / 1000))}`;
+      if (h.date) meta += ` · ${h.date}`;
+    } else {
+      meta = `Heard live${h.channel ? ' on ' + h.channel : ''}${h.date ? ' · ' + h.date : ''}`;
+    }
+    const r = row({
+      img: h.img, title: h.title, meta,
+      playing: ArchivePlayer.isLoaded(h.show, h.episode),
+      onClick: () => go({ type: 'episode', show: h.show, episode: h.episode })
     });
-    return [head, list];
+    if (h.kind === 'archive' && h.duration && !h.finished) {
+      const bar = el('span', 'item__progress');
+      bar.style.setProperty('--p', `${Math.min(100, (h.position / h.duration) * 100)}%`);
+      r.querySelector('.item__pic').append(bar);
+    }
+    return r;
+  }
+
+  // Home: episodes you're part-way through
+  function continueSection() {
+    const all = History.all();
+    const items = all.filter((h) => h.kind === 'archive' && h.duration && !h.finished && h.position > 30000).slice(0, 3);
+    if (!items.length) return all.length ? [sectionTitle('History', 'See all', () => go({ type: 'history' }))] : [];
+    const list = el('div', 'items');
+    items.forEach((h) => list.append(historyRow(h)));
+    return [sectionTitle('Continue listening', 'History', () => go({ type: 'history' })), list];
+  }
+
+  // Full history page
+  function renderHistory() {
+    const items = History.all();
+    const head = backBar('History');
+    if (!items.length) { root.replaceChildren(head, el('p', 'archive__status', 'Nothing here yet.')); return; }
+    const clear = el('button', 'archive__more', 'Clear history');
+    clear.addEventListener('click', () => { History.clear(); render(); });
+    const list = el('div', 'items');
+    items.forEach((h) => list.append(historyRow(h)));
+    root.replaceChildren(head, list, clear);
+  }
+
+  // Home: what's on air now, NTS 1 and NTS 2
+  function onAirSection() {
+    const box = el('div', 'onair');
+    box.id = 'onAir';
+    fillOnAir(box);
+    return [sectionTitle('On air', 'Schedule', () => go({ type: 'schedule', channel: 1 })), box];
+  }
+  function fillOnAir(box) {
+    const results = typeof live !== 'undefined' ? live?.results : null;
+    if (!results) { box.replaceChildren(loader('Loading')); return; }
+    box.replaceChildren(...results.slice(0, 2).map((r, i) => {
+      const info = showInfo(r);
+      const hearing = playing && source === 'live' && channel === i;
+      const card = el('div', 'onair__card' + (hearing ? ' onair__card--playing' : ''));
+      const pic = el('button', 'onair__pic');
+      pic.title = `Open NTS ${i + 1}`;
+      if (info.img) { const im = el('img'); im.src = info.img; im.alt = ''; im.addEventListener('error', () => im.remove()); pic.append(im); }
+      pic.addEventListener('click', () => setChannel(i));
+      const playBtn = el('button', 'onair__play');
+      playBtn.setAttribute('aria-label', hearing ? `Stop NTS ${i + 1}` : `Play NTS ${i + 1}`);
+      playBtn.innerHTML = hearing
+        ? '<svg viewBox="0 0 24 24"><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
+      playBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (hearing) stop();
+        else { channel = i; localStorage.setItem('channel', i); play(); }
+        fillOnAir(box);
+      });
+      pic.append(playBtn);
+      const meta = el('div', 'onair__meta');
+      const badge = el('span', 'onair__badge');
+      badge.append(el('span', 'channel-icon', String(i + 1)), el('span', 'live-dot'));
+      const title = el('button', 'onair__title', info.title);
+      title.addEventListener('click', () => setChannel(i));
+      meta.append(badge, title, el('span', 'onair__where', [info.location, info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : ''].filter(Boolean).join(' · ')));
+      card.append(pic, meta);
+      return card;
+    }));
   }
 
   // ---- My NTS: your saved episodes, followed shows and saved tracks (from nts.live) ----
@@ -364,14 +426,14 @@ const Archive = (() => {
   async function comingUpSection() {
     if (!Following.any()) return [];
     const box = el('div', 'items');
-    const head = sectionTitle('Coming up from shows you follow');
+    const head = sectionTitle('Coming up from shows you follow', 'Schedule', () => go({ type: 'schedule', channel: 1 }));
     (async () => {
       const now = Date.now();
       const all = (await Promise.all([1, 2].map((ch) => getSchedule(ch).then((r) => broadcasts(r, ch)).catch(() => []))))
         .flat()
         .filter((x) => x.p?.show && Following.has(x.p.show) && x.end.getTime() > now && !x.repeat)
         .sort((a, b) => a.start - b.start)
-        .slice(0, 6);
+        .slice(0, 3);
       if (!all.length) { box.append(el('p', 'archive__status', 'None of your shows are on this week. Repeats aren’t listed.')); return; }
       all.forEach((x) => {
         const live = x.start.getTime() <= now;
@@ -387,16 +449,6 @@ const Archive = (() => {
   }
 
   // ---- Schedule: what's on, with reminders ----
-  function scheduleSection() {
-    const nav = el('div', 'mynts-nav');
-    [1, 2].forEach((ch) => {
-      const b = el('button', 'mynts-nav__item', `NTS ${ch} schedule`);
-      b.addEventListener('click', () => go({ type: 'schedule', channel: ch }));
-      nav.append(b);
-    });
-    return [sectionTitle('Schedule'), nav];
-  }
-
   async function renderSchedule(ch) {
     const bar = backBar(`Schedule · NTS ${ch}`);
     root.replaceChildren(bar, loader('Loading the schedule'));
@@ -501,7 +553,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...historySection(), ...(await comingUpSection()), ...scheduleSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...onAirSection(), ...continueSection(), ...(await comingUpSection()), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -813,6 +865,8 @@ const Archive = (() => {
 
   return {
     resumeLast,
+    home() { started = true; history.length = 0; current = { type: 'home' }; render(); },
+    refreshOnAir() { const box = document.getElementById('onAir'); if (box && current.type === 'home') fillOnAir(box); },
     playNext,
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
@@ -823,4 +877,7 @@ const Archive = (() => {
 })();
 
 // Pick up where you left off
-Archive.resumeLast().then(() => { if (typeof render === 'function') render(); });
+Archive.resumeLast().then(() => {
+  if (view !== 'archive') { view = 'archive'; Archive.open(); }   // start on Home
+  if (typeof render === 'function') render();
+});

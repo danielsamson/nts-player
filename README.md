@@ -9,9 +9,17 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 
 ## Features
 
+### Home
+
+The app opens on Home (or click the NTS logo): **On air** with NTS 1 and NTS 2 and a
+play button each, **Continue listening**, **Coming up from shows you follow**, **My NTS**
+and **Recently added**, with search at the top. "See all" links lead to the full
+schedule, history and lists.
+
 ### Live radio
 
-- **NTS 1 and NTS 2**, one click to switch. Show title, artwork, location, time slot,
+- **NTS 1 and NTS 2**, one click to switch. Clicking a channel while an archive episode
+  plays switches to live (the episode keeps its place). Show title, artwork, location, time slot,
   genres, description and what's on next.
 - **Always live.** Stopping drops the stream, so play picks up what's on air now.
   Reconnects by itself if the stream drops.

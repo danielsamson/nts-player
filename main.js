@@ -237,6 +237,10 @@ if (process.platform === 'win32') app.setAppUserModelId('local.ntsplayer');
 app.whenReady().then(() => {
   // Present as a regular Chrome browser to nts.live (drops the "Electron" token)
   const nts = session.fromPartition(NTS_PARTITION);
+  // NTS's own pages (live tracklist, My NTS) can send browser notifications, e.g. "new
+  // live track", whatever you're listening to. The app sends its own, so block theirs.
+  nts.setPermissionRequestHandler((_wc, permission, cb) => cb(permission !== 'notifications'));
+  nts.setPermissionCheckHandler((_wc, permission) => permission !== 'notifications');
   nts.setUserAgent(nts.getUserAgent().replace(/\s(Electron|nts-player)\/\S+/g, ''));
   createWindow();
   desktop.init(win, ipcMain);

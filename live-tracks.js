@@ -41,6 +41,7 @@ const READ = `(() => {
 
 // channel: 1 or 2. Returns { supporter, tracks } or { available: false }
 async function getLiveTracks(channel) {
+  touch();
   const w = ensureWindow();
   if (channelLoaded !== channel) {
     channelLoaded = channel;
@@ -52,6 +53,13 @@ async function getLiveTracks(channel) {
     await new Promise((res) => setTimeout(res, 300));
   }
   return { available: false };
+}
+
+// Close the page when it hasn't been asked for a while (live radio stopped)
+let idleTimer = null;
+function touch() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(reset, 90 * 1000);
 }
 
 function reset() {

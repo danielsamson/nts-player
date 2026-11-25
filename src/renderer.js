@@ -726,7 +726,7 @@ setInterval(() => {
 }, 5 * 60_000);
 
 async function refresh() {
-  try { live = await window.nts.getLive(); render(); Reminders.check(); }
+  try { live = await window.nts.getLive(); render(); Reminders.check(); if (typeof Archive !== 'undefined') Archive.refreshOnAir(); }
   catch (e) { if (!live) $('title').textContent = 'Could not reach NTS'; }
 }
 
@@ -764,13 +764,17 @@ function stop() {
 
 // Live tabs show that channel; if live radio is playing, it switches to it.
 // An archive episode keeps playing while you look at the live channels.
+// Live tabs: while something is playing, clicking a channel switches to it (an archive
+// episode pauses and keeps its place in History). When nothing plays, it just shows it,
+// and the play button then plays that channel.
 function setChannel(ch) {
   view = 'live';
-  if (ch !== channel) {
-    channel = ch;
-    localStorage.setItem('channel', ch);
-    if (playing) { play(); return; }
-  }
+  const changed = ch !== channel;
+  channel = ch;
+  localStorage.setItem('channel', ch);
+  const archivePlaying = source === 'archive' && (ArchivePlayer.state.playing || ArchivePlayer.state.loading);
+  if (archivePlaying || (playing && changed)) { play(); return; }
+  if (!playing) source = 'live';
   render();
 }
 
@@ -780,6 +784,8 @@ $('nextTrack').addEventListener('click', () => Archive.skipTrack(1));
 document.querySelectorAll('.tab[data-ch]').forEach((b) =>
   b.addEventListener('click', () => setChannel(Number(b.dataset.ch))));
 $('archiveTab').addEventListener('click', () => { view = 'archive'; Archive.open(); render(); });
+// The NTS logo goes Home
+$('homeBtn').addEventListener('click', () => { view = 'archive'; Archive.home(); render(); });
 // Mute toggles between silent and your last volume
 const VOL_ON = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z';
 const VOL_OFF = 'M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z';

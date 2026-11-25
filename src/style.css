@@ -913,3 +913,41 @@ body.offline .nowbar__next { color: var(--live); }
 .schedule__filter { margin: 10px 12px; }
 
 .item--nopic .item__pic { display: none; }
+
+/* ======================================================================
+   Home
+   ====================================================================== */
+.logo-button { display: block; flex-shrink: 0; border-right: var(--rule); }
+.logo-button .logo { border-right: 0; }
+.logo-button:hover { background: var(--grey-4); }
+
+.archive__see {
+  font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2);
+}
+.archive__see:hover { color: var(--white); }
+
+/* On air: two channel cards */
+.onair { display: grid; grid-template-columns: 1fr 1fr; border-bottom: var(--rule); }
+.onair .loader { grid-column: 1 / -1; }
+.onair__card { display: flex; flex-direction: column; min-width: 0; padding: 10px; }
+.onair__card + .onair__card { border-left: var(--rule); }
+.onair__card--playing { background: var(--white); color: var(--black); }
+.onair__pic { position: relative; aspect-ratio: 16 / 9; background: var(--grey-4); overflow: hidden; margin-bottom: 8px; }
+.onair__pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.onair__play {
+  position: absolute; left: 6px; bottom: 6px; width: 34px; height: 34px; display: grid; place-items: center;
+  background: var(--white); border: 1px solid var(--black);
+}
+.onair__play svg { width: 16px; height: 16px; fill: var(--black); }
+.onair__card--playing .onair__play { background: var(--black); border-color: var(--white); }
+.onair__card--playing .onair__play svg { fill: var(--white); }
+.onair__meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.onair__badge { display: flex; align-items: center; gap: 6px; }
+.onair__card--playing .channel-icon { background: var(--black); color: var(--white); }
+.onair__title {
+  text-align: left; font-size: 13px; line-height: 16px; font-weight: 700; text-transform: uppercase;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.onair__title:hover { text-decoration: underline; }
+.onair__where { font-size: 11px; line-height: 14px; color: var(--grey-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.onair__card--playing .onair__where { color: var(--grey-3); }

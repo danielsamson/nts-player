@@ -1,0 +1,23 @@
+{
+  "name": "nts-player",
+  "productName": "NTS Player",
+  "version": "1.0.0",
+  "description": "A tiny desktop player for NTS Radio's live channels",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "local.ntsplayer",
+    "productName": "NTS Player",
+    "files": ["main.js", "preload.js", "src/**/*"],
+    "win": { "target": ["portable", "nsis"] },
+    "portable": { "artifactName": "NTS-Player-portable.exe" },
+    "nsis": { "oneClick": true, "artifactName": "NTS-Player-Setup.exe" }
+  }
+}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self'; script-src 'self'">
+  <title>NTS Player</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo">NTS</div>
+    <nav>
+      <button class="ch active" data-ch="0">1</button>
+      <button class="ch" data-ch="1">2</button>
+    </nav>
+  </header>
+
+  <main>
+    <div class="art" id="art"><div class="live-badge" id="liveBadge">LIVE</div></div>
+    <div class="meta">
+      <div class="location" id="location">&nbsp;</div>
+      <h1 id="title">Loading…</h1>
+      <div class="time" id="time">&nbsp;</div>
+    </div>
+  </main>
+
+  <footer>
+    <button id="play" class="play" aria-label="Play">
+      <svg id="iconPlay" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
+      <svg id="iconPause" viewBox="0 0 24 24" hidden><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+    </button>
+    <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+    <div class="next" id="next">&nbsp;</div>
+  </footer>
+
+  <audio id="audio" preload="none"></audio>
+  <script src="renderer.js"></script>
+</body>
+</html>

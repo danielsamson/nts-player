@@ -96,11 +96,16 @@ function render() {
 const Art = (() => {
   const memo = new Map();
   const key = (t) => `${t.artist}|${t.title}`;
-  function get(t) {
+  // priority 'high' for the track you're listening to; tracklist rows use 'low'
+  function get(t, priority = 'low') {
     if (!t?.artist || !t?.title) return Promise.resolve(null);
     const k = key(t);
-    if (!memo.has(k)) {
-      memo.set(k, window.nts.art({ artist: t.artist, title: t.title, isrc: t.isrc_id, deezer: t.deezer_track_id }).catch(() => null));
+    if (!memo.has(k) || (priority === 'high' && memo.get(k).low)) {
+      const p = window.nts.art({ artist: t.artist, title: t.title, isrc: t.isrc_id, deezer: t.deezer_track_id }, priority)
+        .catch(() => null)
+        .then((art) => { if (!art) memo.delete(k); return art; });   // misses can be retried later
+      p.low = priority !== 'high';
+      memo.set(k, p);
     }
     return memo.get(k);
   }
@@ -309,7 +314,7 @@ const TrackNotify = (() => {
   async function announce(ep, { idx, track }) {
     const total = ep.tracks.length;
     // Album art if we can find it quickly; otherwise the episode artwork
-    const art = await Promise.race([Art.get(track), new Promise((r) => setTimeout(() => r(null), 2500))]);
+    const art = await Promise.race([Art.get(track, 'high'), new Promise((r) => setTimeout(() => r(null), 2500))]);
     if (lastKey !== `${ep.show}/${ep.episode}#${idx}`) return;   // moved on meanwhile
     setNowArt(art?.small || '');
     const cover = art?.large || ep.img;
@@ -707,7 +712,7 @@ const Stage = (() => {
       paint({ ...base, img: '', linkItems: links(t, null) });
       // Art (and the Deezer link) first; the exact Apple Music link follows when found
       const appleP = window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null);
-      const art = await Art.get(t);
+      const art = await Art.get(t, 'high');
       if (my !== token) return;
       const full = { ...base, img: art?.large || ep.img, square: !!art,
         album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '' };

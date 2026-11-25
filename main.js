@@ -129,11 +129,11 @@ app.on('web-contents-created', (_e, contents) => {
 });
 
 // Album art for a tracklist entry (see art.js)
-ipcMain.handle('art:lookup', (_e, track) => getArt(track && {
+ipcMain.handle('art:lookup', (_e, track, priority) => getArt(track && {
   artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200),
   isrc: track.isrc ? String(track.isrc).slice(0, 20) : null,
   deezer: track.deezer ? String(track.deezer).slice(0, 20) : null
-}));
+}, priority === 'high' ? 'high' : 'low'));
 
 // Open a link in the music app if it's installed (Spotify, Deezer, Apple Music),
 // otherwise on the web. Windows/macOS tell us whether something handles the scheme.

@@ -107,8 +107,8 @@ it. Click **More info**, then **Run anyway**.
 | Now playing, archive, tracklists | The NTS API at `www.nts.live/api/v2/` |
 | Archive audio | NTS's SoundCloud uploads, played through SoundCloud's official embed player |
 | Live tracklists | `www.nts.live/live-tracklist/{1,2}`, shown in an embedded view (NTS Supporters) |
-| Album covers | Deezer, by the track's Deezer ID or ISRC from NTS, or a search |
-| Apple Music links | iTunes Search, for the track shown in the wide view |
+| Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
+| Apple Music links | iTunes Search, for the track you're listening to |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist

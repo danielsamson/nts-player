@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('nts', {
   copy: (text) => ipcRenderer.invoke('clipboard:write', text),
   focus: () => ipcRenderer.invoke('win:focus'),
   setWide: (wide) => ipcRenderer.invoke('win:set-wide', wide),
-  art: (track) => ipcRenderer.invoke('art:lookup', track),
+  art: (track, priority) => ipcRenderer.invoke('art:lookup', track, priority),
   appleLink: (track) => ipcRenderer.invoke('links:apple', track),
   openLink: (link) => ipcRenderer.invoke('open:link', link),
   notify: (n) => ipcRenderer.invoke('notify', n),

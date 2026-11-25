@@ -865,6 +865,30 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
   let key = '';
   let list = [];
   let listKey = '';
+
+  // NTS's page only shows the latest few tracks, so keep our own log per broadcast:
+  // every track we see is added, newest first. Kept on this computer (last 6 broadcasts).
+  const LOG = 'liveTrackLog';
+  const readLog = () => { try { return JSON.parse(localStorage.getItem(LOG)) || {}; } catch { return {}; } };
+  const broadcastKey = (ch) => {
+    const r = live?.results?.[ch];
+    const info = r ? showInfo(r) : null;
+    return `${ch + 1}|${info?.episode || info?.start || 'unknown'}`;
+  };
+  function remember(ch, tracks) {
+    const log = readLog();
+    const k = broadcastKey(ch);
+    const entry = log[k] || { at: Date.now(), tracks: [] };
+    const id = (t) => `${t.time}|${t.artist}|${t.title}`.toLowerCase();
+    const seen = new Set(entry.tracks.map(id));
+    const fresh = tracks.filter((t) => !seen.has(id(t)));
+    entry.tracks = [...fresh, ...entry.tracks].slice(0, 300);
+    entry.at = Date.now();
+    log[k] = entry;
+    const keep = Object.entries(log).sort((a, b) => b[1].at - a[1].at).slice(0, 6);
+    try { localStorage.setItem(LOG, JSON.stringify(Object.fromEntries(keep))); } catch {}
+    return entry.tracks;
+  }
   let listChannel = null;
   let listState = 'loading';
   const listOpen = () => supporter && view === 'live' && pane === 'tracks';
@@ -882,7 +906,7 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     }
     listChannel = ch;
     listState = r?.available ? 'ok' : 'error';
-    list = r?.available ? r.tracks : list;
+    list = r?.available ? remember(ch, r.tracks) : (readLog()[broadcastKey(ch)]?.tracks || list);
     paintList();
     set(hearing && r?.available ? r.tracks[0] || null : null);
   }
@@ -892,9 +916,14 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     if (!listOpen()) return;
     const ol = $('liveTracksList');
     const note = $('liveNote');
-    if (listChannel !== channel) { note.replaceChildren(loader('Loading live tracks')); ol.replaceChildren(); listKey = ''; return; }
+    if (listChannel !== channel) {
+      const saved = readLog()[broadcastKey(channel)]?.tracks;
+      if (saved?.length) { list = saved; listChannel = channel; listState = 'ok'; }
+      else { note.replaceChildren(loader('Loading live tracks')); ol.replaceChildren(); listKey = ''; return; }
+    }
     note.textContent = listState === 'error' ? 'Couldn’t reach the live tracklist. Trying again…'
-      : !list.length ? 'No tracks identified yet for this show.' : '';
+      : !list.length ? 'No tracks identified yet for this show.'
+      : list.length > 3 ? `${list.length} tracks this show (since the app has been open)` : '';
     const k = `${listChannel}|` + list.map((t) => t.time + t.title).join('|');
     if (k === listKey) return;
     listKey = k;

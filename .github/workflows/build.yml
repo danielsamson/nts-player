@@ -60,7 +60,11 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build
-        run: npx electron-builder --publish ${{ needs.prepare.outputs.release == 'true' && 'always' || 'never' }}
+        shell: bash
+        # macOS runners sometimes fail to unmount the disk image ("hdiutil detach"); retry once
+        run: |
+          MODE=${{ needs.prepare.outputs.release == 'true' && 'always' || 'never' }}
+          npx electron-builder --publish $MODE || { echo "Build failed, retrying once"; sleep 20; npx electron-builder --publish $MODE; }
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false   # unsigned builds
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, net, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard } = require('electron');
 const path = require('path');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
@@ -15,7 +15,7 @@ if (!app.requestSingleInstanceLock()) {
 function createWindow() {
   win = new BrowserWindow({
     width: 380,
-    height: 620,
+    height: 660,
     minWidth: 320,
     minHeight: 560,
     backgroundColor: '#000000',
@@ -44,6 +44,21 @@ ipcMain.handle('nts:live', async () => {
   const res = await net.fetch(LIVE_API, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`NTS API ${res.status}`);
   return res.json();
+});
+
+// Read-only access to other NTS API paths (tracklists, episodes). Only
+// /api/v2/... paths on nts.live are allowed.
+ipcMain.handle('nts:api', async (_e, apiPath) => {
+  if (typeof apiPath !== 'string' || !/^\/api\/v2\/[A-Za-z0-9\-_/]+(\?[A-Za-z0-9=&_-]*)?$/.test(apiPath) || apiPath.includes('..')) {
+    throw new Error('Invalid NTS API path');
+  }
+  const res = await net.fetch(`https://www.nts.live${apiPath}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`NTS API ${res.status}`);
+  return res.json();
+});
+
+ipcMain.handle('clipboard:write', (_e, text) => {
+  if (typeof text === 'string' && text.length < 1000) clipboard.writeText(text);
 });
 
 app.whenReady().then(createWindow);

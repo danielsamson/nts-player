@@ -108,11 +108,13 @@ body.playing .channel .channel-icon { background: var(--black); color: var(--whi
 }
 .picture img:not([src]), .picture img[src=""] { visibility: hidden; }
 
-.channel__details { padding: 12px 8px 16px; min-height: 0; overflow: hidden; }
+.channel__details {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 8px 0;
+}
 .broadcast-heading {
   font-size: 24px; line-height: 28px; font-weight: 700; text-transform: uppercase;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 8px; flex-shrink: 0;
 }
 .broadcast-description {
   font-size: 13px; line-height: 18px; color: var(--grey-2);
@@ -155,3 +157,58 @@ input[type=range]::-webkit-slider-thumb {
 }
 input[type=range]:focus-visible { outline: none; }
 input[type=range]:focus-visible::-webkit-slider-thumb { background: var(--live); }
+
+/* ---- Genre tags (nts-tag) ---- */
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; flex-shrink: 0; }
+.tags:empty { display: none; }
+.tag {
+  font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase;
+  padding: 3px 6px; border: 1px solid var(--fg); white-space: nowrap;
+}
+
+/* ---- About / Tracklist switch (nts-toggle) ---- */
+.switch { display: flex; border: 1px solid var(--fg); flex-shrink: 0; margin-bottom: 12px; }
+.switch__item {
+  flex: 1; height: 28px; font-size: 12px; line-height: 14px; font-weight: 700;
+  text-transform: uppercase; color: var(--fg);
+}
+.switch__item + .switch__item { border-left: 1px solid var(--fg); }
+.switch__item.active { background: var(--fg); color: var(--bg); }
+.switch__item:not(.active):hover { background: var(--grey-4); color: var(--white); }
+
+.pane { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 12px; }
+.pane::-webkit-scrollbar { width: 4px; }
+.pane::-webkit-scrollbar-thumb { background: var(--grey-3); }
+#pane-about .broadcast-description { -webkit-line-clamp: unset; display: block; margin-bottom: 12px; }
+
+.text-link {
+  color: inherit; text-decoration: none; border-bottom: 1px solid var(--grey-2);
+  font-size: 13px; line-height: 18px; font-weight: 700; text-transform: uppercase;
+}
+.text-link:hover { border-color: var(--fg); }
+
+/* ---- Tracklist ---- */
+.tracks__note { font-size: 13px; line-height: 18px; color: var(--grey-2); margin-bottom: 8px; }
+.tracks__note:empty { display: none; }
+.tracks__note a { color: inherit; }
+body.playing .tracks__note { color: var(--grey-3); }
+.tracks { list-style: none; }
+.track {
+  display: grid; grid-template-columns: 44px 1fr; gap: 0 8px; padding: 8px 0;
+  border-top: 1px solid var(--grey-4); cursor: pointer; font-size: 13px; line-height: 18px;
+}
+body.playing .track { border-top-color: var(--grey-1); }
+.track:hover .track__title { text-decoration: underline; }
+.track__time { color: var(--grey-2); font-weight: 700; font-variant-numeric: tabular-nums; }
+.track__artist { font-weight: 700; text-transform: uppercase; }
+.track__title { grid-column: 2; }
+
+/* ---- Snackbar ---- */
+.snackbar {
+  position: fixed; left: 8px; right: 8px; bottom: 64px; z-index: 10;
+  background: var(--white); color: var(--black); border: 1px solid var(--black);
+  padding: 10px 12px; font-size: 13px; line-height: 18px; font-weight: 700; text-transform: uppercase;
+}
+
+/* Give the tracklist the room: hide the artwork while it's open */
+body.pane-tracks .picture { display: none; }

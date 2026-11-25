@@ -10,6 +10,11 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 - **Both live channels.** Switch between NTS 1 and NTS 2 with one click.
 - **Now playing.** Show title, artwork, location and time slot, plus what's on next.
   Refreshes every minute.
+- **Tracklists.** The Tracklist tab lists each track with its timestamp. Click a
+  track to copy "Artist - Title". Live track IDs are an
+  [NTS Supporter](https://www.nts.live/supporters) feature, so while a show is on air
+  the app shows the tracklist from that show's previous episode, labelled with its date.
+- **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.
 - **Reconnects** by itself if the stream drops.
@@ -60,6 +65,7 @@ it. Click **More info**, then **Run anyway**.
 | NTS 1 audio | `https://stream-relay-geo.ntslive.net/stream`          |
 | NTS 2 audio | `https://stream-relay-geo.ntslive.net/stream2`         |
 | Now playing | `https://www.nts.live/api/v2/live`                     |
+| Tracklists  | `https://www.nts.live/api/v2/shows/{show}/episodes/{episode}/tracklist` |
 
 ```
 main.js          Electron window, and fetches "now playing" from the NTS API

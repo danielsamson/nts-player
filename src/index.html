@@ -35,8 +35,21 @@
     <div class="picture"><img id="art" alt=""></div>
     <div class="channel__details">
       <h1 class="broadcast-heading" id="title">Loading…</h1>
-      <p class="broadcast-description" id="description"></p>
+      <div class="tags" id="tags"></div>
+      <div class="switch" role="tablist">
+        <button class="switch__item active" data-pane="about" role="tab">About</button>
+        <button class="switch__item" data-pane="tracks" role="tab">Tracklist</button>
+      </div>
+      <div class="pane" id="pane-about">
+        <p class="broadcast-description" id="description"></p>
+        <a class="text-link" id="episodeLink" target="_blank" hidden>View on nts.live</a>
+      </div>
+      <div class="pane" id="pane-tracks" hidden>
+        <p class="tracks__note" id="tracksNote"></p>
+        <ol class="tracks" id="tracks"></ol>
+      </div>
     </div>
+    <div class="snackbar" id="snackbar" hidden>Track info copied</div>
   </main>
 
   <div class="next">

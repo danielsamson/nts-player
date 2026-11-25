@@ -43,8 +43,8 @@ schedule, history and lists.
 - **Play episodes** in the app with a seek bar, and previous / next track buttons.
 - **Keep listening.** When an episode ends, the show's previous episode starts (then the
   newest in the archive). Switch it off with **Autoplay next episode** on any episode page.
-- **Tracklists that follow the mix.** The track playing is highlighted; click any track
-  to jump to it. Media keys skip between tracks.
+- **Tracklists that follow the mix.** The track playing is highlighted; click a track for
+  its details, or its ▶ to jump to it. Media keys skip between tracks.
 - **Track-change notifications** with the album cover (switch off with
   **Notify on track change** above the tracklist).
 

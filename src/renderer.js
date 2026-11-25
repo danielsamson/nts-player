@@ -45,6 +45,9 @@ function showInfo(r) {
 function render() {
   document.querySelectorAll('.tab[data-ch]').forEach((b) =>
     b.classList.toggle('active', view === 'live' && Number(b.dataset.ch) === channel));
+  // The channel you're hearing is highlighted on every page (Home, archive, ...)
+  document.querySelectorAll('.tab[data-ch]').forEach((b) =>
+    b.classList.toggle('tab--hearing', playing && source === 'live' && Number(b.dataset.ch) === channel));
   $('archiveTab').classList.toggle('active', view === 'archive');
   document.body.classList.toggle('view-archive', view === 'archive');
   $('channel').hidden = view !== 'live';
@@ -134,7 +137,7 @@ const Art = (() => {
 })();
 
 // One tracklist row: album art, time, artist, title, copy button
-function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
+function trackRow(t, { onClick, title, saveButtons, deferArt, onPlay, liveSave } = {}) {
   const li = document.createElement('li');
   li.className = 'track';
   li.title = title || 'Click to copy';
@@ -152,6 +155,14 @@ function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
   copy.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/></svg>';
   copy.addEventListener('click', (e) => { e.stopPropagation(); copyTrack(`${t.artist} - ${t.title}`); });
   const actions = document.createElement('span'); actions.className = 'track__actions';
+  if (onPlay) {
+    const pl = document.createElement('button');
+    pl.className = 'track__play'; pl.title = `Play from ${time.textContent}`;
+    pl.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
+    pl.addEventListener('click', (e) => { e.stopPropagation(); onPlay(); });
+    actions.append(pl);
+  }
+  if (liveSave) actions.append(liveSaveButton(t));
   if (saveButtons) {
     const save = document.createElement('button');
     save.className = 'track__save'; save.hidden = true; save.title = 'Save track to My NTS';
@@ -163,6 +174,40 @@ function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
   li.append(art, text, actions);
   li.addEventListener('click', onClick || (() => copyTrack(`${t.artist} - ${t.title}`)));
   return li;
+}
+
+// Bookmark for a live tracklist row: saves through an episode that has the track
+function isKnownSaved(t) {
+  if (MyNTS.originOf(t)) return true;
+  try {
+    const n = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return (JSON.parse(localStorage.getItem('mynts:tracks'))?.tracks || []).some((x) => n(x.title) === n(t.title));
+  } catch { return false; }
+}
+function liveSaveButton(t) {
+  const b = document.createElement('button');
+  b.className = 'track__save';
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
+  const paint = () => {
+    const saved = isKnownSaved(t);
+    b.classList.toggle('track__save--on', saved);
+    b.title = saved ? 'Saved to My NTS: click to remove' : 'Save track to My NTS';
+  };
+  paint();
+  b.hidden = !supporter;
+  b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    b.classList.add('is-busy');
+    const want = !isKnownSaved(t);
+    const o = MyNTS.originOf(t);
+    const ep = !want && o?.show ? o : await liveSaveTarget(t);
+    if (!ep) { b.classList.remove('is-busy'); showSnack('NTS hasn’t logged this track yet, so it can’t be saved'); return; }
+    await MyNTS.toggleTrack(ep.show, ep.episode, t, want, { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: ep.offset });
+    b.classList.remove('is-busy');
+    paint();
+    NowSave.update(true);
+  });
+  return b;
 }
 
 // ---- Now-playing bar: live radio or an archive episode ----
@@ -319,6 +364,15 @@ const MyNTS = (() => {
       localStorage.setItem(ORIGINS, JSON.stringify(m));
     } catch {}
   }
+  function forgetSaved(track) {
+    try {
+      const m = JSON.parse(localStorage.getItem(ORIGINS) || '{}');
+      delete m[norm(track.title)];
+      localStorage.setItem(ORIGINS, JSON.stringify(m));
+      const c = JSON.parse(localStorage.getItem('mynts:tracks') || 'null');
+      if (c?.tracks) { c.tracks = c.tracks.filter((x) => norm(x.title) !== norm(track.title)); localStorage.setItem('mynts:tracks', JSON.stringify(c)); }
+    } catch {}
+  }
   function originOf(track) {
     try { return JSON.parse(localStorage.getItem(ORIGINS) || '{}')[norm(track.title)] || null; } catch { return null; }
   }
@@ -329,6 +383,7 @@ const MyNTS = (() => {
     if (res && !res.error) {
       setState(show, episode, res);
       if (want && origin) rememberOrigin(track, origin);
+      if (!want) forgetSaved(track);
       showSnack(want ? 'Track saved to My NTS' : 'Track removed');
     } else showSnack('Couldn’t update My NTS. Try again on nts.live');
     return res;
@@ -934,7 +989,7 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     listKey = k;
     ol.replaceChildren(...list.map((t, i) => {
       const li = trackRow({ artist: t.artist, title: t.title, time: t.time }, {
-        title: 'Track details',
+        title: 'Track details', liveSave: true,
         onClick: () => { Archive.showTrack(t.artist, t.title, { fromLive: true }); render(); }
       });
       if (i === 0) li.classList.add('track--now');

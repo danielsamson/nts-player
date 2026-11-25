@@ -354,7 +354,7 @@ const Archive = (() => {
     linksNav.append(linksLabel, linksList);
     body.append(title, artist, album, from, linksNav, actions);
     wrap.append(picWrap, body);
-    root.replaceChildren(backBar(current.returnLive ? 'Track' : 'Saved track'), wrap);
+    root.replaceChildren(backBar(current.type === 'track' && !current.returnLive && !current.origin ? 'Saved track' : 'Track'), wrap);
 
     Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
     from.append(loader('Finding where it was played'));
@@ -362,7 +362,7 @@ const Archive = (() => {
     // Episodes it was played on (NTS track search) and the one you saved it from
     const info = await TrackInfo.find(t);
     if (current.type !== 'track' || current.title !== t.title) return;
-    const remembered = MyNTS.originOf(t);
+    const remembered = current.origin || MyNTS.originOf(t);
     const o = remembered?.show ? remembered : info.match;
     from.replaceChildren();
     if (o?.show && o?.episode && o.offset != null) {
@@ -416,7 +416,7 @@ const Archive = (() => {
     }
 
     // Cover and album: with the exact IDs from the tracklist when we have them
-    const exact = { artist: t.artist, title: t.title, isrc_id: info.match?.isrc_id, deezer_track_id: info.match?.deezer_track_id };
+    const exact = { artist: t.artist, title: t.title, isrc_id: current.origin?.isrc_id || info.match?.isrc_id, deezer_track_id: current.origin?.deezer_track_id || info.match?.deezer_track_id };
     const [art, apple] = await Promise.all([
       Art.get(exact, 'high'),
       window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null)
@@ -751,12 +751,13 @@ const Archive = (() => {
         const playable = url && offset != null;
         const li = trackRow(t, {
           saveButtons,
-          title: playable ? 'Play from here' : 'Click to copy',
-          onClick: () => {
-            if (!playable) { copyTrack(`${t.artist} - ${t.title}`); return; }
+          title: 'Track details',
+          onClick: () => go({ type: 'track', artist: t.artist, title: t.title,
+            origin: { show, episode, title: info.title, date: info.date, offset, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id } }),
+          onPlay: playable ? () => {
             if (ArchivePlayer.isLoaded(show, episode)) { switchToArchive(); ArchivePlayer.seek(offset * 1000); }
             else playArchive(info, offset * 1000);
-          }
+          } : null
         });
         li.dataset.index = i;
         list.append(li);

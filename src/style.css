@@ -76,11 +76,13 @@ button:focus-visible { outline: 2px solid var(--live); outline-offset: -2px; }
 .eq i:nth-child(3) { animation-delay: -.7s; animation-duration: 1.1s; }
 @keyframes eq { 0%, 100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
 @media (prefers-reduced-motion: reduce) { .eq i { animation: none; transform: scaleY(.7); } }
-body.playing .tab[data-ch].active .live-dot { display: none; }
-body.playing .tab[data-ch].active .eq { display: inline-flex; }
-body.playing .tab:not(.active) { color: var(--grey-2); }
-body.playing .tab:not(.active) .channel-icon { background: var(--grey-2); }
-body.playing .tab:not(.active):hover { color: var(--white); }
+body.playing .tab.tab--hearing .live-dot { display: none; }
+body.playing .tab.tab--hearing .eq { display: inline-flex; }
+.tab.tab--hearing { background: var(--white); color: var(--black); }
+.tab.tab--hearing .channel-icon { background: var(--black); color: var(--white); }
+body.playing .tab[data-ch]:not(.active):not(.tab--hearing) { color: var(--grey-2); }
+body.playing .tab[data-ch]:not(.active):not(.tab--hearing) .channel-icon { background: var(--grey-2); }
+body.playing .tab[data-ch]:not(.active):not(.tab--hearing):hover { color: var(--white); }
 
 /* ---- Channel panel ---- */
 .channel {
@@ -1029,3 +1031,10 @@ body.mini .volume { padding: 0; }
 .track--now .track__save, .track--now .track__copy { color: var(--black); }
 body.playing .live-list .track--now .track__save, body.playing .live-list .track--now .track__copy { color: var(--white); }
 body:not(.mini) .mini-exit { display: none; }
+
+/* Track row: play-from and save */
+.track__play { width: var(--btn-s); height: var(--btn-s); display: grid; place-items: center; color: var(--grey-3); }
+.track__play svg { width: 14px; height: 14px; fill: currentColor; }
+.track__play:hover { color: var(--white); }
+.track--now .track__play { color: var(--black); }
+.track__save.is-busy { opacity: .4; pointer-events: none; }

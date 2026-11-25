@@ -144,7 +144,7 @@ body.playing .broadcast-description { color: var(--grey-4); }
 body:not(.pane-tracks) .channel { overflow-y: auto; }
 
 /* Tracklist: artwork hidden, title on one line, the list gets the space */
-body.pane-tracks .picture { display: none; }
+body.pane-tracks .picture-wrap { display: none; }
 body.pane-tracks .broadcast-heading { -webkit-line-clamp: 1; font-size: 20px; line-height: 24px; }
 body.pane-tracks .channel__details { flex: 1; min-height: 0; }
 body.pane-tracks #pane-tracks { flex: 1; min-height: 0; overflow-y: auto; }
@@ -217,3 +217,40 @@ input[type=range]:focus-visible::-webkit-slider-thumb { background: var(--live);
   background: var(--white); color: var(--black); border: 1px solid var(--black);
   padding: 10px 12px; font-size: 13px; line-height: 18px; font-weight: 700; text-transform: uppercase;
 }
+
+/* ---- NTS structure: 1px rules that box and divide everything ----
+   Inside the channel the rules follow the panel colour, so they turn black
+   when the panel inverts to white while playing. */
+.channel { --rule-c: 1px solid var(--fg); }
+
+/* Artwork inset like NTS's live channel block, with a rule underneath */
+.picture-wrap { padding: 8px; border-bottom: var(--rule-c); flex-shrink: 0; }
+.picture { box-shadow: 0 1px 20px 0 rgba(0, 0, 0, .05); }
+
+/* Title block, then a full-width ruled toggle bar */
+.channel__details { padding: 12px 0 0; }
+.broadcast-heading, .tags { margin-left: 12px; margin-right: 12px; }
+.switch {
+  border-left: 0; border-right: 0; border-top: var(--rule-c); border-bottom: var(--rule-c);
+}
+.switch::after { left: 0; right: 0; }
+.switch__item { height: 36px; }
+.pane { padding: 12px 12px 16px; }
+#pane-tracks.live { padding: 12px 12px 0; }
+
+/* Tracklist rows ruled like NTS lists */
+.track { border-top: 1px solid var(--grey-4); }
+body.playing .track { border-top-color: var(--grey-1); }
+.supporter { padding-bottom: 12px; margin: 0 -12px 0; padding-left: 12px; padding-right: 12px; border-bottom: var(--rule-c); margin-bottom: 12px; }
+
+/* Now-playing bar: segments divided by vertical rules, square bordered buttons */
+.play { border-right: var(--rule); }
+.nowbar__text { border-right: var(--rule); }
+.volume { padding: 0 12px 0 0; gap: 10px; }
+.volume__button { width: var(--bar); height: 100%; border-right: var(--rule); }
+.volume__button:hover { background: var(--grey-4); }
+.volume__button:hover svg { opacity: 1; }
+
+/* Live tracklist runs edge to edge under the switch */
+#pane-tracks.live { padding: 0; }
+#pane-tracks.live .supporter { margin: 0; }

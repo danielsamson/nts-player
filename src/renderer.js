@@ -168,7 +168,8 @@ function renderSupporter() {
   $('episodeTracks').hidden = supporter;
   $('signIn').hidden = supporter;
   $('signOut').hidden = !supporter;
-  $('supporterLabel').textContent = supporter ? `Live on ${channel + 1}` : 'NTS Supporter?';
+  $('supporterLabel').textContent = supporter ? 'Live tracklist' : 'NTS Supporter?';
+  themeWebview();
   if (showLive && webviewChannel !== channel) {
     webviewChannel = channel;
     webview.src = `https://www.nts.live/live-tracklist/${channel + 1}`;
@@ -194,6 +195,30 @@ function checkForPromo() {
   };
   probe();
 }
+// Fit NTS's page into ours: our tabs already pick the channel, so hide its
+// heading and channel picker, drop its padding, and invert it to match the
+// white panel while playing.
+const WEBVIEW_CSS = `
+  .page-live-tracks__header { display: none !important; }
+  .page-live-tracks__live-tracks { padding: 4px 0 16px !important; max-width: none !important; }
+  .page-live-tracks__body { padding: 0 12px !important; }
+  .page-live-tracks__notification { margin-left: 12px !important; margin-right: 12px !important; }
+  html, body { background: #000 !important; }
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: #666; }`;
+let cssKey = null, invertKey = null, webviewReady = false, theming = false;
+async function themeWebview() {
+  if (!webviewReady || theming) return;
+  theming = true;
+  try {
+    if (!cssKey) cssKey = await webview.insertCSS(WEBVIEW_CSS);
+    if (playing && !invertKey) invertKey = await webview.insertCSS('html { filter: invert(1) !important; }');
+    if (!playing && invertKey) { await webview.removeInsertedCSS(invertKey); invertKey = null; }
+  } catch {}
+  theming = false;
+  if (!!invertKey !== playing && webviewReady) themeWebview();
+}
+webview.addEventListener('dom-ready', () => { webviewReady = true; cssKey = null; invertKey = null; themeWebview(); });
+webview.addEventListener('did-start-navigation', (e) => { if (e.isMainFrame && !e.isInPlace) webviewReady = false; });
 webview.addEventListener('dom-ready', checkForPromo);
 webview.addEventListener('did-navigate-in-page', checkForPromo);
 

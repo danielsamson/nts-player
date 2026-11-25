@@ -81,6 +81,7 @@ function render() {
   nextText = info.next?.broadcast_title
     ? `Next ${fmtTime(info.next.start_timestamp)} · ${info.next.broadcast_title}` : '';
   renderNowbar();
+  recordLive();
   if (typeof Stage !== 'undefined') Stage.render();
 
   if (source === 'live' && 'mediaSession' in navigator) {
@@ -210,6 +211,78 @@ function togglePlayback() {
 }
 
 ArchivePlayer.onChange(renderNowbar);
+
+// ---- Listening history ----
+// Archive episodes with how far you got, and live shows you heard, newest first.
+// Stored on this computer only.
+const History = (() => {
+  const KEY = 'history';
+  const MAX = 50;
+  let items;
+  try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch { items = []; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items.slice(0, MAX))); } catch {} };
+  const id = (show, episode) => `${show}/${episode}`;
+  const get = (show, episode) => items.find((i) => i.id === id(show, episode));
+
+  function upsert(show, episode, patch) {
+    if (!show || !episode) return null;
+    let it = get(show, episode);
+    if (it) items = items.filter((i) => i !== it);
+    else it = { id: id(show, episode), show, episode };
+    Object.assign(it, patch, { at: Date.now() });
+    items.unshift(it);
+    save();
+    return it;
+  }
+
+  // Where to resume an episode: only if you're past the start and not at the very end
+  function resumeAt(show, episode) {
+    const it = get(show, episode);
+    if (!it?.position || !it?.duration) return 0;
+    return it.position > 30_000 && it.position < it.duration - 60_000 ? it.position : 0;
+  }
+
+  return {
+    all: () => items,
+    get, upsert, resumeAt,
+    clear() { items = []; save(); }
+  };
+})();
+
+// Remember what you were listening to, for resuming next time
+const Session = {
+  save(s) { try { localStorage.setItem('lastSession', JSON.stringify(s)); } catch {} },
+  load() { try { return JSON.parse(localStorage.getItem('lastSession')); } catch { return null; } }
+};
+
+// Record archive progress every few seconds while playing, and on pause
+(() => {
+  let lastSave = 0;
+  const record = (a) => {
+    const ep = a.episode;
+    if (!ep || !a.duration) return;
+    History.upsert(ep.show, ep.episode, {
+      kind: 'archive', title: ep.title, img: ep.img, date: ep.date, location: ep.location,
+      position: Math.round(a.position), duration: Math.round(a.duration),
+      finished: a.position >= a.duration - 1000
+    });
+    Session.save({ source: 'archive', show: ep.show, episode: ep.episode });
+  };
+  let wasPlaying = false;
+  ArchivePlayer.onChange((a) => {
+    if (a.playing && Date.now() - lastSave > 5000) { lastSave = Date.now(); record(a); }
+    if (wasPlaying && !a.playing) record(a);
+    wasPlaying = a.playing;
+  });
+  window.addEventListener('beforeunload', () => { if (ArchivePlayer.state.playing) record(ArchivePlayer.state); });
+})();
+
+// Show an archive episode in the now-playing bar, paused at a position (used on launch)
+function primeArchive(info, positionMs, durationMs) {
+  source = 'archive';
+  ArchivePlayer.prime(info, positionMs, durationMs);
+  render();
+}
 
 // ---- Track-change notifications for archive episodes ----
 // When an episode moves into a new track from its tracklist, show a Windows
@@ -446,6 +519,22 @@ setInterval(() => {
 async function refresh() {
   try { live = await window.nts.getLive(); render(); }
   catch (e) { if (!live) $('title').textContent = 'Could not reach NTS'; }
+}
+
+let heardLiveKey = '';
+function recordLive() {
+  const r = live?.results?.[channel];
+  if (!playing || !r) return;
+  const info = showInfo(r);
+  const key = `${info.show}/${info.episode}`;
+  if (!info.episode || key === heardLiveKey) return;
+  heardLiveKey = key;
+  const media = r.now?.embeds?.details?.media || {};
+  History.upsert(info.show, info.episode, {
+    title: info.title, img: media.background_small || media.picture_small || info.img,
+    date: info.start ? fmtDate(info.start) : '', location: info.location, heardLive: true, channel: channel + 1
+  });
+  Session.save({ source: 'live', channel });
 }
 
 function play() {

@@ -604,3 +604,20 @@ body.playing .track__art { background: var(--grey-1); }
   .stage__body { gap: 20px; padding-top: 20px; }
 }
 }
+
+/* ---- History & resume ---- */
+.archive__clear {
+  font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2);
+}
+.archive__clear:hover { color: var(--white); }
+.item__pic { position: relative; }
+.item__progress {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(0, 0, 0, .6);
+}
+.item__progress::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--p, 0%); background: var(--white); }
+.item--playing .item__progress::after { background: var(--black); }
+.episode-restart {
+  display: block; margin: 10px auto 0; font-size: 12px; line-height: 14px; font-weight: 700;
+  text-transform: uppercase; color: var(--grey-2); border-bottom: 1px solid var(--grey-4);
+}
+.episode-restart:hover { color: var(--white); border-color: var(--white); }

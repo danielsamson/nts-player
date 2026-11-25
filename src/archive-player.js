@@ -17,6 +17,7 @@ const ArchivePlayer = (() => {
   let widget = null;
   let volume = 0.8;
   let pendingSeek = null;
+  let primed = null;   // { episode, startMs }: shown as paused, loaded when you press play
 
   const emit = () => listeners.forEach((fn) => fn(state));
 
@@ -50,6 +51,7 @@ const ArchivePlayer = (() => {
 
   // Load an episode and start playing, optionally from a position in ms
   function load(episode, startMs = 0) {
+    primed = null;
     state.episode = episode;
     state.playing = false;
     state.loading = true;
@@ -76,14 +78,29 @@ const ArchivePlayer = (() => {
     }
   }
 
+  // Show an episode as paused at a position without loading it (resume on launch)
+  function prime(episode, startMs = 0, durationMs = 0) {
+    primed = { episode, startMs };
+    state.episode = episode;
+    state.playing = false;
+    state.loading = false;
+    state.position = startMs;
+    state.duration = durationMs;
+    state.error = null;
+    emit();
+  }
+  const startPrimed = () => { const p = primed; load(p.episode, p.startMs); };
+
   return {
     state,
     onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
     load,
-    play: () => widget?.play(),
+    prime,
+    play: () => (primed ? startPrimed() : widget?.play()),
     pause: () => widget?.pause(),
-    toggle: () => (state.playing ? widget?.pause() : widget?.play()),
+    toggle: () => (primed ? startPrimed() : state.playing ? widget?.pause() : widget?.play()),
     seek: (ms) => {
+      if (primed) { primed.startMs = ms; state.position = ms; emit(); return; }
       if (!widget) return;
       state.position = ms;
       widget.seekTo(ms);

@@ -95,6 +95,38 @@ const Archive = (() => {
     });
   }
 
+  // ---- History (newest first): progress for archive episodes, and shows heard live ----
+  function historySection() {
+    const items = History.all().slice(0, 8);
+    if (!items.length) return [];
+    const head = sectionTitle('History');
+    const clear = el('button', 'archive__clear', 'Clear');
+    clear.addEventListener('click', () => { History.clear(); render(); });
+    head.append(clear);
+    const list = el('div', 'items');
+    items.forEach((h) => {
+      let meta;
+      if (h.kind === 'archive' && h.duration) {
+        meta = h.finished ? 'Played' : `${fmtOffset(Math.floor(h.position / 1000))} of ${fmtOffset(Math.floor(h.duration / 1000))}`;
+        if (h.date) meta += ` · ${h.date}`;
+      } else {
+        meta = `Heard live${h.channel ? ' on ' + h.channel : ''}${h.date ? ' · ' + h.date : ''}`;
+      }
+      const r = row({
+        img: h.img, title: h.title, meta,
+        playing: ArchivePlayer.isLoaded(h.show, h.episode),
+        onClick: () => go({ type: 'episode', show: h.show, episode: h.episode })
+      });
+      if (h.kind === 'archive' && h.duration && !h.finished) {
+        const bar = el('span', 'item__progress');
+        bar.style.setProperty('--p', `${Math.min(100, (h.position / h.duration) * 100)}%`);
+        r.querySelector('.item__pic').append(bar);
+      }
+      list.append(r);
+    });
+    return [head, list];
+  }
+
   // ---- Home: recently added ----
   async function renderHome() {
     const list = el('div', 'items');
@@ -107,7 +139,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(sectionTitle('Recently added'), list);
+      root.replaceChildren(...historySection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(el('p', 'archive__status', 'Could not load the archive.')); }
   }
@@ -183,19 +215,25 @@ const Archive = (() => {
   }
 
   // ---- Episode page ----
+  // Episode details + tracklist, in the shape the player uses
+  async function fetchEpisode(show, episode) {
+    const [ep, tl] = await Promise.all([
+      api(`/api/v2/shows/${show}/episodes/${episode}`),
+      api(`/api/v2/shows/${show}/episodes/${episode}/tracklist`).catch(() => ({ results: [] }))
+    ]);
+    const info = {
+      show, episode, url: soundcloudUrl(ep), title: ep.name, img: pick(ep.media),
+      date: ep.broadcast ? fmtDate(ep.broadcast) : '', location: ep.location_long || '',
+      tracks: tl.results || []
+    };
+    return { ep, info };
+  }
+
   async function renderEpisode(show, episode) {
     try {
-      const [ep, tl] = await Promise.all([
-        api(`/api/v2/shows/${show}/episodes/${episode}`),
-        api(`/api/v2/shows/${show}/episodes/${episode}/tracklist`).catch(() => ({ results: [] }))
-      ]);
-      const url = soundcloudUrl(ep);
-      const info = {
-        show, episode, url, title: ep.name, img: pick(ep.media),
-        date: ep.broadcast ? fmtDate(ep.broadcast) : '', location: ep.location_long || ''
-      };
-      const tracks = tl.results || [];
-      info.tracks = tracks;
+      const { ep, info } = await fetchEpisode(show, episode);
+      const url = info.url;
+      const tracks = info.tracks;
 
       const wrap = el('div', 'detail');
       const picWrap = el('div', 'picture-wrap');
@@ -213,20 +251,29 @@ const Archive = (() => {
       body.append(showLink, tagRow(ep.genres));
 
       const playBtn = el('button', 'episode-play');
+      const startOver = el('button', 'episode-restart', 'Start over');
       const paintPlay = () => {
         const loaded = ArchivePlayer.isLoaded(show, episode);
         const s = ArchivePlayer.state;
+        const resume = loaded ? s.position : History.resumeAt(show, episode);
         playBtn.disabled = !url;
         playBtn.classList.toggle('episode-play--active', loaded && s.playing);
         playBtn.textContent = !url ? 'Not available to stream'
           : loaded && s.loading ? 'Loading…'
-          : loaded && s.playing ? 'Pause episode' : loaded ? 'Resume episode' : 'Play episode';
+          : loaded && s.playing ? 'Pause episode'
+          : resume > 1000 ? `Resume from ${fmtOffset(Math.floor(resume / 1000))}` : 'Play episode';
+        startOver.hidden = !url || (loaded && s.playing) || !(resume > 1000);
       };
       playBtn.addEventListener('click', () => {
         if (ArchivePlayer.isLoaded(show, episode)) togglePlayback();
-        else playArchive(info, 0);
+        else playArchive(info, History.resumeAt(show, episode));
       });
-      body.append(playBtn);
+      startOver.addEventListener('click', () => {
+        if (ArchivePlayer.isLoaded(show, episode) && ArchivePlayer.state.episode && !startOver.hidden) {
+          switchToArchive(); ArchivePlayer.seek(0); if (!ArchivePlayer.state.playing) ArchivePlayer.play();
+        } else playArchive(info, 0);
+      });
+      body.append(playBtn, startOver);
       if (ep.description) body.append(el('p', 'broadcast-description detail__desc', ep.description));
       if (url) {
         const sc = el('a', 'text-link detail__source', 'Audio via SoundCloud');
@@ -330,9 +377,33 @@ const Archive = (() => {
   ArchivePlayer.onChange(highlight);
 
   let started = false;
+  // On launch: if you were listening to an archive episode, open it paused where you left off
+  async function resumeLast() {
+    const s = Session.load();
+    if (s?.source !== 'archive' || !s.show || !s.episode) return;
+    try {
+      const { info } = await fetchEpisode(s.show, s.episode);
+      if (!info.url) return;
+      const h = History.get(s.show, s.episode);
+      const pos = h && !h.finished ? h.position || 0 : 0;
+      primeArchive(info, pos, h?.duration || 0);
+      view = 'archive';
+      started = true;
+      history.length = 0;
+      history.push({ type: 'home' });
+      current = { type: 'episode', show: s.show, episode: s.episode };
+      render();
+      if (typeof window.render === 'function') window.render();
+    } catch {}
+  }
+
   return {
+    resumeLast,
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
     skipTrack
   };
 })();
+
+// Pick up where you left off
+Archive.resumeLast().then(() => { if (typeof render === 'function') render(); });

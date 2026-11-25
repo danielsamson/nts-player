@@ -22,6 +22,9 @@ const isNts = (url) => {
 // Pages that are part of signing in, rather than the destination after it
 const isAuthPage = (url) => isNts(url) && /^\/(sign-in|join|forgot-password|reset-password)(\/|$)/.test(new URL(url).pathname);
 
+// Tests run with a throwaway profile so they never touch your settings or history
+if (process.env.NTS_PLAYER_USER_DATA) app.setPath('userData', process.env.NTS_PLAYER_USER_DATA);
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

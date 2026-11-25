@@ -1,0 +1,42 @@
+name: NTS site check
+
+# Once a day, check that nts.live still looks the way the app expects (live track IDs,
+# My NTS saving and lists read NTS's pages). If something changed, open an issue.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Check nts.live
+        id: check
+        run: xvfb-run -a npx electron tests/nts-site-check.js --no-sandbox
+      - name: Open or update an issue
+        if: failure() && steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="nts.live changed: some features may not work"
+          {
+            echo "The daily check found that parts of nts.live the app relies on have changed:"
+            echo
+            cat nts-check-report.txt
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > body.md
+          NUM=$(gh issue list --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+          if [ -n "$NUM" ]; then gh issue comment "$NUM" --body-file body.md
+          else gh issue create --title "$TITLE" --body-file body.md --label bug; fi

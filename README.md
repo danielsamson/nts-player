@@ -12,8 +12,8 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 ### Home
 
 The app opens on Home (or click the NTS logo): **On air** with NTS 1 and NTS 2 and a
-play button each, **Continue listening**, **Coming up from shows you follow**, **My NTS**
-and **Recently added**, with search at the top. "See all" links lead to the full
+play button each, **Continue listening**, **Coming up from shows you follow**, **Explore**,
+**My NTS** and **Recently added**, with search at the top. "See all" links lead to the full
 schedule, history and lists.
 
 ### Live radio
@@ -38,6 +38,9 @@ schedule, history and lists.
 
 ### Archive
 
+- **Explore by mood and genre:** NTS's moods (Sedative, Lean Back, Music To Dance To…) and
+  every genre and subgenre lead to their episodes. Genre tags anywhere in the app are
+  clickable too.
 - **Browse and search** every NTS show and episode: recently added, search, and show
   pages with all their episodes.
 - **Play episodes** in the app with a seek bar, and previous / next track buttons.
@@ -134,6 +137,13 @@ Anywhere, even when NTS Player isn't in front (on a Mac, `Cmd` + `Option`):
 | `Ctrl` + `Alt` + `←` / `→` | Previous / next track (or channel) |
 | `Ctrl` + `Alt` + `M` | Mini player |
 
+### Accessibility
+
+- Everything works from the keyboard: Tab through controls (a red outline shows where you
+  are), Enter or Space presses buttons and opens tracklist rows, Esc closes panels.
+- Buttons have labels for screen readers; the now-playing title is announced.
+- Animations (record spin, cover tilt) switch off when your system asks for reduced motion.
+
 ## Getting started
 
 You need [Node.js](https://nodejs.org) (the LTS version).
@@ -144,6 +154,19 @@ cd nts-player
 npm install
 npm start
 ```
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs the real app and checks the main journeys (Home, live, archive, saving, explore,
+schedule, search, keyboard), with a stand-in NTS account and a throwaway profile. On Linux
+without a display: `xvfb-run -a npm test`. The tests run on GitHub before every build.
+
+A separate **NTS site check** runs daily and opens an issue if nts.live has changed in a
+way that affects the app (live track IDs, My NTS).
 
 ## Build the app
 

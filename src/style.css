@@ -1038,3 +1038,49 @@ body:not(.mini) .mini-exit { display: none; }
 .track__play:hover { color: var(--white); }
 .track--now .track__play { color: var(--black); }
 .track__save.is-busy { opacity: .4; pointer-events: none; }
+
+/* ---- Explore ---- */
+button.tag { cursor: pointer; color: inherit; }
+button.tag:hover { background: var(--fg, var(--white)); color: var(--bg, var(--black)); }
+.moods { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--grey-4); }
+.moods--row { display: flex; overflow-x: auto; scrollbar-width: none; }
+.moods--row::-webkit-scrollbar { display: none; }
+.moods--row .mood { flex: 0 0 110px; }
+.mood { position: relative; aspect-ratio: 1; background: var(--grey-4); overflow: hidden; display: flex; align-items: flex-end; text-align: left; }
+.mood img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.mood:hover img { transform: scale(1.05); }
+.mood::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 40%, rgba(0, 0, 0, .75)); }
+.mood__name { position: relative; z-index: 1; padding: 8px; font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--white); }
+.genre { padding: 12px; border-bottom: 1px solid var(--grey-4); }
+.genre__name { display: block; margin-bottom: 8px; font-size: 14px; line-height: 18px; font-weight: 700; text-transform: uppercase; text-align: left; }
+.genre__name:hover { text-decoration: underline; }
+.genre__subs { margin: 0; }
+
+/* ======================================================================
+   Welcome
+   ====================================================================== */
+.welcome { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, .8); }
+.welcome__card { width: min(460px, 100%); max-height: 100%; overflow-y: auto; background: var(--black); border: var(--rule); padding: 20px; }
+.welcome__logo { width: 52px; height: 52px; filter: invert(1); display: block; margin-bottom: 14px; }
+.welcome__title { font-size: 24px; line-height: 28px; font-weight: 700; text-transform: uppercase; margin-bottom: 14px; }
+.welcome__list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; font-size: 14px; line-height: 20px; color: var(--grey-1); }
+.welcome__list li { padding-left: 14px; position: relative; }
+.welcome__list li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; background: var(--live); }
+.welcome__list strong { color: var(--white); text-transform: uppercase; font-size: 13px; }
+.welcome kbd { font: inherit; font-weight: 700; color: var(--white); border: 1px solid var(--grey-3); padding: 0 4px; }
+.welcome__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.welcome__go { width: auto; padding: 0 20px; }
+
+/* ======================================================================
+   Accessibility
+   ====================================================================== */
+/* A clear focus outline for keyboard users, everywhere */
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible, input:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid var(--live); outline-offset: -2px;
+}
+input[type=range]:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+.track:focus-visible { outline-offset: 0; }
+/* Small grey text that was too faint (#666 on black) gets #999 */
+.stage__links-label, .settings__keys, .mynts__note, .archive__search input::placeholder,
+.track-page__links .stage__links-label, .item__meta, .track__time, .archive__crumb { color: var(--grey-2); }
+body.playing .channel .track__time { color: var(--grey-3); }

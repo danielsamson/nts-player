@@ -38,7 +38,8 @@ function showInfo(r) {
     next: r?.next || r?.next1,
     show: d.show_alias || '',
     episode: d.episode_alias || '',
-    genres: (d.genres || []).map((g) => (g.value || '').trim()).filter(Boolean)
+    genres: (d.genres || []).map((g) => (g.value || '').trim()).filter(Boolean),
+    genreTags: d.genres || []
   };
 }
 
@@ -68,9 +69,7 @@ function render() {
   $('title').textContent = info.title;
   $('location').textContent = info.location;
   $('description').textContent = info.description;
-  $('tags').replaceChildren(...info.genres.slice(0, 4).map((g) => {
-    const t = document.createElement('span'); t.className = 'tag'; t.textContent = g; return t;
-  }));
+  $('tags').replaceChildren(...(typeof Archive !== 'undefined' ? Archive.tagButtons(info.genreTags) : []));
   const myKey = `${info.show}/${info.episode}`;
   if ($('liveMyNts').dataset.key !== myKey) {
     $('liveMyNts').dataset.key = myKey;
@@ -173,6 +172,16 @@ function trackRow(t, { onClick, title, saveButtons, deferArt, onPlay, liveSave }
   actions.append(copy);
   li.append(art, text, actions);
   li.addEventListener('click', onClick || (() => copyTrack(`${t.artist} - ${t.title}`)));
+  // Keyboard: rows are focusable; Enter or Space opens them
+  li.tabIndex = 0;
+  li.setAttribute('role', 'button');
+  li.setAttribute('aria-label', `${t.artist} – ${t.title}${time.textContent ? ', ' + time.textContent : ''}`);
+  li.addEventListener('keydown', (e) => {
+    if (e.target !== li) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); }
+  });
+  // icon buttons are announced by their tooltip
+  actions.querySelectorAll('button').forEach((b) => { if (b.title && !b.getAttribute('aria-label')) b.setAttribute('aria-label', b.title); });
   return li;
 }
 
@@ -865,8 +874,13 @@ $('volume').addEventListener('input', (e) => {
   paintMute();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.target.matches?.('input')) return;
-  if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+  if (e.target.matches?.('input, textarea')) return;
+  if (e.key === 'Escape') {                          // close whatever's open
+    if (!$('welcome').hidden) { closeWelcome(); return; }
+    if (!$('settings').hidden) { $('settings').hidden = true; $('settingsBtn').focus(); return; }
+  }
+  // Space plays / pauses, unless a button or row has focus (then Space presses it)
+  if (e.code === 'Space' && !e.target.closest?.('button, a, [tabindex], [role="button"]')) { e.preventDefault(); togglePlayback(); }
   // Shift + arrow keys: previous / next track in an archive episode
   if (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && source === 'archive' && ArchivePlayer.state.episode) {
     e.preventDefault();
@@ -1155,7 +1169,7 @@ async function paintSettings() {
 $('settingsBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   $('settings').hidden = !$('settings').hidden;
-  if (!$('settings').hidden) paintSettings();
+  if (!$('settings').hidden) { paintSettings(); $('settings').querySelector('button')?.focus(); }
 });
 document.addEventListener('click', (e) => { if (!$('settings').hidden && !$('settings').contains(e.target)) $('settings').hidden = true; });
 document.querySelectorAll('#sleepChoices button').forEach((b) => b.addEventListener('click', () => {
@@ -1553,6 +1567,22 @@ const Stage = (() => {
 
   return { render, links, paintLinks };
 })();
+
+// ---- First launch: a short welcome ----
+function closeWelcome() {
+  $('welcome').hidden = true;
+  try { localStorage.setItem('welcomeSeen', '1'); } catch {}
+  $('play').focus();
+}
+$('welcomeGo').addEventListener('click', closeWelcome);
+$('welcomeSignIn').addEventListener('click', () => { closeWelcome(); window.nts.signIn(); });
+$('welcome').addEventListener('click', (e) => { if (e.target === $('welcome')) closeWelcome(); });
+if (localStorage.getItem('welcomeSeen') !== '1') {
+  $('welcomeKey').textContent = /Mac/.test(navigator.platform) ? 'Cmd+Opt+P' : 'Ctrl+Alt+P';
+  $('welcomeSignIn').hidden = supporter;
+  $('welcome').hidden = false;
+  setTimeout(() => $('welcomeGo').focus(), 50);
+}
 
 render();
 refresh();

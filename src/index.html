@@ -115,6 +115,25 @@
     </div>
   </aside>
 
+  <!-- First launch -->
+  <div class="welcome" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="welcome__card">
+      <img class="welcome__logo" src="nts-logo.svg" alt="">
+      <h2 class="welcome__title" id="welcomeTitle">Welcome to NTS Player</h2>
+      <ul class="welcome__list">
+        <li><strong>Home</strong> shows what's on air, shows you follow and new episodes. The NTS logo always brings you back.</li>
+        <li><strong>Explore</strong> the archive by mood and genre, or search it.</li>
+        <li><strong>Wide view</strong> (the expand button, top right) puts the album art centre stage.</li>
+        <li><strong>NTS Supporters:</strong> sign in for live track IDs and to save to My NTS.</li>
+        <li><strong>It keeps playing</strong> in the tray when you close the window. Play / pause from anywhere with <kbd id="welcomeKey">Ctrl+Alt+P</kbd>.</li>
+      </ul>
+      <div class="welcome__actions">
+        <button class="mynts-btn" id="welcomeSignIn">Sign in to NTS</button>
+        <button class="episode-play welcome__go" id="welcomeGo">Start listening</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings: sleep timer, mini player, tray, start at login -->
   <div class="settings" id="settings" hidden role="dialog" aria-label="Settings">
     <div class="settings__row">
@@ -154,7 +173,7 @@
     </button>
     <div class="nowbar__art" id="nowArt" hidden><img id="nowArtImg" alt=""></div>
     <div class="nowbar__text">
-      <span class="nowbar__now"><span class="nowbar__kind" id="nowKind"></span><span id="nowLabel">Play NTS 1</span></span>
+      <span class="nowbar__now" aria-live="polite"><span class="nowbar__kind" id="nowKind"></span><span id="nowLabel">Play NTS 1</span></span>
       <span class="nowbar__next" id="next"></span>
     </div>
     <button class="nowbar__save" id="nowSave" hidden aria-label="Save track to My NTS">

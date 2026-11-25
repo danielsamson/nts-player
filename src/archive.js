@@ -57,6 +57,8 @@ const Archive = (() => {
     else if (current.type === 'mynts') renderMyNts(current.kind);
     else if (current.type === 'schedule') renderSchedule(current.channel);
     else if (current.type === 'history') renderHistory();
+    else if (current.type === 'genres') renderGenres();
+    else if (current.type === 'explore') renderExplore(current);
     else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
   }
 
@@ -588,7 +590,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...onAirSection(), ...continueSection(), ...(await comingUpSection()), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...onAirSection(), ...continueSection(), ...(await comingUpSection()), ...exploreSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -656,11 +658,104 @@ const Archive = (() => {
     } catch { root.replaceChildren(backBar(), failed('Couldn’t load this show.')); }
   }
 
+  // Genre tags are buttons into Explore (episode genre ids look like "genres-<id>")
+  function tagButtons(genres) {
+    return (genres || []).filter((g) => (g.value || '').trim()).slice(0, 4).map((g) => {
+      const id = String(g.id || '').replace(/^genres-/, '');
+      const b = el('button', 'tag', g.value.trim());
+      b.title = `Explore ${g.value.trim()}`;
+      b.addEventListener('click', () => openExplore({ kind: 'genre', id, name: g.value.trim() }));
+      return b;
+    });
+  }
   function tagRow(genres) {
     const tags = el('div', 'tags');
-    (genres || []).map((g) => (g.value || '').trim()).filter(Boolean).slice(0, 4)
-      .forEach((g) => tags.append(el('span', 'tag', g)));
+    tags.append(...tagButtons(genres));
     return tags;
+  }
+
+  // Open Explore results from anywhere (switches to the archive side if needed)
+  function openExplore(target) {
+    started = true;
+    if (typeof view !== 'undefined' && view !== 'archive') { view = 'archive'; history.length = 0; history.push({ type: 'home' }); current = { type: 'explore', ...target }; window.render?.(); render(); return; }
+    go({ type: 'explore', ...target });
+  }
+
+  // ---- Explore: moods and genres ----
+  let genresP = null, moodsP = null;
+  const getGenres = () => (genresP ||= api('/api/v2/genres').then((r) => r.results || []).catch((e) => { genresP = null; throw e; }));
+  const getMoods = () => (moodsP ||= api('/api/v2/moods').then((r) => r.results || []).catch((e) => { moodsP = null; throw e; }));
+  const titleCase = (x) => String(x || '').toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase());
+
+  function moodTile(m) {
+    const b = el('button', 'mood');
+    b.title = `Explore ${titleCase(m.name)}`;
+    const img = m.image?.medium || m.image?.small;
+    if (img) { const i = el('img'); i.src = img; i.alt = ''; i.loading = 'lazy'; i.addEventListener('error', () => i.remove()); b.append(i); }
+    b.append(el('span', 'mood__name', titleCase(m.name)));
+    b.addEventListener('click', () => go({ type: 'explore', kind: 'mood', id: m.id, name: titleCase(m.name) }));
+    return b;
+  }
+
+  // Home: a row of moods and a way into all genres
+  function exploreSection() {
+    const box = el('div', 'moods moods--row');
+    getMoods().then((ms) => box.replaceChildren(...ms.map(moodTile))).catch(() => box.remove());
+    return [sectionTitle('Explore', 'All genres', () => go({ type: 'genres' })), box];
+  }
+
+  async function renderGenres() {
+    const bar = backBar('Explore');
+    root.replaceChildren(bar, loader('Loading'));
+    let genres, moods;
+    try { [genres, moods] = await Promise.all([getGenres(), getMoods().catch(() => [])]); }
+    catch { root.replaceChildren(bar, failed('Couldn’t load genres.')); return; }
+    if (current.type !== 'genres') return;
+    const moodGrid = el('div', 'moods');
+    moods.forEach((m) => moodGrid.append(moodTile(m)));
+    const parts = [bar, sectionTitle('Moods'), moodGrid, sectionTitle('Genres')];
+    genres.forEach((g) => {
+      const group = el('div', 'genre');
+      const head = el('button', 'genre__name', titleCase(g.name));
+      head.addEventListener('click', () => go({ type: 'explore', kind: 'genre', id: g.id, name: titleCase(g.name) }));
+      const subs = el('div', 'tags genre__subs');
+      (g.subgenres || []).forEach((sg) => {
+        const b = el('button', 'tag', sg.name);
+        b.addEventListener('click', () => go({ type: 'explore', kind: 'genre', id: sg.id, name: sg.name }));
+        subs.append(b);
+      });
+      group.append(head, subs);
+      parts.push(group);
+    });
+    root.replaceChildren(...parts);
+  }
+
+  async function renderExplore(t) {
+    const list = el('div', 'items');
+    let offset = 0;
+    const param = t.kind === 'mood' ? `moods[]=${enc(t.id)}` : `genres[]=${enc(t.id)}`;
+    const more = async (btn) => {
+      const res = await api(`/api/v2/search/episodes?${param}&offset=${offset}&limit=20`);
+      offset += 20;
+      (res.results || []).forEach((x) => {
+        const p = parsePath(x.article?.path);
+        if (!p?.episode) return;
+        list.append(row({
+          img: x.image?.small || x.image?.medium || '', title: x.title,
+          meta: [x.local_date, x.location].filter(Boolean).join(' · '),
+          playing: ArchivePlayer.isLoaded(p.show, p.episode),
+          onClick: () => go({ type: 'episode', show: p.show, episode: p.episode })
+        }));
+      });
+      btn?.remove();
+      if (!list.children.length) list.append(el('p', 'archive__status', 'Nothing here yet.'));
+      if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
+    };
+    const bar = backBar(`${t.kind === 'mood' ? 'Mood' : 'Genre'} · ${t.name}`);
+    try {
+      root.replaceChildren(bar, list);
+      await more();
+    } catch { root.replaceChildren(bar, failed('Couldn’t load these episodes.')); }
   }
 
   // ---- Episode page ----
@@ -901,6 +996,7 @@ const Archive = (() => {
 
   return {
     findTrack: (t) => TrackInfo.find(t),
+    tagButtons,
     resumeLast,
     home() { started = true; history.length = 0; current = { type: 'home' }; render(); },
     refreshOnAir() { const box = document.getElementById('onAir'); if (box && current.type === 'home') fillOnAir(box); },

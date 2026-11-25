@@ -1,2 +1,4 @@
 node_modules/
 dist/
+test-failure-*.png
+nts-check-report.txt

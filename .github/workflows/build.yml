@@ -5,6 +5,7 @@ name: Build
 #   version, and publish a GitHub Release with that version's notes from CHANGELOG.md.
 # - Push a version tag yourself (v1.2.0): same, using the tag.
 # - Run from the Actions tab: just build (files attached to the run).
+# The app tests run first; nothing is built or released if they fail.
 on:
   push:
     branches: [main]
@@ -45,8 +46,25 @@ jobs:
           gh release view "v$VERSION" >/dev/null 2>&1 || \
             gh release create "v$VERSION" --draft --title "NTS Player $VERSION" --notes-file notes.md --target "$GITHUB_SHA"
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run the app tests
+        run: xvfb-run -a npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-failures
+          path: test-failure-*.png
+
   build:
-    needs: prepare
+    needs: [prepare, test]
     strategy:
       fail-fast: false
       matrix:

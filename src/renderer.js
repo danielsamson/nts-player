@@ -148,12 +148,13 @@ function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
   top.append(time, artist);
   const name = document.createElement('span'); name.className = 'track__title'; name.textContent = t.title;
   text.append(top, name);
-  const copy = document.createElement('button'); copy.className = 'track__copy'; copy.textContent = '⧉'; copy.title = 'Copy track';
+  const copy = document.createElement('button'); copy.className = 'track__copy'; copy.title = 'Copy track';
+  copy.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/></svg>';
   copy.addEventListener('click', (e) => { e.stopPropagation(); copyTrack(`${t.artist} - ${t.title}`); });
   const actions = document.createElement('span'); actions.className = 'track__actions';
   if (saveButtons) {
     const save = document.createElement('button');
-    save.className = 'track__save'; save.hidden = true;
+    save.className = 'track__save'; save.hidden = true; save.title = 'Save track to My NTS';
     save.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
     saveButtons.set(MyNTS.trackKey(t), save);
     actions.append(save);
@@ -1474,8 +1475,8 @@ const Stage = (() => {
     $('expandBtn').title = wide ? 'Thin strip' : 'Wide view';
     $('expandBtn').setAttribute('aria-label', $('expandBtn').title);
     $('expandIcon').setAttribute('d', wide
-      ? 'M10 10H4V8h2.6L2.3 3.7l1.4-1.4L8 6.6V4h2zm4 4h6v2h-2.6l4.3 4.3-1.4 1.4-4.3-4.3V20h-2z'
-      : 'M4 4h6v2H7.4l4.3 4.3-1.4 1.4L6 7.4V10H4zm16 16h-6v-2h2.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z');
+      ? 'M4 10h6V4H8v2.6L3.7 2.3 2.3 3.7 6.6 8H4zm16 4h-6v6h2v-2.6l4.3 4.3 1.4-1.4-4.3-4.3H20z'
+      : 'M3 3h7v2H6.4l4.3 4.3-1.4 1.4L5 6.4V10H3zm18 18h-7v-2h3.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z');
   }
   $('expandBtn').addEventListener('click', () => {
     const wide = !wideQuery.matches;

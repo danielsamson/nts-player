@@ -92,7 +92,7 @@ function setMini(on) {
   if (on) {
     normalBounds = win.getBounds();
     win.setMinimumSize(320, 56);
-    win.setContentSize(Math.max(380, Math.min(normalBounds.width, 520)), 56, true);
+    win.setContentSize(Math.max(380, Math.min(normalBounds.width, 520)), 48, true);
     win.setAlwaysOnTop(true, 'floating');
   } else {
     win.setAlwaysOnTop(false);

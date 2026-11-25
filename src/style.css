@@ -976,3 +976,56 @@ body.playing .live-list .track--now .track__time, body.playing .live-list .track
   body.can-skip input[type=range] { display: none; }
   body.can-skip .volume { padding-right: 0; }
 }
+
+/* ======================================================================
+   Button system (keep everything below consistent)
+   - Icon buttons: square cells the full height of their bar, divider on the right,
+     18px icons (play 22px)
+   - Text buttons: --btn-s 28px (chips), --btn-m 32px (actions), --btn-l 44px (primary)
+   - Track row icons: 28px squares, 16px icons
+   ====================================================================== */
+:root { --head: 44px; --btn-s: 28px; --btn-m: 32px; --btn-l: 44px; --icon: 18px; }
+@media (max-width: 719px) { :root { --bar: 48px; } }
+body.mini { --bar: 48px; }
+
+/* Header: logo and icon cells are 44 x 44 (+1px divider) */
+.tab--archive, .tab--settings, .tab--expand { flex: 0 0 calc(var(--head) + 1px); padding: 0; justify-content: center; border-left: var(--rule); }
+.tab--archive svg, .tab--settings svg, .tab--expand svg { width: var(--icon); height: var(--icon); }
+.tab--settings, .tab--expand { color: var(--grey-1); }
+
+/* Bottom bar: every control is a square cell with a divider on its right */
+.nowbar { height: var(--bar); }
+.play, .skip, .nowbar__save, .mini-exit, .volume__button {
+  flex: 0 0 var(--bar); width: var(--bar); height: 100%; display: grid; place-items: center;
+  border-left: 0; border-right: var(--rule);
+}
+.play svg { width: 22px; height: 22px; }
+.skip svg, .nowbar__save svg, .mini-exit svg, .volume__button svg { width: var(--icon); height: var(--icon); }
+.nowbar__art { flex: 0 0 var(--bar); width: var(--bar); }
+.volume { padding: 0 16px 0 0; gap: 12px; }
+@media (max-width: 719px) {
+  body.can-skip .volume__button { width: var(--bar); }
+  .volume { padding-right: 12px; }
+}
+body.mini .mini-exit { display: grid; }
+body.mini input[type=range] { display: none; }
+body.mini .volume { padding: 0; }
+
+/* Text buttons: three heights */
+.mynts-btn, .supporter__button { height: var(--btn-m); padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; }
+.mynts-btn svg { width: 14px; height: 14px; }
+.settings__choices button { height: var(--btn-s); padding: 0 10px; }
+.episode-play, .archive__more { height: var(--btn-l); }
+.onair__play { width: 36px; height: 36px; }
+.onair__play svg { width: 16px; height: 16px; }
+
+/* Track rows: 28px icon squares, drawn icons */
+.track__actions { gap: 0; }
+.track__save, .track__copy { width: var(--btn-s); height: var(--btn-s); display: grid; place-items: center; color: var(--grey-3); font-size: 0; }
+.track__save svg, .track__copy svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.track__save:hover, .track__copy:hover { color: var(--white); }
+.track__save--on { color: var(--white); }
+.track__save--on svg { fill: currentColor; }
+.track--now .track__save, .track--now .track__copy { color: var(--black); }
+body.playing .live-list .track--now .track__save, body.playing .live-list .track--now .track__copy { color: var(--white); }
+body:not(.mini) .mini-exit { display: none; }

@@ -601,10 +601,12 @@ function renderTracks(info) {
   if (tl.source === 'live') note.textContent = '';
   else if (tl.source === 'error') note.textContent = 'Could not load the tracklist.';
   else {
+    const signIn = Object.assign(document.createElement('button'), { className: 'text-link', textContent: 'Sign in' });
+    signIn.addEventListener('click', () => window.nts.signIn());
     note.replaceChildren(
       'No tracklist yet. Live track IDs are an ',
       Object.assign(document.createElement('a'), { href: 'https://www.nts.live/supporters', target: '_blank', textContent: 'NTS Supporter' }),
-      ' feature: sign in above to see them as they play.');
+      ' feature. ', signIn, ' to see them as they play.');
   }
 
   const shownKey = `${key}:${tl.tracks.length}`;
@@ -633,9 +635,9 @@ function renderSupporter() {
   webview.hidden = true;                  // NTS's page is no longer shown; we draw our own list
   $('liveList').hidden = !supporter;
   $('episodeTracks').hidden = supporter;
-  $('signIn').hidden = supporter;
-  $('signOut').hidden = !supporter;
-  $('supporterLabel').textContent = supporter ? `Live tracklist · NTS ${channel + 1}` : 'NTS Supporter?';
+  $('supporterBar').hidden = !supporter;
+  $('supporterLabel').textContent = `Live tracklist · NTS ${channel + 1}`;
+  paintAccount();
   if (showLive) LiveNow.showList();
 }
 
@@ -1065,8 +1067,16 @@ const Sleep = (() => {
   };
 })();
 
+// NTS account row in Settings
+function paintAccount() {
+  $('signIn').hidden = supporter;
+  $('signOut').hidden = !supporter;
+  $('accountHint').textContent = supporter ? 'Signed in: live track IDs and My NTS' : 'Sign in for live track IDs and My NTS';
+}
+
 // ---- Settings popover ----
 async function paintSettings() {
+  paintAccount();
   document.querySelectorAll('#sleepChoices button').forEach((b) => b.classList.toggle('on', b.dataset.sleep === Sleep.mode));
   $('sleepHint').textContent = Sleep.mode === 'episode' ? 'Stops when this episode ends'
     : Sleep.remaining() ? `Stops in ${Sleep.remaining()} min` : '';

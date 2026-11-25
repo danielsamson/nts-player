@@ -23,8 +23,8 @@ schedule, history and lists.
   genres, description and what's on next.
 - **Always live.** Stopping drops the stream, so play picks up what's on air now.
   Reconnects by itself if the stream drops.
-- **Live tracklists for NTS Supporters.** In the Tracklist tab, click
-  **Sign in for live tracks** and log in on NTS's own sign-in page. The app never sees
+- **Live tracklists for NTS Supporters.** In **Settings**, click
+  **Sign in** and log in on NTS's own sign-in page. The app never sees
   your password, and you stay signed in until you click **Sign out**.
 - **Live track IDs for Supporters, everywhere:** the track playing on live radio shows in
   the now-playing bar and the wide view (with its cover and links), and you get a

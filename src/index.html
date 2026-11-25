@@ -55,8 +55,6 @@
       <div class="pane" id="pane-tracks" hidden>
         <div class="supporter" id="supporterBar">
           <span class="supporter__label" id="supporterLabel">NTS Supporter?</span>
-          <button class="supporter__button" id="signIn">Sign in for live tracks</button>
-          <button class="supporter__button" id="signOut" hidden>Sign out</button>
         </div>
         <webview id="liveTracks" class="live-tracks" partition="persist:nts" hidden></webview>
         <!-- Our own live tracklist (Supporters), from NTS's live track IDs -->
@@ -126,6 +124,12 @@
         <button data-sleep="60">1h</button><button data-sleep="episode">End of episode</button>
       </div>
       <span class="settings__hint" id="sleepHint"></span>
+    </div>
+    <div class="settings__row settings__account">
+      <span class="settings__label">NTS account</span>
+      <span class="settings__hint" id="accountHint"></span>
+      <button class="mynts-btn" id="signIn">Sign in</button>
+      <button class="mynts-btn" id="signOut" hidden>Sign out</button>
     </div>
     <button class="settings__item" id="miniBtn">Mini player</button>
     <button class="settings__item notify-toggle" id="trayToggle">Keep playing when the window is closed</button>

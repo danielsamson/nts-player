@@ -960,3 +960,7 @@ body.offline .nowbar__next { color: var(--live); }
 .live-list .archive-tracks { padding: 0; }
 body.playing .live-list .track--now { background: var(--black); color: var(--white); }
 body.playing .live-list .track--now .track__time, body.playing .live-list .track--now .track__copy { color: var(--white); }
+
+.settings__account { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.settings__account .settings__label { width: 100%; }
+.settings__account .settings__hint { flex: 1; min-width: 150px; }

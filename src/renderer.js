@@ -121,7 +121,7 @@ const Art = (() => {
       io.unobserve(e.target);
       const t = e.target._track;
       get(t).then((art) => {
-        if (!art) { e.target.classList.add('track__art--none'); return; }
+        if (!art?.small) { e.target.classList.add('track__art--none'); return; }
         const img = new Image();
         img.alt = '';
         img.onload = () => e.target.replaceChildren(img);
@@ -999,7 +999,7 @@ const Stage = (() => {
       const art = await Art.get(t, 'high');
       if (my !== token) return;
       // No cover found: a white label, not the show's photo
-      const full = { ...base, img: art?.large || '', square: true, whitelabel: !art, track: t,
+      const full = { ...base, img: art?.large || '', square: true, whitelabel: !art?.large, track: t,
         context: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : (art?.year || ''), album: '' };
       paint({ ...full, linkItems: links(t, art), keepSave: true });
       const appleUrl = await appleP;

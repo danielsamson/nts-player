@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 
 // v2: entries also carry album, year and links to the track on Deezer / Apple Music
-// v4: dropped Deezer's grey placeholder covers saved as if they were real
-const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache-v4.json');
+// v5: covers are checked to exist (Deezer can list an image it doesn't have)
+const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache-v5.json');
 const MISS_TTL = 3 * 24 * 3600 * 1000;    // retry misses after three days
 let cache = null;
 let saveTimer = null;
@@ -105,6 +105,7 @@ const hasDeezerCover = (album) => {
 
 // Deezer track (from /track or /search) -> { small, large, album, year, deezerUrl }
 const fromDeezer = (t) => t?.album?.cover_medium && hasDeezerCover(t.album) ? {
+  medium: t.album.cover_medium,
   small: t.album.cover_small || t.album.cover_medium,
   large: t.album.cover_xl || t.album.cover_big || t.album.cover_medium,
   album: t.album.title || '',
@@ -125,7 +126,34 @@ function bestMatch(track, results, artistOf, titleOf) {
     .sort((a, b) => b.score - a.score)[0]?.x || null;
 }
 
-async function lookup(track, priority) {
+// Deezer sometimes lists an image id for a release that has no image: its CDN then
+// redirects to the grey placeholder. Check the image really exists.
+async function deezerImageExists(url) {
+  try {
+    // A real cover answers 200; a missing one redirects to the placeholder. Electron's
+    // fetch doesn't report redirect targets, so refuse redirects: that throws.
+    const res = await net.fetch(url, { method: 'HEAD', redirect: 'manual' });
+    return res.ok;
+  } catch (e) {
+    if (/redirect/i.test(e.message)) return false;
+    return true;   // can't tell (offline): don't throw away a cover we may have
+  }
+}
+
+async function fromITunes(track, priority) {
+  const q = `${norm(firstArtist(track.artist))} ${norm(cleanTitle(track.title))}`;
+  const d = await itunes(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=10`, priority);
+  const hit = bestMatch(track, d.results || [], (x) => x.artistName, (x) => x.trackName);
+  if (!hit?.artworkUrl100) return null;
+  return {
+    small: hit.artworkUrl100, large: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.'),
+    album: hit.collectionName || '', year: (hit.releaseDate || '').slice(0, 4),
+    appleUrl: hit.trackViewUrl ? `${hit.trackViewUrl.split('?')[0]}?i=${hit.trackId}` : ''
+  };
+}
+
+// Deezer: track ID, then ISRC, then search (exact fields, then looser)
+async function fromDeezerLookup(track) {
   const { deezer, isrc } = track;
   if (deezer) {
     try { const r = fromDeezer(await getJson(`https://api.deezer.com/track/${encodeURIComponent(deezer)}`)); if (r) return r; } catch {}
@@ -136,7 +164,6 @@ async function lookup(track, priority) {
   const artist = firstArtist(track.artist);
   const title = cleanTitle(track.title);
   if (!artist || !title) return null;
-  // Deezer: exact fields first, then a looser search (catches reordered titles)
   for (const q of [`artist:"${artist}" track:"${title}"`, `${norm(artist)} ${norm(title)}`]) {
     try {
       const d = await getJson(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=10`);
@@ -144,21 +171,26 @@ async function lookup(track, priority) {
       if (hit) return fromDeezer(hit);
     } catch {}
   }
-  // iTunes Search as the last resort (rate limited, so it waits its turn)
-  try {
-    const d = await itunes(`https://itunes.apple.com/search?term=${encodeURIComponent(`${norm(artist)} ${norm(title)}`)}&entity=song&limit=10`, priority);
-    const hit = bestMatch(track, d.results || [], (x) => x.artistName, (x) => x.trackName);
-    if (hit?.artworkUrl100) {
-      return {
-        small: hit.artworkUrl100, large: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.'),
-        album: hit.collectionName || '', year: (hit.releaseDate || '').slice(0, 4),
-        appleUrl: hit.trackViewUrl ? `${hit.trackViewUrl.split('?')[0]}?i=${hit.trackId}` : ''
-      };
-    }
-  } catch (e) {
-    if (/rate limited|paused/.test(e.message)) throw e;   // don't cache as a miss
-  }
   return null;
+}
+
+// Result: { small, large, album, year, deezerUrl?, appleUrl? }. small/large are '' when
+// the release is known (album, year, links) but has no real cover anywhere.
+async function lookup(track, priority) {
+  let dz = await fromDeezerLookup(track);
+  if (dz && !(await deezerImageExists(dz.medium || dz.small))) dz = { ...dz, small: '', large: '' };
+  if (dz?.large) return dz;
+  // No (real) Deezer cover: iTunes Search as the last resort (rate limited, waits its turn)
+  try {
+    const it = await fromITunes(track, priority);
+    if (it) return dz ? { ...it, album: dz.album || it.album, year: dz.year || it.year, deezerUrl: dz.deezerUrl } : it;
+  } catch (e) {
+    if (/rate limited|paused/.test(e.message)) {
+      if (dz) return { ...dz, retry: true };   // show what Deezer had, ask iTunes again later
+      throw e;                                 // don't cache as a miss
+    }
+  }
+  return dz;   // album details without a cover, or null
 }
 
 // A small queue so a long tracklist doesn't fire dozens of requests at once
@@ -199,6 +231,7 @@ function getArt(track, priority = 'low') {
   }).then((art) => {
     inflight.delete(key);
     if (art === undefined) return null;      // rate limited: try again later, don't remember a miss
+    if (art?.retry) { const { retry, ...shown } = art; return shown; }   // partial: show it, don't cache
     c[key] = { art, at: Date.now() };
     saveCache();
     return art;

@@ -1084,3 +1084,5 @@ input[type=range]:focus-visible { outline: 2px solid var(--live); outline-offset
 .stage__links-label, .settings__keys, .mynts__note, .archive__search input::placeholder,
 .track-page__links .stage__links-label, .item__meta, .track__time, .archive__crumb { color: var(--grey-2); }
 body.playing .channel .track__time { color: var(--grey-3); }
+
+.welcome__card:focus, .welcome__card:focus-visible { outline: none; }

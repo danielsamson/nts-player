@@ -1572,7 +1572,7 @@ const Stage = (() => {
 function closeWelcome() {
   $('welcome').hidden = true;
   try { localStorage.setItem('welcomeSeen', '1'); } catch {}
-  $('play').focus();
+  document.activeElement?.blur?.();     // don't leave a keyboard-focus outline behind
 }
 $('welcomeGo').addEventListener('click', closeWelcome);
 $('welcomeSignIn').addEventListener('click', () => { closeWelcome(); window.nts.signIn(); });
@@ -1581,7 +1581,8 @@ if (localStorage.getItem('welcomeSeen') !== '1') {
   $('welcomeKey').textContent = /Mac/.test(navigator.platform) ? 'Cmd+Opt+P' : 'Ctrl+Alt+P';
   $('welcomeSignIn').hidden = supporter;
   $('welcome').hidden = false;
-  setTimeout(() => $('welcomeGo').focus(), 50);
+  // Focus the dialog itself (no outline), so Tab and Esc work without highlighting a button
+  setTimeout(() => $('welcome').querySelector('.welcome__card').focus(), 50);
 }
 
 render();

@@ -871,6 +871,7 @@ const Archive = (() => {
   }
 
   return {
+    findTrack: (t) => TrackInfo.find(t),
     resumeLast,
     home() { started = true; history.length = 0; current = { type: 'home' }; render(); },
     refreshOnAir() { const box = document.getElementById('onAir'); if (box && current.type === 'home') fillOnAir(box); },

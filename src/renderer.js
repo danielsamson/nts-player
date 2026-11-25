@@ -214,8 +214,11 @@ function renderNowbar() {
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = active ? 'playing' : (archive || playing ? 'paused' : 'none');
   const sig = `${active}|${label}|${canSkip}`;
   if (sig !== desktopSig) { desktopSig = sig; window.nts.desktop?.state({ playing: active, label, canSkip }); }
+  const srcSig = `${source}|${playing}|${channel}`;
+  if (srcSig !== nowSaveSource) { nowSaveSource = srcSig; if (typeof NowSave !== 'undefined') NowSave.update(); }
 }
 let desktopSig = '';
+let nowSaveSource = '';
 
 // Start an archive episode (stops live radio)
 function playArchive(info, startMs = 0) {
@@ -948,6 +951,7 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     key = k;
     track = t;
     renderNowbar();
+    if (typeof NowSave !== 'undefined') NowSave.update();
     if (typeof Stage !== 'undefined') Stage.render();
     if (t && !first) announce(t);
   }
@@ -1125,26 +1129,42 @@ window.nts.desktop?.onCommand((c) => {
   else if (c === 'channel1' || c === 'channel2') { setChannel(c === 'channel1' ? 0 : 1); if (!playing) play(); }
 });
 
+// A live track can only be saved from an episode page: the live show's own (once NTS
+// has added it there) or an earlier episode that played the same track.
+async function liveSaveTarget(t) {
+  const r = live?.results?.[channel];
+  const info = r ? showInfo(r) : null;
+  if (info?.show && info?.episode) {
+    const st = await MyNTS.getState(info.show, info.episode, true);       // fresh: tracks arrive during the show
+    if (MyNTS.trackState(st, t)?.canSave) return { show: info.show, episode: info.episode, title: info.title, date: info.start ? fmtDate(info.start) : '' };
+  }
+  const found = await Archive.findTrack(t).catch(() => null);
+  const m = found?.match;
+  return m ? { show: m.show, episode: m.episode, title: m.title, date: m.date, offset: m.offset } : null;
+}
+
 // ---- Save the track you're hearing (now-playing bar), to My NTS ----
-const NowSave = (() => {
+var NowSave = (() => {   // var: renderNowbar may ask before this line runs
   const btn = $('nowSave');
   let sig = '';
   let current = null;   // { ep, t, saved }
   async function update(force) {
     const a = ArchivePlayer.state;
-    const cur = source === 'archive' && a.episode ? TrackNotify.currentTrack() : null;
-    const ep = a.episode;
-    const s = cur ? `${ep.show}/${ep.episode}#${cur.idx}` : '';
+    const lt = source === 'live' && playing ? LiveNow?.track : null;
+    const cur = lt ? { track: lt } : source === 'archive' && a.episode ? TrackNotify.currentTrack() : null;
+    const s = !cur ? '' : lt ? `live|${channel}|${lt.time}|${lt.title}` : `${a.episode.show}/${a.episode.episode}#${cur.idx}`;
     if (s === sig && !force) return;
     sig = s;
     current = null;
     paint();
     if (!cur || !supporter) return;          // needs your NTS sign-in
+    const ep = lt ? await liveSaveTarget(lt) : a.episode;
+    if (s !== sig || !ep) return;
     const st = await MyNTS.getState(ep.show, ep.episode);
     if (s !== sig) return;
     const tr = MyNTS.trackState(st, cur.track);
     if (!st?.signedIn || !tr?.canSave) return;
-    current = { ep, t: cur.track, saved: !!tr.saved };
+    current = { ep, t: { ...cur.track, offset: ep.offset ?? cur.track.offset, offset_estimate: cur.track.offset_estimate }, saved: !!tr.saved };
     paint();
   }
   function paint() {
@@ -1374,6 +1394,7 @@ const Stage = (() => {
     if (lt) {
       const base = { label: '', context: '', title: lt.title, artist: lt.artist, square: true };
       paint({ ...base, keepArt: true, linkItems: links(lt, null) });
+      liveSaveTarget(lt).then((ep) => { if (ep && my === token) paintSave(ep, { ...lt, offset: ep.offset }, my); });
       const art = await Art.get(lt, 'high');
       if (my !== token) return;
       paint({ ...base, img: art?.large || '', whitelabel: !art?.large, track: lt,

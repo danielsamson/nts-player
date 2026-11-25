@@ -213,12 +213,19 @@ const READ_LIST = `(() => {
       img: img ? img.currentSrc || img.src : ''
     };
   }).filter((x) => x.path);
-  const tracks = [...page.querySelectorAll('.track')].map((t) => {
-    const a = t.closest('[href*="/shows/"]') || t.querySelector('a[href*="/shows/"]');
+  // Saved tracks page: .my-track rows (NTS renders a phone and a wide-screen copy of
+  // each); artist is the bold line, title the line under it
+  const seen = new Set();
+  const tracks = [...page.querySelectorAll('.my-track')].map((t) => {
     const txt = (sel) => { const e = t.querySelector(sel); return e ? e.textContent.trim() : ''; };
-    const artist = [...t.querySelectorAll('.track__artist:not(.track__artist--mobile)')].map((e) => e.textContent.trim()).filter(Boolean).join(', ') || txt('.track__artists');
-    return { artist, title: txt('.track__title'), path: a ? new URL(a.getAttribute('href'), location.origin).pathname : '' };
-  }).filter((x) => x.title);
+    const a = t.querySelector('a[href*="/shows/"]');
+    return { artist: txt('.text-bold'), title: txt('.font-secondary'), path: a ? new URL(a.getAttribute('href'), location.origin).pathname : '' };
+  }).filter((x) => {
+    const k = (x.artist + '|' + x.title).toLowerCase();
+    if (!x.title || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   const empty = !items.length && !tracks.length;
   return { items, tracks, empty, ready: !!document.querySelector('.page-my-nts') };
 })()`;

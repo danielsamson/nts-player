@@ -39,7 +39,7 @@ const Archive = (() => {
 
   function render() {
     episodeView = null;
-    root.replaceChildren(el('p', 'archive__status', 'Loading…'));
+    root.replaceChildren(loader('Loading'));
     if (current.type === 'home') renderHome();
     else if (current.type === 'search') renderSearch(current.q);
     else if (current.type === 'show') renderShow(current.show);
@@ -140,22 +140,14 @@ const Archive = (() => {
     return [head, nav];
   }
 
-  async function renderMyNts(kind) {
-    const titles = { episodes: 'Saved episodes', shows: 'Followed shows', tracks: 'Saved tracks' };
-    root.replaceChildren(backBar(`My NTS · ${titles[kind]}`), el('p', 'archive__status', 'Loading from My NTS…'));
-    const res = await window.nts.account.list(kind).catch(() => null);
-    if (current.type !== 'mynts' || current.kind !== kind) return;
-    if (!res || res.signedIn === false) {
-      const btn = el('button', 'archive__more', 'Sign in to NTS');
-      btn.addEventListener('click', () => window.nts.signIn());
-      root.replaceChildren(backBar(`My NTS · ${titles[kind]}`),
-        el('p', 'archive__status', 'Sign in with your NTS account to see what you’ve saved on nts.live and the NTS app.'), btn);
-      return;
-    }
-    if (!res.available) {
-      root.replaceChildren(backBar(`My NTS · ${titles[kind]}`), el('p', 'archive__status', 'Couldn’t read My NTS right now.'));
-      return;
-    }
+  // My NTS lists come from nts.live and take a few seconds. Show the last copy straight
+  // away (with a loader while it refreshes), then the fresh one.
+  const MYNTS_TITLES = { episodes: 'Saved episodes', shows: 'Followed shows', tracks: 'Saved tracks' };
+  const cacheKey = (kind) => `mynts:${kind}`;
+  const readCache = (kind) => { try { return JSON.parse(localStorage.getItem(cacheKey(kind))); } catch { return null; } };
+  const writeCache = (kind, res) => { try { localStorage.setItem(cacheKey(kind), JSON.stringify({ items: res.items, tracks: res.tracks })); } catch {} };
+
+  function myNtsList(kind, res) {
     const list = el('div', 'items');
     if (kind === 'tracks') {
       const ol = el('ol', 'tracks archive-tracks');
@@ -166,7 +158,7 @@ const Archive = (() => {
           onClick: p?.episode ? () => go({ type: 'episode', show: p.show, episode: p.episode }) : undefined
         }));
       });
-      list.append(ol);
+      if (ol.children.length) list.append(ol);
     } else {
       (res.items || []).forEach((it) => {
         const p = parsePath(it.path);
@@ -178,9 +170,31 @@ const Archive = (() => {
         }));
       });
     }
-    const empty = kind === 'tracks' ? !(res.tracks || []).length : !list.children.length;
-    root.replaceChildren(backBar(`My NTS · ${titles[kind]}`),
-      empty ? el('p', 'archive__status', `Nothing here yet.`) : list);
+    return list.children.length ? list : el('p', 'archive__status',
+      kind === 'tracks' ? 'No saved tracks yet. Use the bookmark on any track in an episode.' : 'Nothing here yet.');
+  }
+
+  async function renderMyNts(kind) {
+    const bar = () => backBar(`My NTS · ${MYNTS_TITLES[kind]}`);
+    const cached = readCache(kind);
+    if (cached) root.replaceChildren(bar(), loader('Updating from My NTS'), myNtsList(kind, cached));
+    else root.replaceChildren(bar(), loader('Loading from My NTS'));
+
+    const res = await window.nts.account.list(kind).catch(() => null);
+    if (current.type !== 'mynts' || current.kind !== kind) return;
+    if (!res || res.signedIn === false) {
+      const btn = el('button', 'archive__more', 'Sign in to NTS');
+      btn.addEventListener('click', () => window.nts.signIn());
+      root.replaceChildren(bar(),
+        el('p', 'archive__status', 'Sign in with your NTS account to see what you’ve saved on nts.live and the NTS app.'), btn);
+      return;
+    }
+    if (!res.available) {
+      root.replaceChildren(bar(), el('p', 'archive__status', 'Couldn’t read My NTS right now.'), ...(cached ? [myNtsList(kind, cached)] : []));
+      return;
+    }
+    writeCache(kind, res);
+    root.replaceChildren(bar(), myNtsList(kind, res));
   }
 
   // ---- Home: recently added ----

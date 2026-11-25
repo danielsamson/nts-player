@@ -231,6 +231,16 @@ function togglePlayback() {
 
 ArchivePlayer.onChange(renderNowbar);
 
+// A small NTS-style loader: three blinking squares and a label
+function loader(text) {
+  const d = document.createElement('div');
+  d.className = 'loader';
+  d.innerHTML = '<span class="loader__dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="loader__text"></span>';
+  d.querySelector('.loader__text').textContent = text;
+  d.setAttribute('role', 'status');
+  return d;
+}
+
 // ---- My NTS: save episodes, follow shows, save tracks (see account.js) ----
 // Draws "Save episode" / "Follow show" buttons into a container and keeps track
 // buttons in sync. Reads the state from NTS when mounted.
@@ -254,8 +264,7 @@ const MyNTS = (() => {
     if (!show || !episode) return;
     const note = document.createElement('span');
     note.className = 'mynts__note';
-    note.textContent = 'Checking My NTS…';
-    container.append(note);
+    container.append(loader('Checking My NTS'));
     let state = null;
 
     const save = button('Save episode', ICON_SAVE);
@@ -263,7 +272,8 @@ const MyNTS = (() => {
 
     function paint() {
       if (!state?.available) {
-        note.textContent = state ? 'My NTS isn’t available right now' : 'Checking My NTS…';
+        if (!state) { container.replaceChildren(loader('Checking My NTS')); return; }
+        note.textContent = 'My NTS isn’t available right now';
         container.replaceChildren(note);
         return;
       }

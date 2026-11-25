@@ -1,6 +1,8 @@
 # Changelog
 
-Notes for each version, used for its GitHub Release.
+Each version's notes become its GitHub Release. To release, bump `version` in
+`package.json`, add a section here for it, and push to `main`: the Build workflow
+tags it and publishes the release automatically.
 
 ## 1.1.0
 

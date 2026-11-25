@@ -160,10 +160,14 @@ The builds aren't code-signed, so the first launch needs a click past a warning:
 
 ### Releasing a new version
 
-1. Bump `version` in `package.json` and commit.
-2. Tag it and push the tag: `git tag v1.1.0` then `git push origin v1.1.0`.
-3. The **Build** workflow builds every version and attaches them to a draft
-   **GitHub Release**. Publish the release, and installed apps update themselves.
+Releases are fully automatic:
+
+1. Bump `version` in `package.json` and add a section for it in `CHANGELOG.md`.
+2. Push to `main`.
+
+The **Build** workflow sees the new version, builds every platform, tags it (`v1.2.0`),
+and publishes a GitHub Release with the notes from `CHANGELOG.md`. Installed apps then
+update themselves. (Pushing a `v*` tag yourself does the same.)
 
 Automatic updates work for the Windows installer and the Linux AppImage. macOS only
 allows them for signed apps, so Mac users download new versions from the release page.

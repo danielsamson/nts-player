@@ -82,5 +82,6 @@
     }
   },
   "homepage": "https://github.com/danielsamson/nts-player",
-  "author": "Daniel Samson"
+  "author": "Daniel Samson",
+  "license": "MIT"
 }

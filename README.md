@@ -162,6 +162,13 @@ nts.live uses Univers Condensed, a commercial typeface that can't be redistribut
 The app bundles [Roboto Condensed](https://fonts.google.com/specimen/Roboto+Condensed) as
 a close, free stand-in, and uses Univers Condensed if you have it installed.
 
+## License
+
+The code is open source under the [MIT License](LICENSE): use it, change it, share it.
+
+That covers this project's code only. The NTS name and logo belong to NTS, and the
+bundled Roboto Condensed font is under the SIL Open Font License (`src/fonts/`).
+
 ## Disclaimer
 
 This is an unofficial, personal project. It isn't affiliated with or endorsed by NTS

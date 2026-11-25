@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage } = require('electron');
-const { getArt } = require('./art');
+const { getArt, getAppleLink } = require('./art');
 const path = require('path');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
@@ -133,6 +133,27 @@ ipcMain.handle('art:lookup', (_e, track) => getArt(track && {
   artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200),
   isrc: track.isrc ? String(track.isrc).slice(0, 20) : null,
   deezer: track.deezer ? String(track.deezer).slice(0, 20) : null
+}));
+
+// Open a link in the music app if it's installed (Spotify, Deezer, Apple Music),
+// otherwise on the web. Windows/macOS tell us whether something handles the scheme.
+const APP_SCHEMES = new Set(['spotify', 'deezer', 'music', 'musics', 'itmss']);
+ipcMain.handle('open:link', async (_e, { web, apps } = {}) => {
+  for (const u of Array.isArray(apps) ? apps.slice(0, 4) : []) {
+    const scheme = typeof u === 'string' ? u.split(':')[0].toLowerCase() : '';
+    if (!APP_SCHEMES.has(scheme)) continue;
+    let handler = '';
+    try { handler = app.getApplicationNameForProtocol(`${scheme}://`); } catch {}
+    if (handler) {
+      try { await shell.openExternal(u); return `app:${scheme}`; } catch {}
+    }
+  }
+  if (typeof web === 'string' && /^https:\/\//.test(web)) { await shell.openExternal(web); return 'web'; }
+  return 'none';
+});
+
+ipcMain.handle('links:apple', (_e, track) => getAppleLink(track && {
+  artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200)
 }));
 
 // Track-change notifications, shown from here so they can carry the album art on Windows

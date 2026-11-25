@@ -4,7 +4,8 @@
 //   1. Deezer by track ID      (exact)
 //   2. Deezer by ISRC          (exact)
 //   3. Deezer search           (artist + title, checked for a match)
-//   4. iTunes Search           (artist + title, checked for a match)
+// (iTunes is kept for the exact Apple Music link of the track on the stage, see below,
+//  because its rate limit is tight.)
 // Only artist and title are sent. Results (including misses) are cached on disk.
 
 const { net, app } = require('electron');
@@ -33,6 +34,27 @@ async function getJson(url) {
   const res = await net.fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(String(res.status));
   return res.json();
+}
+
+// iTunes Search allows roughly 20 requests a minute. All iTunes calls go through
+// this: one at a time, at least 3 s apart, and a 60 s pause after a 403/429.
+let itunesChain = Promise.resolve();
+let itunesLast = 0;
+let itunesPausedUntil = 0;
+function itunes(url) {
+  const run = async () => {
+    if (Date.now() < itunesPausedUntil) throw new Error('itunes paused');
+    const wait = itunesLast + 3000 - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    itunesLast = Date.now();
+    const res = await net.fetch(url, { headers: { Accept: 'application/json' } });
+    if (res.status === 403 || res.status === 429) { itunesPausedUntil = Date.now() + 60_000; throw new Error('itunes rate limited'); }
+    if (!res.ok) throw new Error(String(res.status));
+    return res.json();
+  };
+  const p = itunesChain.then(run, run);
+  itunesChain = p.catch(() => {});
+  return p;
 }
 
 const norm = (s) => (s || '').toLowerCase()
@@ -80,18 +102,6 @@ async function lookup(track) {
     const hit = (d.data || []).find((x) => matches(track, x.artist?.name, x.title));
     if (hit) return fromDeezer(hit);
   } catch {}
-  try {
-    const q = encodeURIComponent(`${artist} ${title}`);
-    const d = await getJson(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
-    const hit = (d.results || []).find((x) => matches(track, x.artistName, x.trackName));
-    if (hit?.artworkUrl100) {
-      return {
-        small: hit.artworkUrl100, large: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.'),
-        album: hit.collectionName || '', year: (hit.releaseDate || '').slice(0, 4),
-        appleUrl: (hit.trackViewUrl || '').split('?')[0]
-      };
-    }
-  } catch {}
   return null;
 }
 
@@ -124,4 +134,42 @@ function getArt(track) {
   return p;
 }
 
-module.exports = { getArt };
+// Exact Apple Music link for one track (used for the track on the stage only, to keep
+// requests low). iTunes Search by artist + title, checked for a match. Cached.
+async function getAppleLink(track) {
+  if (!track || typeof track.artist !== 'string' || typeof track.title !== 'string') return null;
+  const key = `apple|${norm(track.artist)}|${norm(track.title)}`;
+  const c = loadCache();
+  const hit = c[key];
+  if (hit && (hit.url || Date.now() - hit.at < MISS_TTL)) return hit.url;
+
+  // Keep the remix / version in the title ("Sweetie (IZCO Remix)"), drop featured artists
+  const fullTitle = track.title.replace(/\s*[([]\s*(ft\.?|feat\.?|featuring|prod\.?)[^)\]]*[)\]]/gi, '')
+    .replace(/\s+(ft\.?|feat\.?|featuring|prod\.?( by)?)\s.*$/i, '');
+  const want = words(fullTitle);
+  // Prefer the result whose title shares the most words with ours (so a remix beats the original)
+  const best = (results) => results
+    .filter((x) => matches(track, x.artistName, x.trackName))
+    .map((x) => {
+      const got = words(x.trackName);
+      const shared = [...want].filter((w) => got.has(w)).length;
+      const extra = [...got].filter((w) => !want.has(w)).length;
+      return { x, score: shared * 2 - extra };
+    })
+    .sort((a, b) => b.score - a.score)[0]?.x;
+
+  let url = null;
+  try {
+    for (const t of [fullTitle, cleanTitle(track.title)]) {
+      const q = encodeURIComponent(`${norm(firstArtist(track.artist))} ${norm(t)}`);
+      const d = await itunes(`https://itunes.apple.com/search?term=${q}&entity=song&limit=10`);
+      const m = best(d.results || []);
+      if (m?.trackViewUrl) { url = `${m.trackViewUrl.split('?')[0]}?i=${m.trackId}`; break; }
+    }
+  } catch { return null; }    // network trouble: don't cache, try again next time
+  c[key] = { url, at: Date.now() };
+  saveCache();
+  return url;
+}
+
+module.exports = { getArt, getAppleLink };

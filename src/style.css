@@ -592,6 +592,8 @@ body.playing .track__art { background: var(--grey-1); }
     transition: color .1s linear, border-color .1s linear;
   }
   .stage__link:hover { color: var(--white); border-color: var(--white); }
+  /* Links straight to the track read a touch brighter; searches stay grey */
+  .stage__link--exact { color: var(--grey-1); border-color: var(--grey-3); }
 }
 
 /* Short windows: smaller title so the cover keeps its size */

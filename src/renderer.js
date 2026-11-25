@@ -535,23 +535,36 @@ const Stage = (() => {
   const cleanTitle = (t) => (t || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+(ft\.?|feat\.?|featuring|prod\.?( by)?)\s.*$/i, '').trim();
   const firstArtist = (a) => (a || '').split(/,|&| x | ft\.? | feat\.? /i)[0].trim();
 
-  function links(track, art) {
-    const q = encodeURIComponent(`${firstArtist(track.artist)} ${cleanTitle(track.title)}`.trim());
+  // [name, url, exact]: exact links open the track itself, the rest open a search
+  function links(track, art, appleUrl) {
+    const plain = (x) => x.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[‘’“”'"`´]/g, '').replace(/\s+/g, ' ').trim();
+    const q = encodeURIComponent(plain(`${firstArtist(track.artist)} ${cleanTitle(track.title)}`));
+    const apple = appleUrl || art?.appleUrl;
+    const appleWeb = apple || `https://music.apple.com/us/search?term=${q}`;
+    const deezerWeb = art?.deezerUrl || `https://www.deezer.com/search/${q}`;
+    // 4th item: app links to try first (opened only if that app is installed)
     return [
-      ['Spotify', `https://open.spotify.com/search/${q}`],
-      ['Apple Music', art?.appleUrl || `https://music.apple.com/us/search?term=${q}`],
-      ['Deezer', art?.deezerUrl || `https://www.deezer.com/search/${q}`],
-      ['YouTube', `https://www.youtube.com/results?search_query=${q}`],
-      ['Bandcamp', `https://bandcamp.com/search?q=${q}`],
-      ['Discogs', `https://www.discogs.com/search/?q=${q}&type=all`]
+      ['Spotify', `https://open.spotify.com/search/${q}`, false, [`spotify:search:${q}`]],
+      ['Apple Music', appleWeb, !!apple, ['music', 'itmss'].map((s) => appleWeb.replace(/^https:/, `${s}:`))],
+      ['Deezer', deezerWeb, !!art?.deezerUrl, [deezerWeb.replace(/^https:/, 'deezer:')]],
+      ['YouTube', `https://www.youtube.com/results?search_query=${q}`, false],
+      ['Bandcamp', `https://bandcamp.com/search?q=${q}`, false],
+      ['Discogs', `https://www.discogs.com/search/?q=${q}&type=all`, false]
     ];
   }
 
   function paintLinks(items) {
     $('stageLinksLabel').hidden = !items.length || items.length === 1;
-    $('stageLinks').replaceChildren(...items.map(([name, href]) => {
+    $('stageLinks').replaceChildren(...items.map(([name, href, exact = true, apps = []]) => {
       const a = document.createElement('a');
-      a.className = 'stage__link'; a.href = href; a.target = '_blank'; a.textContent = name;
+      a.className = 'stage__link' + (exact ? ' stage__link--exact' : '');
+      a.href = href; a.target = '_blank'; a.textContent = name;
+      a.title = (exact ? `Open this track in ${name}` : `Search ${name} for this track`) + (apps.length ? ' (opens the app if installed)' : '');
+      // Prefer the desktop app when it's installed; otherwise the web page
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.nts.openLink({ web: href, apps });
+      });
       return a;
     }));
   }
@@ -603,11 +616,16 @@ const Stage = (() => {
         square: true
       };
       paint({ ...base, img: '', linkItems: links(t, null) });
+      // Art (and the Deezer link) first; the exact Apple Music link follows when found
+      const appleP = window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null);
       const art = await Art.get(t);
       if (my !== token) return;
-      paint({ ...base, img: art?.large || ep.img, square: !!art,
-        album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '',
-        linkItems: links(t, art) });
+      const full = { ...base, img: art?.large || ep.img, square: !!art,
+        album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '' };
+      paint({ ...full, linkItems: links(t, art) });
+      const appleUrl = await appleP;
+      if (my !== token || !appleUrl) return;
+      paintLinks(links(t, art, appleUrl));
       return;
     }
 

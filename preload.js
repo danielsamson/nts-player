@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('nts', {
   focus: () => ipcRenderer.invoke('win:focus'),
   setWide: (wide) => ipcRenderer.invoke('win:set-wide', wide),
   art: (track) => ipcRenderer.invoke('art:lookup', track),
+  appleLink: (track) => ipcRenderer.invoke('links:apple', track),
+  openLink: (link) => ipcRenderer.invoke('open:link', link),
   notify: (n) => ipcRenderer.invoke('notify', n),
   signIn: () => ipcRenderer.invoke('nts:sign-in'),
   signOut: () => ipcRenderer.invoke('nts:sign-out'),

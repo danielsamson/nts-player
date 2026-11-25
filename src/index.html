@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self' https://w.soundcloud.com; frame-src https://w.soundcloud.com">
   <title>NTS Player</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -21,6 +21,10 @@
         <span class="tab__title" id="tabTitle1"></span>
       </button>
     </nav>
+    <button class="tab tab--archive" id="archiveTab" title="Archive" aria-label="Archive">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h4v16H3zM9 4h4v16H9zM15.2 4.6l3.9-1 4 15.5-3.9 1z"/></svg>
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
   </header>
 
   <main class="channel" id="channel">
@@ -56,16 +60,25 @@
     </div>
   </main>
 
+  <section class="archive" id="archive" hidden>
+    <div class="archive__search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
+      <input id="archiveSearch" type="search" placeholder="Search the archive" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="archive__content" id="archiveContent"></div>
+  </section>
+
   <div class="snackbar" id="snackbar" hidden>Track info copied</div>
 
   <!-- Now-playing bar: what you hear, what's next, volume -->
   <footer class="nowbar">
+    <div class="seek" id="seek" title="Seek"><div class="seek__fill" id="seekFill"></div></div>
     <button id="play" class="play" aria-label="Play">
       <svg id="iconPlay" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>
       <svg id="iconPause" viewBox="0 0 24 24" hidden><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>
     </button>
     <div class="nowbar__text">
-      <span class="nowbar__now" id="nowLabel">Play NTS 1</span>
+      <span class="nowbar__now"><span class="nowbar__kind" id="nowKind"></span><span id="nowLabel">Play NTS 1</span></span>
       <span class="nowbar__next" id="next"></span>
     </div>
     <div class="volume">
@@ -77,6 +90,9 @@
   </footer>
 
   <audio id="audio" preload="none"></audio>
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+  <script src="archive-player.js"></script>
   <script src="renderer.js"></script>
+  <script src="archive.js"></script>
 </body>
 </html>

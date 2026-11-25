@@ -3,7 +3,7 @@
 A tiny desktop player for [NTS Radio](https://www.nts.live)'s two live channels. It's
 for Windows, where there's no NTS app, but it runs anywhere Electron does.
 
-<img src="docs/screenshot.png" alt="NTS Player showing channel 1 live" width="380">
+<img src="docs/screenshot.png" alt="NTS Player showing channel 1 live" width="320"> <img src="docs/archive.png" alt="An archive episode playing, with the current track highlighted" width="320">
 
 ## Features
 
@@ -18,6 +18,10 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 - **Tracklists for everyone else.** Without a Supporter sign-in, the Tracklist tab
   shows the show's previous episode, labelled with its date, with timestamps. Click a
   track to copy "Artist - Title".
+- **The NTS archive.** The archive tab (next to 1 and 2) has recently added episodes,
+  search across shows and episodes, and show pages with every episode. Episodes play
+  in the app with a seek bar. In the tracklist, the track that's playing is highlighted
+  and clicking a track jumps straight to it. Media keys skip between tracks.
 - **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.
@@ -70,13 +74,17 @@ it. Click **More info**, then **Run anyway**.
 | NTS 2 audio | `https://stream-relay-geo.ntslive.net/stream2`         |
 | Now playing | `https://www.nts.live/api/v2/live`                     |
 | Tracklists  | `https://www.nts.live/api/v2/shows/{show}/episodes/{episode}/tracklist` |
+| Archive     | `https://www.nts.live/api/v2/collections/recently-added`, `/api/v2/search`, `/api/v2/shows/...` |
+| Archive audio | NTS's SoundCloud uploads, played through SoundCloud's official embed player and its Widget API |
 | Live tracks | `https://www.nts.live/live-tracklist/{1,2}` (NTS Supporters, shown in an embedded view) |
 
 ```
 main.js          Electron window, and fetches "now playing" from the NTS API
 preload.js       Exposes that fetch safely to the page
 src/index.html   Player UI
-src/renderer.js  Playback, channel switching, media keys
+src/renderer.js  Live playback, channel switching, now-playing bar, media keys
+src/archive.js   Archive: recently added, search, show and episode pages
+src/archive-player.js  Plays archive episodes via SoundCloud's embed player
 src/style.css    Styling (design tokens at the top)
 src/fonts/       Roboto Condensed (SIL Open Font License)
 build/icon.png   App icon

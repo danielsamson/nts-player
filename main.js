@@ -74,7 +74,7 @@ ipcMain.handle('nts:live', async () => {
 // Read-only access to other NTS API paths (tracklists, episodes). Only
 // /api/v2/... paths on nts.live are allowed.
 ipcMain.handle('nts:api', async (_e, apiPath) => {
-  if (typeof apiPath !== 'string' || !/^\/api\/v2\/[A-Za-z0-9\-_/]+(\?[A-Za-z0-9=&_-]*)?$/.test(apiPath) || apiPath.includes('..')) {
+  if (typeof apiPath !== 'string' || !/^\/api\/v2\/[A-Za-z0-9\-_/]+(\?[A-Za-z0-9=&_.%+\[\]-]*)?$/.test(apiPath) || apiPath.includes('..')) {
     throw new Error('Invalid NTS API path');
   }
   const res = await net.fetch(`https://www.nts.live${apiPath}`, { headers: { Accept: 'application/json' } });

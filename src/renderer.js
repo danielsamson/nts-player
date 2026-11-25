@@ -6,7 +6,9 @@ const STREAMS = [
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
 let channel = Number(localStorage.getItem('channel') || 0);
-let playing = false;
+let playing = false;            // live radio playing
+let view = 'live';              // 'live' or 'archive': what the panel shows
+let source = 'live';            // 'live' or 'archive': what the play button controls
 let live = null;
 let pane = localStorage.getItem('pane') || 'about';
 // Set once you've signed in to NTS; cleared if NTS sends the tracklist to sign-in
@@ -41,18 +43,19 @@ function showInfo(r) {
 }
 
 function render() {
-  document.querySelectorAll('.tab').forEach((b) =>
-    b.classList.toggle('active', Number(b.dataset.ch) === channel));
+  document.querySelectorAll('.tab[data-ch]').forEach((b) =>
+    b.classList.toggle('active', view === 'live' && Number(b.dataset.ch) === channel));
+  $('archiveTab').classList.toggle('active', view === 'archive');
+  document.body.classList.toggle('view-archive', view === 'archive');
+  $('channel').hidden = view !== 'live';
+  $('archive').hidden = view !== 'archive';
+  renderNowbar();
   document.body.classList.toggle('playing', playing);
-  $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
-  document.querySelectorAll('.tab').forEach((b) => {
+  document.querySelectorAll('.tab[data-ch]').forEach((b) => {
     const ch = Number(b.dataset.ch);
     b.title = ch === channel ? (playing ? `Playing NTS ${ch + 1}` : `NTS ${ch + 1} selected`) : `Switch to NTS ${ch + 1}`;
   });
   document.body.classList.toggle('pane-tracks', pane === 'tracks');
-  $('iconPlay').toggleAttribute('hidden', playing);
-  $('iconPause').toggleAttribute('hidden', !playing);
-  $('play').setAttribute('aria-label', playing ? 'Stop' : 'Play');
 
   const results = live?.results;
   if (!results) return;
@@ -75,17 +78,92 @@ function render() {
   if (!supporter) renderTracks(info);
   $('time').textContent = info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : '';
   if ($('art').getAttribute('src') !== info.img) $('art').setAttribute('src', info.img);
-  $('next').textContent = info.next?.broadcast_title
+  nextText = info.next?.broadcast_title
     ? `Next ${fmtTime(info.next.start_timestamp)} · ${info.next.broadcast_title}` : '';
-  document.title = `NTS ${channel + 1} · ${info.title}`;
+  renderNowbar();
 
-  if ('mediaSession' in navigator) {
+  if (source === 'live' && 'mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: info.title, artist: `NTS ${channel + 1}`, album: info.location || 'NTS Radio',
       artwork: info.img ? [{ src: info.img, sizes: '512x512' }] : []
     });
   }
 }
+
+// ---- Now-playing bar: live radio or an archive episode ----
+let nextText = '';
+const fmtMs = (ms) => fmtOffset(Math.max(0, Math.floor((ms || 0) / 1000)));
+
+function renderNowbar() {
+  const a = ArchivePlayer.state;
+  const archive = source === 'archive' && a.episode;
+  const active = archive ? (a.playing || a.loading) : playing;
+  document.body.classList.toggle('archive-playing', !!(archive && (a.playing || a.loading)));
+  document.body.classList.toggle('source-archive', !!archive);
+  $('iconPlay').toggleAttribute('hidden', active);
+  $('iconPause').toggleAttribute('hidden', !active);
+  $('play').setAttribute('aria-label', active ? (archive ? 'Pause' : 'Stop') : 'Play');
+
+  if (archive) {
+    $('nowKind').textContent = 'Archive';
+    $('nowLabel').textContent = a.episode.title;
+    $('next').textContent = a.error || (a.loading ? 'Loading…' : `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}${a.episode.date ? ' · ' + a.episode.date : ''}`);
+    $('seekFill').style.width = a.duration ? `${Math.min(100, (a.position / a.duration) * 100)}%` : '0%';
+    document.title = `NTS Archive · ${a.episode.title}`;
+  } else {
+    $('nowKind').textContent = '';
+    $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
+    $('next').textContent = nextText;
+    const t = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
+    document.title = t ? `NTS ${channel + 1} · ${t}` : 'NTS Player';
+  }
+}
+
+// Start an archive episode (stops live radio)
+function playArchive(info, startMs = 0) {
+  if (playing) stop();
+  source = 'archive';
+  ArchivePlayer.load(info, startMs);
+  ArchivePlayer.setVolume(audio.muted ? 0 : audio.volume);
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: info.title, artist: 'NTS Archive', album: [info.location, info.date].filter(Boolean).join(' · '),
+      artwork: info.img ? [{ src: info.img, sizes: '512x512' }] : []
+    });
+  }
+  render();
+}
+function switchToArchive() { if (playing) stop(); source = 'archive'; }
+
+// The one play button: controls whichever source is current
+function togglePlayback() {
+  if (source === 'archive' && ArchivePlayer.state.episode) {
+    if (!ArchivePlayer.state.playing && playing) stop();
+    ArchivePlayer.toggle();
+  } else {
+    playing ? stop() : play();
+  }
+}
+
+ArchivePlayer.onChange(renderNowbar);
+
+// Seek bar (archive only): click or drag
+(() => {
+  const bar = $('seek');
+  let dragging = false;
+  const seekTo = (e) => {
+    const a = ArchivePlayer.state;
+    if (!a.duration) return;
+    const r = bar.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    $('seekFill').style.width = `${ratio * 100}%`;
+    if (!dragging) ArchivePlayer.seek(ratio * a.duration);
+    return ratio * a.duration;
+  };
+  bar.addEventListener('pointerdown', (e) => { dragging = true; bar.setPointerCapture(e.pointerId); seekTo(e); });
+  bar.addEventListener('pointermove', (e) => { if (dragging) seekTo(e); });
+  bar.addEventListener('pointerup', (e) => { const ms = seekTo(e); dragging = false; if (ms != null) ArchivePlayer.seek(ms); });
+})();
 
 // ---- Tracklists ----
 // Live track IDs are an NTS Supporter feature, so the live episode's tracklist
@@ -257,6 +335,8 @@ async function refresh() {
 }
 
 function play() {
+  ArchivePlayer.pause();
+  source = 'live';
   // Always reconnect fresh so you hear what's live now, not a stale buffer
   audio.src = `${STREAMS[channel]}?t=${Date.now()}`;
   audio.play().catch(() => {});
@@ -270,16 +350,22 @@ function stop() {
   playing = false; render();
 }
 
+// Live tabs show that channel; if live radio is playing, it switches to it.
+// An archive episode keeps playing while you look at the live channels.
 function setChannel(ch) {
-  if (ch === channel) return;
-  channel = ch;
-  localStorage.setItem('channel', ch);
-  if (playing) play(); else render();
+  view = 'live';
+  if (ch !== channel) {
+    channel = ch;
+    localStorage.setItem('channel', ch);
+    if (playing) { play(); return; }
+  }
+  render();
 }
 
-$('play').addEventListener('click', () => (playing ? stop() : play()));
-document.querySelectorAll('.tab').forEach((b) =>
+$('play').addEventListener('click', togglePlayback);
+document.querySelectorAll('.tab[data-ch]').forEach((b) =>
   b.addEventListener('click', () => setChannel(Number(b.dataset.ch))));
+$('archiveTab').addEventListener('click', () => { view = 'archive'; Archive.open(); render(); });
 // Mute toggles between silent and your last volume
 const VOL_ON = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z';
 const VOL_OFF = 'M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z';
@@ -287,7 +373,11 @@ const paintMute = () => {
   $('volIcon').setAttribute('d', audio.muted || audio.volume === 0 ? VOL_OFF : VOL_ON);
   $('mute').setAttribute('aria-label', audio.muted ? 'Unmute' : 'Mute');
 };
-$('mute').addEventListener('click', () => { audio.muted = !audio.muted; paintMute(); });
+$('mute').addEventListener('click', () => {
+  audio.muted = !audio.muted;
+  ArchivePlayer.setVolume(audio.muted ? 0 : audio.volume);
+  paintMute();
+});
 paintMute();
 
 $('volume').addEventListener('input', (e) => {
@@ -295,10 +385,12 @@ $('volume').addEventListener('input', (e) => {
   localStorage.setItem('volume', audio.volume);
   paintVolume();
   if (audio.muted) audio.muted = false;
+  ArchivePlayer.setVolume(audio.volume);
   paintMute();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space') { e.preventDefault(); playing ? stop() : play(); }
+  if (e.target.matches?.('input')) return;
+  if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
   if (e.key === '1') setChannel(0);
   if (e.key === '2') setChannel(1);
 });
@@ -309,11 +401,13 @@ audio.addEventListener('stalled', () => { if (playing) setTimeout(() => playing 
 
 // Windows media keys / system media overlay
 if ('mediaSession' in navigator) {
-  navigator.mediaSession.setActionHandler('play', play);
-  navigator.mediaSession.setActionHandler('pause', stop);
-  navigator.mediaSession.setActionHandler('stop', stop);
-  navigator.mediaSession.setActionHandler('nexttrack', () => setChannel(channel ? 0 : 1));
-  navigator.mediaSession.setActionHandler('previoustrack', () => setChannel(channel ? 0 : 1));
+  const isArchive = () => source === 'archive' && ArchivePlayer.state.episode;
+  navigator.mediaSession.setActionHandler('play', () => (isArchive() ? ArchivePlayer.play() : play()));
+  navigator.mediaSession.setActionHandler('pause', () => (isArchive() ? ArchivePlayer.pause() : stop()));
+  navigator.mediaSession.setActionHandler('stop', () => (isArchive() ? ArchivePlayer.pause() : stop()));
+  // Live: next/previous switches channel. Archive: jumps between tracks in the tracklist.
+  navigator.mediaSession.setActionHandler('nexttrack', () => (isArchive() ? Archive.skipTrack(1) : setChannel(channel ? 0 : 1)));
+  navigator.mediaSession.setActionHandler('previoustrack', () => (isArchive() ? Archive.skipTrack(-1) : setChannel(channel ? 0 : 1)));
 }
 
 render();

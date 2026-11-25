@@ -3,35 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self'; script-src 'self'">
+        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self'; font-src 'self'; script-src 'self'">
   <title>NTS Player</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
+  <header class="topbar">
     <img class="logo" src="nts-logo.svg" alt="NTS">
-    <nav>
-      <button class="ch active" data-ch="0">1</button>
-      <button class="ch" data-ch="1">2</button>
-    </nav>
+    <span class="topbar__label">Live now <span class="live-dot"></span></span>
   </header>
 
-  <main>
-    <div class="art" id="art"><div class="live-badge" id="liveBadge">LIVE</div></div>
-    <div class="meta">
-      <div class="location" id="location">&nbsp;</div>
-      <h1 id="title">Loading…</h1>
-      <div class="time" id="time">&nbsp;</div>
+  <nav class="tabs">
+    <button class="tab" data-ch="0">
+      <span class="channel-icon">1</span><span class="live-dot"></span>
+      <span class="tab__title" id="tabTitle0"></span>
+    </button>
+    <button class="tab" data-ch="1">
+      <span class="channel-icon">2</span><span class="live-dot"></span>
+      <span class="tab__title" id="tabTitle1"></span>
+    </button>
+  </nav>
+
+  <main class="channel" id="channel">
+    <div class="channel__header">
+      <div class="channel__heading">
+        <span class="channel-icon" id="chIcon">1</span><span class="live-dot"></span>
+        <span class="channel__location" id="location"></span>
+      </div>
+      <span class="channel__times" id="time"></span>
+    </div>
+    <div class="picture"><img id="art" alt=""></div>
+    <div class="channel__details">
+      <h1 class="broadcast-heading" id="title">Loading…</h1>
+      <p class="broadcast-description" id="description"></p>
     </div>
   </main>
 
-  <footer>
+  <div class="next">
+    <span class="next__label" id="nextLabel">Next on 1</span>
+    <span class="next__details" id="next">…</span>
+  </div>
+
+  <footer class="controls">
     <button id="play" class="play" aria-label="Play">
-      <svg id="iconPlay" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>
-      <svg id="iconPause" viewBox="0 0 24 24" hidden><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+      <svg id="iconPlay" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>
+      <svg id="iconPause" viewBox="0 0 24 24" hidden><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>
     </button>
-    <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
-    <div class="next" id="next">&nbsp;</div>
+    <div class="volume">
+      <svg class="volume__icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+      <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+    </div>
   </footer>
 
   <audio id="audio" preload="none"></audio>

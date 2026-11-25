@@ -11,41 +11,56 @@ let live = null;
 
 audio.volume = Number(localStorage.getItem('volume') ?? 0.8);
 $('volume').value = audio.volume;
+const paintVolume = () => $('volume').style.setProperty('--fill', `${audio.volume * 100}%`);
+paintVolume();
 
 function fmtTime(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function showInfo(r) {
+  const now = r?.now || {};
+  const d = now.embeds?.details || {};
+  const media = d.media || {};
+  return {
+    title: now.broadcast_title || d.name || 'NTS Live',
+    location: d.location_long || '',
+    description: d.description || '',
+    img: media.background_large || media.picture_large || media.background_medium || media.picture_medium || '',
+    start: now.start_timestamp, end: now.end_timestamp,
+    next: r?.next || r?.next1
+  };
 }
 
 function render() {
-  document.querySelectorAll('.ch').forEach((b) =>
+  document.querySelectorAll('.tab').forEach((b) =>
     b.classList.toggle('active', Number(b.dataset.ch) === channel));
   document.body.classList.toggle('playing', playing);
   $('iconPlay').toggleAttribute('hidden', playing);
   $('iconPause').toggleAttribute('hidden', !playing);
+  $('play').setAttribute('aria-label', playing ? 'Stop' : 'Play');
+  $('chIcon').textContent = channel + 1;
+  $('nextLabel').textContent = `Next on ${channel + 1}`;
 
-  const r = live?.results?.[channel];
-  if (!r) return;
-  const now = r.now || {};
-  const d = now.embeds?.details || {};
-  const media = d.media || {};
-  const title = now.broadcast_title || d.name || 'NTS Live';
-  const img = media.background_large || media.picture_large || media.background_medium || media.picture_medium || '';
+  const results = live?.results;
+  if (!results) return;
+  results.slice(0, 2).forEach((r, i) => { $(`tabTitle${i}`).textContent = showInfo(r).title; });
 
-  $('title').textContent = title;
-  $('location').textContent = d.location_long || `Channel ${channel + 1}`;
-  $('time').textContent = now.start_timestamp
-    ? `${fmtTime(now.start_timestamp)} – ${fmtTime(now.end_timestamp)}` : '';
-  $('art').style.backgroundImage = img ? `url("${img}")` : '';
-  const next = r.next || r.next1;
-  $('next').textContent = next?.broadcast_title
-    ? `Next ${fmtTime(next.start_timestamp)}: ${next.broadcast_title}` : '';
-  document.title = `NTS ${channel + 1} · ${title}`;
+  const info = showInfo(results[channel]);
+  $('title').textContent = info.title;
+  $('location').textContent = info.location;
+  $('description').textContent = info.description;
+  $('time').textContent = info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : '';
+  if ($('art').getAttribute('src') !== info.img) $('art').setAttribute('src', info.img);
+  $('next').textContent = info.next?.broadcast_title
+    ? `${fmtTime(info.next.start_timestamp)} ${info.next.broadcast_title}` : '';
+  document.title = `NTS ${channel + 1} · ${info.title}`;
 
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
-      title, artist: `NTS ${channel + 1}`, album: d.location_long || 'NTS Radio',
-      artwork: img ? [{ src: img, sizes: '512x512' }] : []
+      title: info.title, artist: `NTS ${channel + 1}`, album: info.location || 'NTS Radio',
+      artwork: info.img ? [{ src: info.img, sizes: '512x512' }] : []
     });
   }
 }
@@ -77,11 +92,12 @@ function setChannel(ch) {
 }
 
 $('play').addEventListener('click', () => (playing ? stop() : play()));
-document.querySelectorAll('.ch').forEach((b) =>
+document.querySelectorAll('.tab').forEach((b) =>
   b.addEventListener('click', () => setChannel(Number(b.dataset.ch))));
 $('volume').addEventListener('input', (e) => {
   audio.volume = Number(e.target.value);
   localStorage.setItem('volume', audio.volume);
+  paintVolume();
 });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); playing ? stop() : play(); }

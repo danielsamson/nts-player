@@ -16,6 +16,9 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 - **Media keys.** Works with your keyboard's play/pause keys and the Windows media
   overlay. Next/previous switches channel.
 - **Remembers** your last channel and volume.
+- **Looks like NTS.** Uses the visual language of nts.live: black and white, 1px
+  rules, square corners, bold uppercase condensed type, the red live dot, and the
+  channel inverting to white while it's playing.
 
 ### Keyboard shortcuts
 
@@ -63,9 +66,17 @@ main.js          Electron window, and fetches "now playing" from the NTS API
 preload.js       Exposes that fetch safely to the page
 src/index.html   Player UI
 src/renderer.js  Playback, channel switching, media keys
-src/style.css    Styling
+src/style.css    Styling (design tokens at the top)
+src/fonts/       Roboto Condensed (SIL Open Font License)
 build/icon.png   App icon
 ```
+
+### Type
+
+nts.live uses Univers Condensed, a commercial typeface that can't be redistributed
+here. The app bundles [Roboto Condensed](https://fonts.google.com/specimen/Roboto+Condensed)
+as a close, free stand-in. If you have Univers Condensed installed, the app uses it
+automatically.
 
 ## Disclaimer
 

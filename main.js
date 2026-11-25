@@ -15,9 +15,9 @@ if (!app.requestSingleInstanceLock()) {
 function createWindow() {
   win = new BrowserWindow({
     width: 380,
-    height: 600,
+    height: 620,
     minWidth: 320,
-    minHeight: 480,
+    minHeight: 560,
     backgroundColor: '#000000',
     title: 'NTS Player',
     icon: path.join(__dirname, 'build', 'icon.png'),

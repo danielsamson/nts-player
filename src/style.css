@@ -226,3 +226,39 @@ body.pane-tracks .picture { display: none; }
 .supporter__button:hover { background: var(--fg); color: var(--bg); }
 #pane-tracks.live { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
 .live-tracks { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--black); }
+
+/* ---- Which channel is playing ----
+   The playing channel's red dot becomes moving level bars, in the top bar and
+   on its tab, so it's always clear which one you're hearing. */
+.eq { display: none; align-items: flex-end; gap: 2px; height: 12px; margin-left: 6px; flex-shrink: 0; }
+.eq i { display: block; width: 3px; height: 100%; background: currentColor; transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: -.4s; animation-duration: .8s; }
+.eq i:nth-child(3) { animation-delay: -.7s; animation-duration: 1.1s; }
+@keyframes eq { 0%, 100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .eq i { animation: none; transform: scaleY(.7); } }
+
+body.playing .topbar .live-dot,
+body.playing .tab.active .live-dot { display: none; }
+body.playing .topbar .eq,
+body.playing .tab.active .eq { display: inline-flex; }
+body.playing .topbar .eq { color: var(--live); }
+
+/* The tab you're not hearing steps back a little */
+body.playing .tab:not(.active) { color: var(--grey-2); }
+body.playing .tab:not(.active) .channel-icon { background: var(--grey-2); }
+body.playing .tab:not(.active):hover { color: var(--white); }
+
+.now-label {
+  display: flex; align-items: center; padding-left: 12px; flex-shrink: 0;
+  font-size: 13px; line-height: 18px; font-weight: 700; text-transform: uppercase; white-space: nowrap;
+}
+.controls .volume { min-width: 0; }
+
+/* About tab: the whole channel area scrolls, so the artwork moves out of the
+   way and the show info gets the full height */
+.channel__header, .picture { flex-shrink: 0; }
+body:not(.pane-tracks) .channel { overflow-y: auto; }
+body:not(.pane-tracks) .channel__details { flex: none; }
+body:not(.pane-tracks) #pane-about { flex: none; overflow: visible; padding-bottom: 16px; }
+.channel::-webkit-scrollbar { width: 4px; }
+.channel::-webkit-scrollbar-thumb { background: var(--grey-3); }

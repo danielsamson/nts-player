@@ -44,6 +44,12 @@ function render() {
   document.querySelectorAll('.tab').forEach((b) =>
     b.classList.toggle('active', Number(b.dataset.ch) === channel));
   document.body.classList.toggle('playing', playing);
+  $('topLabel').textContent = playing ? `Playing NTS ${channel + 1}` : 'Live now';
+  $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
+  document.querySelectorAll('.tab').forEach((b) => {
+    const ch = Number(b.dataset.ch);
+    b.title = ch === channel ? (playing ? `Playing NTS ${ch + 1}` : `NTS ${ch + 1} selected`) : `Switch to NTS ${ch + 1}`;
+  });
   document.body.classList.toggle('pane-tracks', pane === 'tracks');
   $('iconPlay').toggleAttribute('hidden', playing);
   $('iconPause').toggleAttribute('hidden', !playing);

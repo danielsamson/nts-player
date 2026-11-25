@@ -8,6 +8,11 @@ contextBridge.exposeInMainWorld('nts', {
   art: (track, priority) => ipcRenderer.invoke('art:lookup', track, priority),
   appleLink: (track) => ipcRenderer.invoke('links:apple', track),
   openLink: (link) => ipcRenderer.invoke('open:link', link),
+  account: {
+    episode: (show, episode) => ipcRenderer.invoke('account:episode', show, episode),
+    toggle: (action) => ipcRenderer.invoke('account:toggle', action),
+    list: (kind) => ipcRenderer.invoke('account:list', kind)
+  },
   notify: (n) => ipcRenderer.invoke('notify', n),
   signIn: () => ipcRenderer.invoke('nts:sign-in'),
   signOut: () => ipcRenderer.invoke('nts:sign-out'),

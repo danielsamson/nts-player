@@ -44,6 +44,7 @@ const Archive = (() => {
     else if (current.type === 'search') renderSearch(current.q);
     else if (current.type === 'show') renderShow(current.show);
     else if (current.type === 'episode') renderEpisode(current.show, current.episode);
+    else if (current.type === 'mynts') renderMyNts(current.kind);
   }
 
   function backBar(label) {
@@ -127,6 +128,61 @@ const Archive = (() => {
     return [head, list];
   }
 
+  // ---- My NTS: your saved episodes, followed shows and saved tracks (from nts.live) ----
+  function myNtsSection() {
+    const head = sectionTitle('My NTS');
+    const nav = el('div', 'mynts-nav');
+    [['episodes', 'Saved episodes'], ['shows', 'Followed shows'], ['tracks', 'Saved tracks']].forEach(([kind, label]) => {
+      const b = el('button', 'mynts-nav__item', label);
+      b.addEventListener('click', () => go({ type: 'mynts', kind }));
+      nav.append(b);
+    });
+    return [head, nav];
+  }
+
+  async function renderMyNts(kind) {
+    const titles = { episodes: 'Saved episodes', shows: 'Followed shows', tracks: 'Saved tracks' };
+    root.replaceChildren(backBar(`My NTS · ${titles[kind]}`), el('p', 'archive__status', 'Loading from My NTS…'));
+    const res = await window.nts.account.list(kind).catch(() => null);
+    if (current.type !== 'mynts' || current.kind !== kind) return;
+    if (!res || res.signedIn === false) {
+      const btn = el('button', 'archive__more', 'Sign in to NTS');
+      btn.addEventListener('click', () => window.nts.signIn());
+      root.replaceChildren(backBar(`My NTS · ${titles[kind]}`),
+        el('p', 'archive__status', 'Sign in with your NTS account to see what you’ve saved on nts.live and the NTS app.'), btn);
+      return;
+    }
+    if (!res.available) {
+      root.replaceChildren(backBar(`My NTS · ${titles[kind]}`), el('p', 'archive__status', 'Couldn’t read My NTS right now.'));
+      return;
+    }
+    const list = el('div', 'items');
+    if (kind === 'tracks') {
+      const ol = el('ol', 'tracks archive-tracks');
+      (res.tracks || []).forEach((t) => {
+        const p = parsePath(t.path);
+        ol.append(trackRow({ artist: t.artist, title: t.title }, {
+          title: p?.episode ? 'Open the episode' : 'Click to copy',
+          onClick: p?.episode ? () => go({ type: 'episode', show: p.show, episode: p.episode }) : undefined
+        }));
+      });
+      list.append(ol);
+    } else {
+      (res.items || []).forEach((it) => {
+        const p = parsePath(it.path);
+        if (!p) return;
+        list.append(row({
+          img: it.img, title: it.title, meta: it.subtitle, kind: kind === 'shows' ? 'Show' : null,
+          playing: p.episode && ArchivePlayer.isLoaded(p.show, p.episode),
+          onClick: () => go(p.episode ? { type: 'episode', show: p.show, episode: p.episode } : { type: 'show', show: p.show })
+        }));
+      });
+    }
+    const empty = kind === 'tracks' ? !(res.tracks || []).length : !list.children.length;
+    root.replaceChildren(backBar(`My NTS · ${titles[kind]}`),
+      empty ? el('p', 'archive__status', `Nothing here yet.`) : list);
+  }
+
   // ---- Home: recently added ----
   async function renderHome() {
     const list = el('div', 'items');
@@ -139,7 +195,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...historySection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...historySection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(el('p', 'archive__status', 'Could not load the archive.')); }
   }
@@ -273,7 +329,8 @@ const Archive = (() => {
           switchToArchive(); ArchivePlayer.seek(0); if (!ArchivePlayer.state.playing) ArchivePlayer.play();
         } else playArchive(info, 0);
       });
-      body.append(playBtn, startOver);
+      const mynts = el('div');
+      body.append(playBtn, startOver, mynts);
       if (ep.description) body.append(el('p', 'broadcast-description detail__desc', ep.description));
       if (url) {
         const sc = el('a', 'text-link detail__source', 'Audio via SoundCloud');
@@ -283,10 +340,12 @@ const Archive = (() => {
       wrap.append(picWrap, body);
 
       const list = el('ol', 'tracks archive-tracks');
+      const saveButtons = new Map();
       tracks.forEach((t, i) => {
         const offset = t.offset ?? t.offset_estimate;
         const playable = url && offset != null;
         const li = trackRow(t, {
+          saveButtons,
           title: playable ? 'Play from here' : 'Click to copy',
           onClick: () => {
             if (!playable) { copyTrack(`${t.artist} - ${t.title}`); return; }
@@ -304,6 +363,7 @@ const Archive = (() => {
       parts.push(tracks.length ? list : el('p', 'archive__status', 'No tracklist for this episode.'));
       root.replaceChildren(...parts);
       episodeView = { show, episode, tracks, list, paintPlay };
+      MyNTS.mount(mynts, show, episode, { trackButtons: saveButtons });
       paintPlay();
       highlight();
     } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Could not load this episode.')); }
@@ -399,6 +459,7 @@ const Archive = (() => {
 
   return {
     resumeLast,
+    refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
     skipTrack

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage } = require('electron');
 const { getArt, getAppleLink } = require('./art');
+const account = require('./account');
 const path = require('path');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
@@ -95,6 +96,7 @@ function openSignIn() {
   // Signed in once NTS sends us on from the sign-in pages to anywhere else on nts.live
   const check = (_e, url) => {
     if (isNts(url) && !isAuthPage(url)) {
+      account.reset();
       win?.webContents.send('nts:auth-changed', true);
       signInWin.close();
     }
@@ -115,6 +117,7 @@ function openSignIn() {
 ipcMain.handle('nts:sign-in', () => openSignIn());
 ipcMain.handle('nts:sign-out', async () => {
   await session.fromPartition(NTS_PARTITION).clearStorageData();
+  account.reset();
   win?.webContents.send('nts:auth-changed', false);
 });
 
@@ -151,6 +154,18 @@ ipcMain.handle('open:link', async (_e, { web, apps } = {}) => {
   if (typeof web === 'string' && /^https:\/\//.test(web)) { await shell.openExternal(web); return 'web'; }
   return 'none';
 });
+
+// My NTS (see account.js): saved state, NTS's own save/follow buttons, your lists
+const alias = (s) => (typeof s === 'string' && /^[a-z0-9-]{1,200}$/i.test(s) ? s : null);
+ipcMain.handle('account:episode', (_e, show, episode) =>
+  alias(show) && alias(episode) ? account.getEpisodeState(show, episode) : { available: false });
+ipcMain.handle('account:toggle', (_e, a = {}) => {
+  if (!alias(a.show) || !alias(a.episode) || !['episode', 'show', 'track'].includes(a.kind)) return { available: false };
+  return account.toggle({ show: a.show, episode: a.episode, kind: a.kind, want: !!a.want,
+    artist: String(a.artist || '').slice(0, 300), title: String(a.title || '').slice(0, 300) });
+});
+ipcMain.handle('account:list', (_e, kind) =>
+  account.getList(['episodes', 'shows', 'tracks'].includes(kind) ? kind : 'episodes'));
 
 ipcMain.handle('links:apple', (_e, track) => getAppleLink(track && {
   artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200)

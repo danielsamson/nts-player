@@ -68,6 +68,11 @@ function render() {
   $('tags').replaceChildren(...info.genres.slice(0, 4).map((g) => {
     const t = document.createElement('span'); t.className = 'tag'; t.textContent = g; return t;
   }));
+  const myKey = `${info.show}/${info.episode}`;
+  if ($('liveMyNts').dataset.key !== myKey) {
+    $('liveMyNts').dataset.key = myKey;
+    MyNTS.mount($('liveMyNts'), info.show, info.episode);
+  }
   const link = $('episodeLink');
   link.hidden = !info.episode;
   if (info.episode) link.href = `https://www.nts.live/shows/${info.show}/episodes/${info.episode}`;
@@ -129,7 +134,7 @@ const Art = (() => {
 })();
 
 // One tracklist row: album art, time, artist, title, copy button
-function trackRow(t, { onClick, title } = {}) {
+function trackRow(t, { onClick, title, saveButtons } = {}) {
   const li = document.createElement('li');
   li.className = 'track';
   li.title = title || 'Click to copy';
@@ -145,7 +150,16 @@ function trackRow(t, { onClick, title } = {}) {
   text.append(top, name);
   const copy = document.createElement('button'); copy.className = 'track__copy'; copy.textContent = '⧉'; copy.title = 'Copy track';
   copy.addEventListener('click', (e) => { e.stopPropagation(); copyTrack(`${t.artist} - ${t.title}`); });
-  li.append(art, text, copy);
+  const actions = document.createElement('span'); actions.className = 'track__actions';
+  if (saveButtons) {
+    const save = document.createElement('button');
+    save.className = 'track__save'; save.hidden = true;
+    save.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
+    saveButtons.set(MyNTS.trackKey(t), save);
+    actions.append(save);
+  }
+  actions.append(copy);
+  li.append(art, text, actions);
   li.addEventListener('click', onClick || (() => copyTrack(`${t.artist} - ${t.title}`)));
   return li;
 }
@@ -216,6 +230,103 @@ function togglePlayback() {
 }
 
 ArchivePlayer.onChange(renderNowbar);
+
+// ---- My NTS: save episodes, follow shows, save tracks (see account.js) ----
+// Draws "Save episode" / "Follow show" buttons into a container and keeps track
+// buttons in sync. Reads the state from NTS when mounted.
+const MyNTS = (() => {
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const ICON_SAVE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
+  const ICON_FOLLOW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.3 5 6.8 5c2 0 3.6 1.1 5.2 3 1.6-1.9 3.2-3 5.2-3 3.5 0 5.6 3.6 4.3 6.8C19.5 16.4 12 21 12 21z"/></svg>';
+
+  function button(label, icon) {
+    const b = document.createElement('button');
+    b.className = 'mynts-btn';
+    b.innerHTML = `${icon}<span></span>`;
+    b.querySelector('span').textContent = label;
+    return b;
+  }
+
+  // container: element to fill. trackButtons: optional Map("artist|title" -> button)
+  function mount(container, show, episode, { trackButtons } = {}) {
+    container.replaceChildren();
+    container.classList.add('mynts');
+    if (!show || !episode) return;
+    const note = document.createElement('span');
+    note.className = 'mynts__note';
+    note.textContent = 'Checking My NTS…';
+    container.append(note);
+    let state = null;
+
+    const save = button('Save episode', ICON_SAVE);
+    const follow = button('Follow show', ICON_FOLLOW);
+
+    function paint() {
+      if (!state?.available) {
+        note.textContent = state ? 'My NTS isn’t available right now' : 'Checking My NTS…';
+        container.replaceChildren(note);
+        return;
+      }
+      if (!state.signedIn) {
+        const link = document.createElement('button');
+        link.className = 'mynts__signin';
+        link.textContent = 'Sign in to save to My NTS';
+        link.addEventListener('click', () => window.nts.signIn());
+        container.replaceChildren(link);
+        trackButtons?.forEach((b) => { b.hidden = true; });
+        return;
+      }
+      save.classList.toggle('mynts-btn--on', !!state.saved);
+      save.querySelector('span').textContent = state.saved ? 'Saved' : 'Save episode';
+      save.title = state.saved ? 'Remove from your saved episodes' : 'Save to My NTS';
+      follow.classList.toggle('mynts-btn--on', !!state.following);
+      follow.querySelector('span').textContent = state.following ? 'Following' : 'Follow show';
+      follow.title = state.following ? 'Unfollow this show' : 'Follow this show in My NTS';
+      const parts = [];
+      if (state.saved !== null) parts.push(save);
+      if (state.following !== null) parts.push(follow);
+      container.replaceChildren(...parts);
+      trackButtons?.forEach((b, key) => {
+        const t = state.tracks?.find((x) => norm(x.title) === key);
+        b.hidden = !t?.canSave;
+        b.classList.toggle('track__save--on', !!t?.saved);
+        b.title = t?.saved ? 'Remove from your saved tracks' : 'Save track to My NTS';
+      });
+    }
+
+    async function act(kind, want, extra = {}, btn) {
+      btn?.classList.add('mynts-btn--busy');
+      const res = await window.nts.account.toggle({ show, episode, kind, want, ...extra }).catch(() => null);
+      btn?.classList.remove('mynts-btn--busy');
+      if (res) state = res;
+      if (!res || res.error) showSnack('Couldn’t update My NTS. Try again on nts.live');
+      else showSnack(kind === 'episode' ? (want ? 'Saved to My NTS' : 'Removed from saved episodes')
+        : kind === 'show' ? (want ? 'Following in My NTS' : 'Unfollowed')
+        : (want ? 'Track saved to My NTS' : 'Track removed'));
+      paint();
+    }
+    save.addEventListener('click', () => act('episode', !state.saved, {}, save));
+    follow.addEventListener('click', () => act('show', !state.following, {}, follow));
+    trackButtons?.forEach((b, key) => {
+      b.hidden = true;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const t = state?.tracks?.find((x) => norm(x.title) === key);
+        if (t) act('track', !t.saved, { artist: t.artist, title: t.title }, b);
+      });
+    });
+
+    window.nts.account.episode(show, episode).then((s) => {
+      if (!container.isConnected) return;
+      state = s || { available: false };
+      paint();
+    });
+  }
+
+  // tracks are matched by title: NTS's page formats artists differently from its API
+  const trackKey = (t) => norm(t.title);
+  return { mount, trackKey };
+})();
 
 // ---- Listening history ----
 // Archive episodes with how far you got, and live shows you heard, newest first.
@@ -494,7 +605,12 @@ webview.addEventListener('did-navigate-in-page', checkForPromo);
 
 $('signIn').addEventListener('click', () => window.nts.signIn());
 $('signOut').addEventListener('click', () => window.nts.signOut());
-window.nts.onAuthChanged?.((signedIn) => setSupporter(signedIn));
+window.nts.onAuthChanged?.((signedIn) => {
+  setSupporter(signedIn);
+  $('liveMyNts').dataset.key = '';      // re-check My NTS with the new sign-in
+  render();
+  if (typeof Archive !== 'undefined') Archive.refresh();
+});
 
 let snackTimer;
 function copyTrack(text) {

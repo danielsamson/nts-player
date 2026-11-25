@@ -31,6 +31,19 @@ anywhere Electron does.
 - **Track-change notifications** with the album cover (switch off with
   **Notify on track change** above the tracklist).
 
+### My NTS
+
+- **Save episodes, follow shows and save tracks** to your NTS account, right from the
+  app: the same saves you see on nts.live and in the NTS phone app. Sign in once with
+  your NTS account (the app never sees your password).
+- **Your saved episodes, followed shows and saved tracks** are in the archive under
+  **My NTS**.
+
+NTS has no public API for this. The app uses NTS's own website, in your signed-in
+session, out of sight: it opens the page and presses NTS's own Save / Follow buttons,
+and reads your My NTS pages. If NTS changes its site, these buttons may stop working
+until the app is updated.
+
 ### History and resume
 
 - **Pick up where you left off.** Open the app and the episode you were playing is
@@ -109,6 +122,7 @@ it. Click **More info**, then **Run anyway**.
 | Live tracklists | `www.nts.live/live-tracklist/{1,2}`, shown in an embedded view (NTS Supporters) |
 | Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
 | Apple Music links | iTunes Search, for the track you're listening to |
+| My NTS | NTS's own pages and buttons on `www.nts.live`, in your signed-in session |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist
@@ -116,6 +130,7 @@ and title (or its ID) to Deezer and Apple.
 
 ```
 main.js                Window, NTS API access, notifications, sign-in window
+account.js             My NTS: saves and follows through NTS's own website
 art.js                 Album art and Apple Music link lookups, with a local cache
 preload.js             The bridge between the window and main.js
 src/index.html         Layout

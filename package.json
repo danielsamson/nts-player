@@ -27,7 +27,8 @@
       "live-tracks.js",
       "desktop.js",
       "src/**/*",
-      "build/icon.png"
+      "build/icon.png",
+      "build/thumb-*.png"
     ],
     "win": {
       "target": [

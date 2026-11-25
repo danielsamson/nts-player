@@ -61,8 +61,18 @@ function createWindow() {
   // No menu bar on Windows/Linux. macOS keeps the standard app menu, which is where
   // Cmd+Q, Cmd+C/V (e.g. in the search box) and the other shortcuts live.
   if (process.platform === 'darwin') {
+    const cmd = (c) => () => win?.webContents.send('desktop:command', c);
     Menu.setApplicationMenu(Menu.buildFromTemplate([
-      { role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }
+      { role: 'appMenu' }, { role: 'editMenu' },
+      { label: 'Playback', submenu: [
+        { label: 'Play / Pause', accelerator: 'Command+Alt+P', registerAccelerator: false, click: cmd('toggle') },
+        { label: 'Next track', accelerator: 'Command+Alt+Right', registerAccelerator: false, click: cmd('next') },
+        { label: 'Previous track', accelerator: 'Command+Alt+Left', registerAccelerator: false, click: cmd('prev') },
+        { type: 'separator' },
+        { label: 'Listen to NTS 1', click: cmd('channel1') },
+        { label: 'Listen to NTS 2', click: cmd('channel2') }
+      ] },
+      { role: 'windowMenu' }
     ]));
   } else {
     Menu.setApplicationMenu(null);

@@ -32,7 +32,36 @@ function trayIcon() {
   return img.resize({ width: process.platform === 'darwin' ? 18 : 16, height: process.platform === 'darwin' ? 18 : 16 });
 }
 
+// ---- Windows: buttons on the taskbar thumbnail (hover over the icon) ----
+const icon = (name) => nativeImage.createFromPath(path.join(__dirname, 'build', `thumb-${name}.png`));
+function updateThumbar() {
+  if (process.platform !== 'win32' || !win || win.isDestroyed()) return;
+  win.setThumbarButtons([
+    { tooltip: 'Previous track', icon: icon('prev'), flags: state.canSkip ? [] : ['disabled'], click: () => send('prev') },
+    { tooltip: state.playing ? 'Pause' : 'Play', icon: icon(state.playing ? 'pause' : 'play'), click: () => send('toggle') },
+    { tooltip: 'Next track', icon: icon('next'), flags: state.canSkip ? [] : ['disabled'], click: () => send('next') }
+  ]);
+  win.setThumbnailToolTip(state.label);
+}
+
+// ---- macOS: Dock menu (right-click the Dock icon) ----
+function updateDock() {
+  if (process.platform !== 'darwin' || !app.dock) return;
+  app.dock.setMenu(Menu.buildFromTemplate([
+    { label: state.label, enabled: false },
+    { label: state.playing ? 'Pause' : 'Play', click: () => send('toggle') },
+    { label: 'Next track', enabled: state.canSkip, click: () => send('next') },
+    { label: 'Previous track', enabled: state.canSkip, click: () => send('prev') },
+    { type: 'separator' },
+    { label: 'Listen to NTS 1', click: () => send('channel1') },
+    { label: 'Listen to NTS 2', click: () => send('channel2') },
+    { label: mini ? 'Full player' : 'Mini player', click: () => setMini(!mini) }
+  ]));
+}
+
 function buildTrayMenu() {
+  updateThumbar();
+  updateDock();
   if (!tray) return;
   tray.setToolTip(state.label);
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -101,6 +130,7 @@ function checkForUpdates() {
 function init(mainWindow, ipcMain) {
   win = mainWindow;
 
+  win.on('show', updateThumbar);   // Windows drops thumbnail buttons when a window is hidden
   tray = new Tray(trayIcon());
   tray.on('click', () => (win.isVisible() && win.isFocused() ? win.hide() : show()));
   buildTrayMenu();

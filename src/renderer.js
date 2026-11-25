@@ -211,6 +211,7 @@ function renderNowbar() {
   }
   // Tray menu / mini player know what's playing
   const label = archive ? `Archive · ${a.episode.title}` : `NTS ${channel + 1}${live?.results?.[channel] ? ' · ' + showInfo(live.results[channel]).title : ''}`;
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = active ? 'playing' : (archive || playing ? 'paused' : 'none');
   const sig = `${active}|${label}|${canSkip}`;
   if (sig !== desktopSig) { desktopSig = sig; window.nts.desktop?.state({ playing: active, label, canSkip }); }
 }

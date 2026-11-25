@@ -181,6 +181,10 @@ function renderNowbar() {
   const active = archive ? (a.playing || a.loading) : playing;
   document.body.classList.toggle('archive-playing', !!(archive && (a.playing || a.loading)));
   document.body.classList.toggle('source-archive', !!archive);
+  const canSkip = !!(archive && a.episode.tracks?.length);
+  $('prevTrack').hidden = !canSkip;
+  $('nextTrack').hidden = !canSkip;
+  document.body.classList.toggle('can-skip', canSkip);
   $('iconPlay').toggleAttribute('hidden', active);
   $('iconPause').toggleAttribute('hidden', !active);
   $('play').setAttribute('aria-label', active ? (archive ? 'Pause' : 'Stop') : 'Play');
@@ -257,8 +261,44 @@ const MyNTS = (() => {
     return b;
   }
 
+  // One read per episode, shared by the episode page, the live view and the stage
+  const states = new Map();
+  function getState(show, episode, force = false) {
+    const k = `${show}/${episode}`;
+    if (force || !states.has(k)) {
+      states.set(k, window.nts.account.episode(show, episode).catch(() => ({ available: false })));
+    }
+    return states.get(k);
+  }
+  const setState = (show, episode, st) => states.set(`${show}/${episode}`, Promise.resolve(st));
+
+  // Remember which episode a saved track came from (NTS's saved-tracks page doesn't say)
+  const ORIGINS = 'savedTrackOrigins';
+  function rememberOrigin(track, origin) {
+    try {
+      const m = JSON.parse(localStorage.getItem(ORIGINS) || '{}');
+      m[norm(track.title)] = origin;
+      localStorage.setItem(ORIGINS, JSON.stringify(m));
+    } catch {}
+  }
+  function originOf(track) {
+    try { return JSON.parse(localStorage.getItem(ORIGINS) || '{}')[norm(track.title)] || null; } catch { return null; }
+  }
+
+  // Save / unsave one track (by title) on an episode; returns the new state
+  async function toggleTrack(show, episode, track, want, origin) {
+    const res = await window.nts.account.toggle({ show, episode, kind: 'track', want, artist: track.artist, title: track.title }).catch(() => null);
+    if (res && !res.error) {
+      setState(show, episode, res);
+      if (want && origin) rememberOrigin(track, origin);
+      showSnack(want ? 'Track saved to My NTS' : 'Track removed');
+    } else showSnack('Couldn’t update My NTS. Try again on nts.live');
+    return res;
+  }
+  const trackState = (st, track) => st?.tracks?.find((x) => norm(x.title) === norm(track.title)) || null;
+
   // container: element to fill. trackButtons: optional Map("artist|title" -> button)
-  function mount(container, show, episode, { trackButtons } = {}) {
+  function mount(container, show, episode, { trackButtons, origin } = {}) {
     container.replaceChildren();
     container.classList.add('mynts');
     if (!show || !episode) return;
@@ -309,6 +349,11 @@ const MyNTS = (() => {
       const res = await window.nts.account.toggle({ show, episode, kind, want, ...extra }).catch(() => null);
       btn?.classList.remove('mynts-btn--busy');
       if (res) state = res;
+      if (res && !res.error) setState(show, episode, res);
+      if (res && !res.error && kind === 'track' && want && origin) {
+        const tr = (origin.tracks || []).find((x) => norm(x.title) === norm(extra.title));
+        rememberOrigin({ title: extra.title }, { show, episode, title: origin.title, date: origin.date, offset: tr ? (tr.offset ?? tr.offset_estimate) : null });
+      }
       if (!res || res.error) showSnack('Couldn’t update My NTS. Try again on nts.live');
       else showSnack(kind === 'episode' ? (want ? 'Saved to My NTS' : 'Removed from saved episodes')
         : kind === 'show' ? (want ? 'Following in My NTS' : 'Unfollowed')
@@ -326,7 +371,7 @@ const MyNTS = (() => {
       });
     });
 
-    window.nts.account.episode(show, episode).then((s) => {
+    getState(show, episode).then((s) => {
       if (!container.isConnected) return;
       state = s || { available: false };
       paint();
@@ -335,7 +380,7 @@ const MyNTS = (() => {
 
   // tracks are matched by title: NTS's page formats artists differently from its API
   const trackKey = (t) => norm(t.title);
-  return { mount, trackKey };
+  return { mount, trackKey, getState, toggleTrack, trackState, originOf, rememberOrigin };
 })();
 
 // ---- Listening history ----
@@ -697,6 +742,8 @@ function setChannel(ch) {
 }
 
 $('play').addEventListener('click', togglePlayback);
+$('prevTrack').addEventListener('click', () => Archive.skipTrack(-1));
+$('nextTrack').addEventListener('click', () => Archive.skipTrack(1));
 document.querySelectorAll('.tab[data-ch]').forEach((b) =>
   b.addEventListener('click', () => setChannel(Number(b.dataset.ch))));
 $('archiveTab').addEventListener('click', () => { view = 'archive'; Archive.open(); render(); });
@@ -725,6 +772,11 @@ $('volume').addEventListener('input', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.target.matches?.('input')) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlayback(); }
+  // Shift + arrow keys: previous / next track in an archive episode
+  if (e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') && source === 'archive' && ArchivePlayer.state.episode) {
+    e.preventDefault();
+    Archive.skipTrack(e.key === 'ArrowRight' ? 1 : -1);
+  }
   if (e.key === '1') setChannel(0);
   if (e.key === '2') setChannel(1);
 });
@@ -773,9 +825,9 @@ const Stage = (() => {
     ];
   }
 
-  function paintLinks(items) {
-    $('stageLinksLabel').hidden = !items.length || items.length === 1;
-    $('stageLinks').replaceChildren(...items.map(([name, href, exact = true, apps = []]) => {
+  function paintLinks(items, list = $('stageLinks'), label = $('stageLinksLabel')) {
+    if (label) label.hidden = !items.length || items.length === 1;
+    list.replaceChildren(...items.map(([name, href, exact = true, apps = []]) => {
       const a = document.createElement('a');
       a.className = 'stage__link' + (exact ? ' stage__link--exact' : '');
       a.href = href; a.target = '_blank'; a.textContent = name;
@@ -789,7 +841,8 @@ const Stage = (() => {
     }));
   }
 
-  function paint({ label, context, img, kicker, title, artist, album, next, linkItems, square }) {
+  function paint({ label, context, img, kicker, title, artist, album, next, linkItems, square, keepSave }) {
+    if (!keepSave) $('stageSave').replaceChildren();
     $('stageLabel').textContent = label;
     $('stageContext').textContent = context || '';
     const im = $('stageArtImg');
@@ -805,6 +858,29 @@ const Stage = (() => {
     $('stageAlbum').textContent = album || '';
     $('stageNext').textContent = next || '';
     paintLinks(linkItems || []);
+  }
+
+  // Bookmark for the track on the stage (saved to My NTS)
+  async function paintSave(ep, t, my) {
+    const box = $('stageSave');
+    box.replaceChildren();
+    if (!t || !ep?.show || !ep?.episode) return;
+    const st = await MyNTS.getState(ep.show, ep.episode);
+    if (my !== token || !st?.available || !st.signedIn) return;
+    const tr = MyNTS.trackState(st, t);
+    if (!tr?.canSave) return;
+    const b = document.createElement('button');
+    b.className = 'mynts-btn' + (tr.saved ? ' mynts-btn--on' : '');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><span></span>';
+    b.querySelector('span').textContent = tr.saved ? 'Saved track' : 'Save track';
+    b.title = tr.saved ? 'Remove from your saved tracks' : 'Save this track to My NTS';
+    b.addEventListener('click', async () => {
+      b.classList.add('mynts-btn--busy');
+      const off = t.offset ?? t.offset_estimate;
+      await MyNTS.toggleTrack(ep.show, ep.episode, t, !tr.saved, { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: off });
+      if (my === token) paintSave(ep, t, my);
+    });
+    box.append(b);
   }
 
   async function render() {
@@ -836,13 +912,14 @@ const Stage = (() => {
         square: true
       };
       paint({ ...base, img: '', linkItems: links(t, null) });
+      paintSave(ep, t, my);
       // Art (and the Deezer link) first; the exact Apple Music link follows when found
       const appleP = window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null);
       const art = await Art.get(t, 'high');
       if (my !== token) return;
       const full = { ...base, img: art?.large || ep.img, square: !!art,
         album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '' };
-      paint({ ...full, linkItems: links(t, art) });
+      paint({ ...full, linkItems: links(t, art), keepSave: true });
       const appleUrl = await appleP;
       if (my !== token || !appleUrl) return;
       paintLinks(links(t, art, appleUrl));
@@ -921,7 +998,7 @@ const Stage = (() => {
     if (sig !== lastSig) { lastSig = sig; render(); }
   });
 
-  return { render };
+  return { render, links, paintLinks };
 })();
 
 render();

@@ -25,7 +25,7 @@ anywhere Electron does.
 
 - **Browse and search** every NTS show and episode: recently added, search, and show
   pages with all their episodes.
-- **Play episodes** in the app with a seek bar.
+- **Play episodes** in the app with a seek bar, and previous / next track buttons.
 - **Tracklists that follow the mix.** The track playing is highlighted; click any track
   to jump to it. Media keys skip between tracks.
 - **Track-change notifications** with the album cover (switch off with
@@ -37,7 +37,9 @@ anywhere Electron does.
   app: the same saves you see on nts.live and in the NTS phone app. Sign in once with
   your NTS account (the app never sees your password).
 - **Your saved episodes, followed shows and saved tracks** are in the archive under
-  **My NTS**.
+  **My NTS**. Click a saved track for its cover, details and links, and to play it in
+  the episode you saved it from.
+- **Save the track that's playing** from the wide view.
 
 NTS has no public API for this. The app uses NTS's own website, in your signed-in
 session, out of sight: it opens the page and presses NTS's own Save / Follow buttons,
@@ -84,6 +86,7 @@ Deezer, YouTube, Bandcamp and Discogs.
 | Key     | Action             |
 | ------- | ------------------ |
 | `Space` | Play / pause       |
+| `Shift` + `←` / `→` | Previous / next track (archive) |
 | `1`     | Switch to NTS 1    |
 | `2`     | Switch to NTS 2    |
 | `Esc`   | Clear the search   |

@@ -673,3 +673,39 @@ body.playing .track__art { background: var(--grey-1); }
 .loader__dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes blink { 0%, 100% { opacity: .2; } 40% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .loader__dots i { animation: none; opacity: .7; } }
+
+/* ---- Previous / next track ---- */
+.skip { width: 40px; flex-shrink: 0; display: grid; place-items: center; border-right: var(--rule); color: var(--white); }
+.skip svg { width: 16px; height: 16px; fill: currentColor; }
+.skip:hover { background: var(--grey-4); }
+/* Thin strip: make room for the skip buttons */
+@media (max-width: 719px) {
+  body.can-skip .nowbar__art { display: none; }
+  body.can-skip .volume__button { width: 40px; }
+  body.can-skip input[type=range] { width: 52px; }
+}
+
+/* Save track on the stage */
+.stage__save:empty { display: none; }
+.stage__save { margin-top: 6px; }
+
+/* ---- Track page ---- */
+.track-page .picture { aspect-ratio: 1 / 1; }
+.track-page__art--none::after {
+  content: ""; position: absolute; inset: 22%; border-radius: 50%;
+  border: 1px solid var(--grey-3); box-shadow: inset 0 0 0 40px var(--grey-4), inset 0 0 0 41px var(--grey-3);
+}
+.track-page__artist { font-size: 18px; line-height: 22px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+.track-page__from { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.track-page__from:empty { display: none; }
+.track-page__from .detail__show { margin: 0; text-align: left; }
+.track-page__links { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin: 12px 0; }
+.track-page__links .stage__link {
+  color: var(--grey-2); text-decoration: none; border-bottom: 1px solid var(--grey-4);
+  font-size: 11px; line-height: 16px; font-weight: 700; text-transform: uppercase; white-space: nowrap;
+}
+.track-page__links .stage__link--exact { color: var(--grey-1); border-color: var(--grey-3); }
+.track-page__links .stage__link:hover { color: var(--white); border-color: var(--white); }
+.track-page__links .stage__links-label { font-size: 11px; line-height: 16px; font-weight: 700; text-transform: uppercase; color: var(--grey-3); }
+.track-page__links .stage__links-list { display: contents; }
+.track-page__actions { display: flex; gap: 8px; margin-top: 4px; }

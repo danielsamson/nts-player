@@ -45,6 +45,7 @@ const Archive = (() => {
     else if (current.type === 'show') renderShow(current.show);
     else if (current.type === 'episode') renderEpisode(current.show, current.episode);
     else if (current.type === 'mynts') renderMyNts(current.kind);
+    else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
   }
 
   function backBar(label) {
@@ -154,8 +155,8 @@ const Archive = (() => {
       (res.tracks || []).forEach((t) => {
         const p = parsePath(t.path);
         ol.append(trackRow({ artist: t.artist, title: t.title }, {
-          title: p?.episode ? 'Open the episode' : 'Click to copy',
-          onClick: p?.episode ? () => go({ type: 'episode', show: p.show, episode: p.episode }) : undefined
+          title: 'Open track',
+          onClick: () => go({ type: 'track', artist: t.artist, title: t.title })
         }));
       });
       if (ol.children.length) list.append(ol);
@@ -195,6 +196,62 @@ const Archive = (() => {
     }
     writeCache(kind, res);
     root.replaceChildren(bar(), myNtsList(kind, res));
+  }
+
+  // ---- Track page: big cover, details, links, where it was played ----
+  async function renderTrack(t) {
+    const wrap = el('div', 'detail track-page');
+    const picWrap = el('div', 'picture-wrap');
+    const pic = el('div', 'picture track-page__art');
+    const img = el('img'); img.alt = '';
+    pic.append(img); picWrap.append(pic);
+    const body = el('div', 'detail__body');
+    const title = el('h1', 'broadcast-heading', t.title);
+    const artist = el('p', 'track-page__artist', t.artist);
+    const album = el('p', 'detail__meta');
+    const from = el('div', 'track-page__from');
+    const actions = el('div', 'track-page__actions');
+    const copy = el('button', 'mynts-btn', 'Copy artist & title');
+    copy.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
+    actions.append(copy);
+    const linksNav = el('nav', 'track-page__links');
+    const linksLabel = el('span', 'stage__links-label', 'Find it on');
+    const linksList = el('span', 'stage__links-list');
+    linksNav.append(linksLabel, linksList);
+    body.append(title, artist, album, from, linksNav, actions);
+    wrap.append(picWrap, body);
+    root.replaceChildren(backBar('Saved track'), wrap);
+
+    // Where you saved it from (remembered when you saved it in this app)
+    const o = MyNTS.originOf(t);
+    if (o?.show && o?.episode) {
+      const openEp = el('button', 'detail__show', `From ${o.title || 'the episode'}${o.date ? ' · ' + o.date : ''} ›`);
+      openEp.addEventListener('click', () => go({ type: 'episode', show: o.show, episode: o.episode }));
+      from.append(openEp);
+      if (o.offset != null) {
+        const playFrom = el('button', 'episode-play', `Play from ${fmtOffset(o.offset)}`);
+        playFrom.addEventListener('click', async () => {
+          playFrom.textContent = 'Loading…';
+          try {
+            const { info } = await fetchEpisode(o.show, o.episode);
+            if (!info.url) { playFrom.textContent = 'Not available to stream'; playFrom.disabled = true; return; }
+            playArchive(info, o.offset * 1000);
+          } catch { showSnack('Couldn’t load the episode'); }
+          playFrom.textContent = `Play from ${fmtOffset(o.offset)}`;
+        });
+        from.append(playFrom);
+      }
+    }
+
+    Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
+    const [art, apple] = await Promise.all([
+      Art.get(t, 'high'),
+      window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null)
+    ]);
+    if (current.type !== 'track' || current.title !== t.title) return;
+    if (art?.large) img.src = art.large; else pic.classList.add('track-page__art--none');
+    if (art?.album) album.textContent = `${art.album}${art.year ? ' · ' + art.year : ''}`;
+    Stage.paintLinks(Stage.links(t, art, apple), linksList, linksLabel);
   }
 
   // ---- Home: recently added ----
@@ -377,7 +434,7 @@ const Archive = (() => {
       parts.push(tracks.length ? list : el('p', 'archive__status', 'No tracklist for this episode.'));
       root.replaceChildren(...parts);
       episodeView = { show, episode, tracks, list, paintPlay };
-      MyNTS.mount(mynts, show, episode, { trackButtons: saveButtons });
+      MyNTS.mount(mynts, show, episode, { trackButtons: saveButtons, origin: info });
       paintPlay();
       highlight();
     } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Could not load this episode.')); }
@@ -476,6 +533,7 @@ const Archive = (() => {
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
+    showTrack(artist, title) { go({ type: 'track', artist, title }); },
     skipTrack
   };
 })();

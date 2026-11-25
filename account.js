@@ -19,6 +19,8 @@ const SITE = 'https://www.nts.live';
 let win = null;
 let currentUrl = '';
 let chain = Promise.resolve();
+let openedAt = 0;
+const since = () => `(${((Date.now() - openedAt) / 1000).toFixed(1)}s)`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -32,7 +34,9 @@ function ensureWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   if (DEBUG) {
     win.webContents.openDevTools({ mode: 'detach' });
-    win.webContents.on('console-message', (_e, level, message) => { if (level >= 2) log('page console:', message.slice(0, 300)); });
+    win.webContents.on('console-message', (_e, level, message) => {
+      if (level >= 2 && !/Electron Security Warning/.test(message)) log('page console:', message.slice(0, 300));
+    });
     win.webContents.on('did-navigate', (_e, url) => log('navigated to', url));
     win.webContents.on('did-navigate-in-page', (_e, url) => log('in-page navigation to', url));
   }
@@ -53,6 +57,7 @@ async function open(path, force = false) {
   if (!force && currentUrl === url) return w;
   currentUrl = url;
   log('opening', url);
+  openedAt = Date.now();
   try { await w.loadURL(url); } catch (e) { log('load failed:', e.message); }
   return w;
 }
@@ -105,11 +110,11 @@ const READ_EPISODE = `(() => {
 async function readEpisode(show, episode, force) {
   await open(`/shows/${encodeURIComponent(show)}/episodes/${encodeURIComponent(episode)}`, force);
   let state = await waitFor(READ_EPISODE);
-  if (!state) { log('episode buttons not found on', win?.webContents.getURL()); return { available: false }; }
+  if (!state) { log('episode buttons not found', since(), 'on', win?.webContents.getURL()); return { available: false }; }
   // Your saved state arrives a moment after the page; read again once it settles
   await sleep(1500);
   state = (await js(READ_EPISODE).catch(() => null)) || state;
-  log('episode state', JSON.stringify({ signedIn: state.signedIn, saved: state.saved, following: state.following, tracks: state.tracks.length, savedTracks: state.tracks.filter((t) => t.saved).length }));
+  log('episode state', since(), JSON.stringify({ signedIn: state.signedIn, saved: state.saved, following: state.following, tracks: state.tracks.length, savedTracks: state.tracks.filter((t) => t.saved).length }));
   return { available: true, ...state };
 }
 

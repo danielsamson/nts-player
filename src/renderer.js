@@ -1070,6 +1070,7 @@ const Sleep = (() => {
 
 // NTS account row in Settings
 function paintAccount() {
+  if (typeof NowSave !== 'undefined') NowSave.update(true);
   $('signIn').hidden = supporter;
   $('signOut').hidden = !supporter;
   $('accountHint').textContent = supporter ? 'Signed in: live track IDs and My NTS' : 'Sign in for live track IDs and My NTS';
@@ -1122,6 +1123,48 @@ window.nts.desktop?.onCommand((c) => {
   else if (c === 'next' || c === 'prev') { if (archive) Archive.skipTrack(c === 'next' ? 1 : -1); else setChannel(channel ? 0 : 1); }
   else if (c === 'channel1' || c === 'channel2') { setChannel(c === 'channel1' ? 0 : 1); if (!playing) play(); }
 });
+
+// ---- Save the track you're hearing (now-playing bar), to My NTS ----
+const NowSave = (() => {
+  const btn = $('nowSave');
+  let sig = '';
+  let current = null;   // { ep, t, saved }
+  async function update(force) {
+    const a = ArchivePlayer.state;
+    const cur = source === 'archive' && a.episode ? TrackNotify.currentTrack() : null;
+    const ep = a.episode;
+    const s = cur ? `${ep.show}/${ep.episode}#${cur.idx}` : '';
+    if (s === sig && !force) return;
+    sig = s;
+    current = null;
+    btn.hidden = true;
+    if (!cur || !supporter) return;          // needs your NTS sign-in
+    const st = await MyNTS.getState(ep.show, ep.episode);
+    if (s !== sig) return;
+    const tr = MyNTS.trackState(st, cur.track);
+    if (!st?.signedIn || !tr?.canSave) return;
+    current = { ep, t: cur.track, saved: !!tr.saved };
+    paint();
+  }
+  function paint() {
+    btn.hidden = !current;
+    if (!current) return;
+    btn.classList.toggle('nowbar__save--on', current.saved);
+    btn.title = `${current.saved ? 'Saved: click to remove' : 'Save to My NTS'} · ${current.t.artist} – ${current.t.title}`;
+    btn.setAttribute('aria-pressed', String(current.saved));
+  }
+  btn.addEventListener('click', async () => {
+    if (!current) return;
+    const { ep, t, saved } = current;
+    btn.classList.add('mynts-btn--busy');
+    const res = await MyNTS.toggleTrack(ep.show, ep.episode, t, !saved,
+      { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: t.offset ?? t.offset_estimate });
+    btn.classList.remove('mynts-btn--busy');
+    if (res && !res.error && current?.t === t) { current.saved = !saved; paint(); if (typeof Stage !== 'undefined') Stage.render(); }
+  });
+  ArchivePlayer.onChange(() => update());
+  return { update };
+})();
 
 // ---- Wide view: the stage ----
 // Big album art and full details for what's playing, with links to find the
@@ -1273,6 +1316,7 @@ const Stage = (() => {
       const off = t.offset ?? t.offset_estimate;
       await MyNTS.toggleTrack(ep.show, ep.episode, t, !tr.saved, { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: off });
       if (my === token) paintSave(ep, t, my);
+      NowSave.update(true);
     });
     box.append(b);
   }

@@ -964,3 +964,15 @@ body.playing .live-list .track--now .track__time, body.playing .live-list .track
 .settings__account { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .settings__account .settings__label { width: 100%; }
 .settings__account .settings__hint { flex: 1; min-width: 150px; }
+
+/* Save the track you're hearing, in the now-playing bar */
+.nowbar__save { width: 44px; flex-shrink: 0; display: grid; place-items: center; border-left: var(--rule); color: var(--grey-1); }
+.nowbar__save svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+.nowbar__save:hover { background: var(--grey-4); color: var(--white); }
+.nowbar__save--on { color: var(--white); }
+.nowbar__save--on svg { fill: currentColor; }
+/* Thin strip with track buttons: drop the volume slider (mute stays) so the title fits */
+@media (max-width: 719px) {
+  body.can-skip input[type=range] { display: none; }
+  body.can-skip .volume { padding-right: 0; }
+}

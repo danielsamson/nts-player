@@ -56,7 +56,8 @@ schedule, history and lists.
 - **Your saved episodes, followed shows and saved tracks** are in the archive under
   **My NTS**. Click a saved track for its cover, details and links, and to play it in
   the episode you saved it from.
-- **Save the track that's playing** from the wide view.
+- **Save the track that's playing** with the bookmark in the now-playing bar (or on the
+  wide view).
 
 NTS has no public API for this. The app uses NTS's own website, in your signed-in
 session, out of sight: it opens the page and presses NTS's own Save / Follow buttons,

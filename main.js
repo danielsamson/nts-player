@@ -127,9 +127,19 @@ app.on('web-contents-created', (_e, contents) => {
   contents.on('will-navigate', (event, url) => { if (!isNts(url)) event.preventDefault(); });
 });
 
+ipcMain.handle('win:focus', () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
+
 ipcMain.handle('clipboard:write', (_e, text) => {
   if (typeof text === 'string' && text.length < 1000) clipboard.writeText(text);
 });
+
+// Windows needs an app ID for notifications to show up (matches build.appId)
+if (process.platform === 'win32') app.setAppUserModelId('local.ntsplayer');
 
 app.whenReady().then(() => {
   // Present as a regular Chrome browser to nts.live (drops the "Electron" token)

@@ -195,6 +195,7 @@ const Archive = (() => {
         date: ep.broadcast ? fmtDate(ep.broadcast) : '', location: ep.location_long || ''
       };
       const tracks = tl.results || [];
+      info.tracks = tracks;
 
       const wrap = el('div', 'detail');
       const picWrap = el('div', 'picture-wrap');
@@ -253,13 +254,28 @@ const Archive = (() => {
         list.append(li);
       });
 
-      const parts = [backBar(info.date), wrap, sectionTitle(tracks.length ? `Tracklist · ${tracks.length}` : 'Tracklist')];
+      const head = sectionTitle(tracks.length ? `Tracklist · ${tracks.length}` : 'Tracklist');
+      if (tracks.length) head.append(notifyToggle());
+      const parts = [backBar(info.date), wrap, head];
       parts.push(tracks.length ? list : el('p', 'archive__status', 'No tracklist for this episode.'));
       root.replaceChildren(...parts);
       episodeView = { show, episode, tracks, list, paintPlay };
       paintPlay();
       highlight();
     } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Could not load this episode.')); }
+  }
+
+  // "Notify on track change" switch, shared by every episode
+  function notifyToggle() {
+    const b = el('button', 'notify-toggle');
+    const paint = () => {
+      b.classList.toggle('notify-toggle--on', TrackNotify.enabled());
+      b.textContent = 'Notify on track change';
+      b.setAttribute('aria-pressed', String(TrackNotify.enabled()));
+    };
+    b.addEventListener('click', async () => { await TrackNotify.setEnabled(!TrackNotify.enabled()); paint(); });
+    paint();
+    return b;
   }
 
   // Highlight the track that's playing now in an open episode page

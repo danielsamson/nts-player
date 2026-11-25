@@ -21,7 +21,9 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 - **The NTS archive.** The archive tab (next to 1 and 2) has recently added episodes,
   search across shows and episodes, and show pages with every episode. Episodes play
   in the app with a seek bar. In the tracklist, the track that's playing is highlighted
-  and clicking a track jumps straight to it. Media keys skip between tracks.
+  and clicking a track jumps straight to it. Media keys skip between tracks. When the
+  mix moves to a new track you get a Windows notification and the media overlay shows
+  the track (switch it off with **Notify on track change** above the tracklist).
 - **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.

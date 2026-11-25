@@ -147,6 +147,65 @@ function togglePlayback() {
 
 ArchivePlayer.onChange(renderNowbar);
 
+// ---- Track-change notifications for archive episodes ----
+// When an episode moves into a new track from its tracklist, show a Windows
+// notification and put the track in the system media overlay. Waits a moment
+// so dragging the seek bar doesn't fire a burst of notifications.
+const TrackNotify = (() => {
+  let lastKey = null;
+  let timer = null;
+  const enabled = () => localStorage.getItem('trackNotify') !== '0';
+
+  async function setEnabled(on) {
+    if (on && 'Notification' in window && Notification.permission === 'default') {
+      try { await Notification.requestPermission(); } catch {}
+    }
+    try { localStorage.setItem('trackNotify', on ? '1' : '0'); } catch {}
+  }
+
+  function currentTrack() {
+    const a = ArchivePlayer.state;
+    const tracks = a.episode?.tracks || [];
+    const pos = a.position / 1000;
+    let idx = -1;
+    tracks.forEach((t, i) => { const o = t.offset ?? t.offset_estimate; if (o != null && o <= pos) idx = i; });
+    return idx >= 0 ? { idx, track: tracks[idx] } : null;
+  }
+
+  function announce(ep, { idx, track }) {
+    const total = ep.tracks.length;
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title, artist: track.artist, album: `NTS Archive · ${ep.title}`,
+        artwork: ep.img ? [{ src: ep.img, sizes: '512x512' }] : []
+      });
+    }
+    if (!enabled() || !('Notification' in window) || Notification.permission === 'denied') return;
+    const n = new Notification(`${track.artist} – ${track.title}`, {
+      body: `${ep.title} · track ${idx + 1} of ${total}`,
+      silent: true,
+      tag: 'nts-track'          // replaces the previous one instead of stacking
+    });
+    n.onclick = () => window.nts.focus?.();
+  }
+
+  ArchivePlayer.onChange((a) => {
+    if (!a.playing || !a.episode?.tracks?.length) return;
+    const cur = currentTrack();
+    const key = cur ? `${a.episode.show}/${a.episode.episode}#${cur.idx}` : null;
+    if (key === lastKey) return;
+    lastKey = key;
+    clearTimeout(timer);
+    if (!cur) return;
+    const ep = a.episode;
+    timer = setTimeout(() => {
+      if (lastKey === key && ArchivePlayer.state.playing) announce(ep, cur);
+    }, 1500);
+  });
+
+  return { enabled, setEnabled };
+})();
+
 // Seek bar (archive only): click or drag
 (() => {
   const bar = $('seek');

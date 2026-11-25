@@ -385,3 +385,16 @@ body.source-archive .nowbar { border-top-color: transparent; }
 
 /* SoundCloud's player does the playing out of sight */
 .sc-frame { position: fixed; width: 1px; height: 1px; left: -10px; bottom: 0; opacity: 0; pointer-events: none; border: 0; }
+
+/* Track-change notification switch in the archive tracklist header */
+.archive__section { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.notify-toggle {
+  display: inline-flex; align-items: center; gap: 6px; color: var(--grey-2);
+  font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase;
+}
+.notify-toggle::before {
+  content: ""; width: 12px; height: 12px; border: 1px solid currentColor; box-sizing: border-box;
+}
+.notify-toggle--on { color: var(--white); }
+.notify-toggle--on::before { background: var(--white); box-shadow: inset 0 0 0 2px var(--black); }
+.notify-toggle:hover { color: var(--white); }

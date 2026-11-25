@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage } = require('electron');
 const { getArt, getAppleLink } = require('./art');
 const account = require('./account');
+const liveTracks = require('./live-tracks');
+const desktop = require('./desktop');
 const path = require('path');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
@@ -105,6 +107,7 @@ function openSignIn() {
   const check = (_e, url) => {
     if (isNts(url) && !isAuthPage(url)) {
       account.reset();
+      liveTracks.reset();
       win?.webContents.send('nts:auth-changed', true);
       signInWin.close();
     }
@@ -126,6 +129,7 @@ ipcMain.handle('nts:sign-in', () => openSignIn());
 ipcMain.handle('nts:sign-out', async () => {
   await session.fromPartition(NTS_PARTITION).clearStorageData();
   account.reset();
+  liveTracks.reset();
   win?.webContents.send('nts:auth-changed', false);
 });
 
@@ -174,6 +178,9 @@ ipcMain.handle('account:toggle', (_e, a = {}) => {
 });
 ipcMain.handle('account:list', (_e, kind) =>
   account.getList(['episodes', 'shows', 'tracks'].includes(kind) ? kind : 'episodes'));
+
+// Live track IDs for NTS Supporters (see live-tracks.js)
+ipcMain.handle('live:tracks', (_e, channel) => liveTracks.getLiveTracks(channel === 2 ? 2 : 1));
 
 ipcMain.handle('links:apple', (_e, track) => getAppleLink(track && {
   artist: String(track.artist || '').slice(0, 200), title: String(track.title || '').slice(0, 200)
@@ -232,5 +239,8 @@ app.whenReady().then(() => {
   const nts = session.fromPartition(NTS_PARTITION);
   nts.setUserAgent(nts.getUserAgent().replace(/\s(Electron|nts-player)\/\S+/g, ''));
   createWindow();
+  desktop.init(win, ipcMain);
 });
+// macOS: clicking the dock icon brings the window back
+app.on('activate', () => { if (win) { win.show(); win.focus(); } });
 app.on('window-all-closed', () => app.quit());

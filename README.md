@@ -18,7 +18,13 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 - **Live tracklists for NTS Supporters.** In the Tracklist tab, click
   **Sign in for live tracks** and log in on NTS's own sign-in page. The app never sees
   your password, and you stay signed in until you click **Sign out**.
+- **Live track IDs for Supporters, everywhere:** the track playing on live radio shows in
+  the now-playing bar and the wide view (with its cover and links), and you get a
+  notification when it changes.
 - **Without a Supporter sign-in**, the Tracklist tab shows the show's previous episode.
+- **Schedule:** what's on NTS 1 and NTS 2 today and this week, in the archive. Tap the
+  bell on a show to be **reminded when it goes live**; shows you follow in My NTS remind
+  you automatically.
 
 ### Archive
 
@@ -74,6 +80,19 @@ Deezer, YouTube, Bandcamp and Discogs.
   search ([exact Spotify links](https://github.com/danielsamson/nts-player/issues/1)).
 - Spotify, Deezer and Apple Music open in their desktop apps when installed.
 
+### On your desktop
+
+- **Tray / menu bar icon** with play, pause, tracks and channels. Closing the window
+  keeps the music playing (switch off in Settings).
+- **Mini player:** just the now-playing bar, always on top.
+- **Global shortcuts** that work from any app (see below).
+- **Sleep timer:** 15, 30 or 60 minutes, or the end of the episode, with a gentle fade.
+- **Start at login** (Windows and macOS).
+- **Automatic updates** for installed builds (Windows installer and Linux AppImage).
+- **Copes with bad connections:** the live stream reconnects by itself, the app tells you
+  when you're offline and picks up again when you're back, and an episode that won't
+  play is skipped.
+
 ### Everywhere
 
 - **Media keys** and the Windows media overlay: play/pause, and next/previous (switches
@@ -91,6 +110,14 @@ Deezer, YouTube, Bandcamp and Discogs.
 | `1`     | Switch to NTS 1    |
 | `2`     | Switch to NTS 2    |
 | `Esc`   | Clear the search   |
+
+Anywhere, even when NTS Player isn't in front (on a Mac, `Cmd` + `Option`):
+
+| Key | Action |
+| --- | ------ |
+| `Ctrl` + `Alt` + `P` | Play / pause |
+| `Ctrl` + `Alt` + `←` / `→` | Previous / next track (or channel) |
+| `Ctrl` + `Alt` + `M` | Mini player |
 
 ## Getting started
 
@@ -128,6 +155,16 @@ The builds aren't code-signed, so the first launch needs a click past a warning:
 - **macOS:** right-click the app, choose **Open**, then **Open** again.
 - **Linux (AppImage):** make it executable first: `chmod +x NTS-Player-*.AppImage`.
 
+### Releasing a new version
+
+1. Bump `version` in `package.json` and commit.
+2. Tag it and push the tag: `git tag v1.1.0` then `git push origin v1.1.0`.
+3. The **Build** workflow builds every version and attaches them to a draft
+   **GitHub Release**. Publish the release, and installed apps update themselves.
+
+Automatic updates work for the Windows installer and the Linux AppImage. macOS only
+allows them for signed apps, so Mac users download new versions from the release page.
+
 ## How it works
 
 | What | Source |
@@ -147,6 +184,8 @@ and title (or its ID) to Deezer and Apple.
 ```
 main.js                Window, NTS API access, notifications, sign-in window
 account.js             My NTS: saves and follows through NTS's own website
+live-tracks.js         Live track IDs from NTS's live tracklist (Supporters)
+desktop.js             Tray, mini player, global shortcuts, start at login, updates
 art.js                 Album art and Apple Music link lookups, with a local cache
 preload.js             The bridge between the window and main.js
 src/index.html         Layout

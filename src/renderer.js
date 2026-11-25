@@ -192,7 +192,9 @@ function renderNowbar() {
   if (archive) {
     $('nowKind').textContent = 'Archive';
     $('nowLabel').textContent = a.episode.title;
-    $('next').textContent = a.error || (a.loading ? 'Loading…' : `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}${a.episode.date ? ' · ' + a.episode.date : ''}`);
+    $('next').textContent = !navigator.onLine ? 'Offline · waiting for a connection'
+      : a.error ? `${a.error}${localStorage.getItem('autoplay') !== '0' ? ' Skipping…' : ''}`
+      : (a.loading ? 'Loading…' : `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}${a.episode.date ? ' · ' + a.episode.date : ''}`);
     $('seekFill').style.width = a.duration ? `${Math.min(100, (a.position / a.duration) * 100)}%` : '0%';
     $('nowArt').hidden = !nowArtUrl;
     document.title = `NTS Archive · ${a.episode.title}`;
@@ -200,11 +202,19 @@ function renderNowbar() {
     $('nowKind').textContent = '';
     $('nowArt').hidden = true;
     $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
-    $('next').textContent = nextText;
+    const lt = LiveNow?.track;
+    $('next').textContent = !navigator.onLine ? 'Offline · waiting for a connection'
+      : playing && reconnecting ? 'Reconnecting…'
+      : playing && lt ? `Now: ${lt.artist} – ${lt.title}` : nextText;
     const t = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
     document.title = t ? `NTS ${channel + 1} · ${t}` : 'NTS Player';
   }
+  // Tray menu / mini player know what's playing
+  const label = archive ? `Archive · ${a.episode.title}` : `NTS ${channel + 1}${live?.results?.[channel] ? ' · ' + showInfo(live.results[channel]).title : ''}`;
+  const sig = `${active}|${label}|${canSkip}`;
+  if (sig !== desktopSig) { desktopSig = sig; window.nts.desktop?.state({ playing: active, label, canSkip }); }
 }
+let desktopSig = '';
 
 // Start an archive episode (stops live radio)
 function playArchive(info, startMs = 0) {
@@ -239,11 +249,21 @@ ArchivePlayer.onChange(renderNowbar);
 (() => {
   let handled = null;
   ArchivePlayer.onChange((a) => {
-    if (!a.finished || !a.episode || source !== 'archive') return;
+    if (!a.episode || source !== 'archive') return;
+    // An episode that won't play: move on after a moment (when autoplay is on)
+    if (a.error && navigator.onLine && localStorage.getItem('autoplay') !== '0') {
+      const key = `err:${a.episode.show}/${a.episode.episode}`;
+      if (handled === key) return;
+      handled = key;
+      const ep = a.episode;
+      setTimeout(() => { if (ArchivePlayer.state.episode === ep && ArchivePlayer.state.error) Archive.playNext(ep); }, 4000);
+      return;
+    }
+    if (!a.finished) return;
     const key = `${a.episode.show}/${a.episode.episode}`;
     if (handled === key) return;
     handled = key;
-    if (localStorage.getItem('autoplay') === '0') return;
+    if (localStorage.getItem('autoplay') === '0' || Sleep.blocksAutoplay()) return;
     Archive.playNext(a.episode);
   });
 })();
@@ -706,7 +726,7 @@ setInterval(() => {
 }, 5 * 60_000);
 
 async function refresh() {
-  try { live = await window.nts.getLive(); render(); }
+  try { live = await window.nts.getLive(); render(); Reminders.check(); }
   catch (e) { if (!live) $('title').textContent = 'Could not reach NTS'; }
 }
 
@@ -795,8 +815,34 @@ document.addEventListener('keydown', (e) => {
 });
 
 // If the stream drops, try to reconnect
-audio.addEventListener('error', () => { if (playing) setTimeout(play, 3000); });
-audio.addEventListener('stalled', () => { if (playing) setTimeout(() => playing && audio.paused && play(), 5000); });
+// If the stream drops, keep trying (backing off up to 30 s) and say so in the bar
+var reconnecting = false;
+let retryDelay = 2000;
+let retryTimer = null;
+function reconnect() {
+  if (!playing) return;
+  reconnecting = true;
+  renderNowbar();
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => { if (playing && navigator.onLine) play(); }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 30000);
+}
+audio.addEventListener('error', () => { if (playing && audio.getAttribute('src')) reconnect(); });
+audio.addEventListener('stalled', () => { setTimeout(() => { if (playing && audio.paused) reconnect(); }, 5000); });
+audio.addEventListener('playing', () => { reconnecting = false; retryDelay = 2000; renderNowbar(); LiveNow.poll(); });
+
+// Offline / back online
+function onConnectivity() {
+  document.body.classList.toggle('offline', !navigator.onLine);
+  renderNowbar();
+  if (navigator.onLine) {
+    refresh();
+    if (playing) play();                       // pick the live stream back up
+    else if (source === 'archive' && ArchivePlayer.state.error) ArchivePlayer.play();
+  }
+}
+window.addEventListener('online', onConnectivity);
+window.addEventListener('offline', onConnectivity);
 
 // Windows media keys / system media overlay
 if ('mediaSession' in navigator) {
@@ -808,6 +854,168 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => (isArchive() ? Archive.skipTrack(1) : setChannel(channel ? 0 : 1)));
   navigator.mediaSession.setActionHandler('previoustrack', () => (isArchive() ? Archive.skipTrack(-1) : setChannel(channel ? 0 : 1)));
 }
+
+// ---- Live track IDs (NTS Supporters) ----
+// While live radio plays and you're signed in as a Supporter, read the track playing
+// from NTS's live tracklist: shown in the bar and on the stage, with notifications.
+var LiveNow = (() => {   // var: the now-playing bar may ask before this line has run
+  let track = null;
+  let key = '';
+  async function poll() {
+    if (!(playing && source === 'live' && supporter && navigator.onLine)) return set(null);
+    const ch = channel;
+    const r = await window.nts.liveTracks(ch + 1).catch(() => null);
+    if (ch !== channel || !playing) return;
+    set(r?.available && r.supporter ? r.tracks[0] || null : null);
+  }
+  function set(t) {
+    const k = t ? `${channel}|${t.time}|${t.artist}|${t.title}` : '';
+    if (k === key) return;
+    const first = !key;
+    key = k;
+    track = t;
+    renderNowbar();
+    if (typeof Stage !== 'undefined') Stage.render();
+    if (t && !first) announce(t);
+  }
+  async function announce(t) {
+    const art = await Promise.race([Art.get(t, 'high'), new Promise((r) => setTimeout(() => r(null), 2500))]);
+    const show = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: t.title, artist: t.artist, album: `NTS ${channel + 1} · ${show}`,
+        artwork: art?.large ? [{ src: art.large, sizes: '512x512' }] : []
+      });
+    }
+    if (TrackNotify.enabled()) window.nts.notify({ title: `${t.artist} – ${t.title}`, body: `Live on NTS ${channel + 1}${show ? ' · ' + show : ''}`, art: art?.large || '' });
+  }
+  setInterval(poll, 20000);
+  return { get track() { return track; }, poll, clear: () => set(null) };
+})();
+
+// ---- Reminders: tell me when a show goes live ----
+// Shows you asked to be reminded about (from the schedule), plus the shows you follow
+// in My NTS. One notification per broadcast.
+const Reminders = (() => {
+  const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
+  const shows = load('reminders', {});            // alias -> title
+  const notified = load('remindedEpisodes', []);
+  const save = () => { try { localStorage.setItem('reminders', JSON.stringify(shows)); localStorage.setItem('remindedEpisodes', JSON.stringify(notified.slice(-100))); } catch {} };
+  const followed = () => new Set((load('mynts:shows', {}).items || [])
+    .map((it) => (/^\/shows\/([^/]+)/.exec(it.path || '') || [])[1]).filter(Boolean));
+  function check() {
+    const f = followed();
+    (live?.results || []).slice(0, 2).forEach((r, i) => {
+      const info = showInfo(r);
+      if (!info.show || !info.episode || !(shows[info.show] || f.has(info.show))) return;
+      const key = `${info.show}/${info.episode}`;
+      if (notified.includes(key)) return;
+      notified.push(key);
+      save();
+      if (playing && channel === i) return;     // already listening
+      window.nts.notify({ title: `${info.title} is live on NTS ${i + 1}`, body: shows[info.show] ? 'You asked to be reminded' : 'A show you follow', art: info.img });
+    });
+  }
+  return {
+    has: (alias) => !!shows[alias],
+    toggle(alias, title) { if (shows[alias]) delete shows[alias]; else shows[alias] = title; save(); return !!shows[alias]; },
+    check
+  };
+})();
+
+// ---- Sleep timer ----
+const Sleep = (() => {
+  let mode = 'off';
+  let endsAt = 0;
+  let timer = null;
+  let tick = null;
+  function fadeOutThenStop() {
+    const start = audio.volume;
+    let n = 0;
+    const steps = 40;
+    const fade = setInterval(() => {
+      n++;
+      const v = Math.max(0, start * (1 - n / steps));
+      audio.volume = v;
+      ArchivePlayer.setVolume(v);
+      if (n >= steps) {
+        clearInterval(fade);
+        if (source === 'archive') ArchivePlayer.pause(); else if (playing) stop();
+        audio.volume = start;
+        ArchivePlayer.setVolume(audio.muted ? 0 : start);
+        set('off');
+        showSnack('Sleep timer: stopped');
+      }
+    }, 500);   // 20 s fade out
+  }
+  function set(m) {
+    mode = m;
+    clearTimeout(timer);
+    clearInterval(tick);
+    endsAt = 0;
+    if (/^\d+$/.test(m)) {
+      endsAt = Date.now() + Number(m) * 60000;
+      timer = setTimeout(fadeOutThenStop, Math.max(0, Number(m) * 60000 - 20000));
+      tick = setInterval(paintSettings, 30000);
+    }
+    paintSettings();
+  }
+  // "End of episode": stop when the archive episode finishes (no autoplay)
+  ArchivePlayer.onChange((a) => { if (mode === 'episode' && a.finished) { set('off'); showSnack('Sleep timer: stopped at the end of the episode'); } });
+  return {
+    set,
+    get mode() { return mode; },
+    blocksAutoplay: () => mode === 'episode',
+    remaining: () => (endsAt ? Math.max(0, Math.ceil((endsAt - Date.now()) / 60000)) : 0)
+  };
+})();
+
+// ---- Settings popover ----
+async function paintSettings() {
+  document.querySelectorAll('#sleepChoices button').forEach((b) => b.classList.toggle('on', b.dataset.sleep === Sleep.mode));
+  $('sleepHint').textContent = Sleep.mode === 'episode' ? 'Stops when this episode ends'
+    : Sleep.remaining() ? `Stops in ${Sleep.remaining()} min` : '';
+  $('settingsBtn').classList.toggle('has-timer', Sleep.mode !== 'off');
+  const ds = await window.nts.desktop?.settings().catch(() => null);
+  if (ds) {
+    $('trayToggle').classList.toggle('notify-toggle--on', ds.keepInTray);
+    $('loginToggle').classList.toggle('notify-toggle--on', ds.openAtLogin);
+    $('loginToggle').hidden = !ds.loginSupported;
+  }
+  const mod = /Mac/.test(navigator.platform) ? 'Cmd+Opt' : 'Ctrl+Alt';
+  $('shortcutHelp').textContent = `Anywhere: ${mod}+P play/pause · ${mod}+← → tracks · ${mod}+M mini player`;
+}
+$('settingsBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('settings').hidden = !$('settings').hidden;
+  if (!$('settings').hidden) paintSettings();
+});
+document.addEventListener('click', (e) => { if (!$('settings').hidden && !$('settings').contains(e.target)) $('settings').hidden = true; });
+document.querySelectorAll('#sleepChoices button').forEach((b) => b.addEventListener('click', () => {
+  Sleep.set(b.dataset.sleep);
+  if (b.dataset.sleep !== 'off') showSnack(b.dataset.sleep === 'episode' ? 'Sleep timer: end of episode' : `Sleep timer: ${b.textContent}`);
+}));
+$('trayToggle').addEventListener('click', async () => {
+  const ds = await window.nts.desktop.settings();
+  await window.nts.desktop.set('keepInTray', !ds.keepInTray);
+  paintSettings();
+});
+$('loginToggle').addEventListener('click', async () => {
+  const ds = await window.nts.desktop.settings();
+  await window.nts.desktop.set('openAtLogin', !ds.openAtLogin);
+  paintSettings();
+});
+$('miniBtn').addEventListener('click', () => { $('settings').hidden = true; window.nts.desktop.mini(true); });
+$('miniExit').addEventListener('click', () => window.nts.desktop.mini(false));
+window.nts.desktop?.onMini((on) => document.body.classList.toggle('mini', on));
+
+// Tray menu and global shortcuts
+window.nts.desktop?.onCommand((c) => {
+  const archive = source === 'archive' && ArchivePlayer.state.episode;
+  if (c === 'toggle') togglePlayback();
+  else if (c === 'next' || c === 'prev') { if (archive) Archive.skipTrack(c === 'next' ? 1 : -1); else setChannel(channel ? 0 : 1); }
+  else if (c === 'channel1' || c === 'channel2') { setChannel(c === 'channel1' ? 0 : 1); if (!playing) play(); }
+});
 
 // ---- Wide view: the stage ----
 // Big album art and full details for what's playing, with links to find the
@@ -1005,6 +1213,19 @@ const Stage = (() => {
       const appleUrl = await appleP;
       if (my !== token || !appleUrl) return;
       paintLinks(links(t, art, appleUrl));
+      return;
+    }
+
+    // Live radio with a live track ID (Supporters): show the track like an archive track
+    const lt = playing && source === 'live' ? LiveNow?.track : null;
+    if (lt) {
+      const base = { label: '', context: '', title: lt.title, artist: lt.artist, square: true };
+      paint({ ...base, keepArt: true, linkItems: links(lt, null) });
+      const art = await Art.get(lt, 'high');
+      if (my !== token) return;
+      paint({ ...base, img: art?.large || '', whitelabel: !art?.large, track: lt,
+        context: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : (art?.year || ''), linkItems: links(lt, art) });
+      document.body.classList.add('stage-spinning');
       return;
     }
 

@@ -24,6 +24,8 @@
       "preload.js",
       "art.js",
       "account.js",
+      "live-tracks.js",
+      "desktop.js",
       "src/**/*",
       "build/icon.png"
     ],
@@ -79,9 +81,19 @@
       "synopsis": "Desktop player for NTS Radio",
       "maintainer": "NTS Player contributors",
       "artifactName": "NTS-Player-${version}-linux-${arch}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "danielsamson",
+        "repo": "nts-player"
+      }
+    ]
   },
   "homepage": "https://github.com/danielsamson/nts-player",
   "author": "Daniel Samson",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
 }

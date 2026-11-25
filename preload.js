@@ -8,6 +8,15 @@ contextBridge.exposeInMainWorld('nts', {
   art: (track, priority) => ipcRenderer.invoke('art:lookup', track, priority),
   appleLink: (track) => ipcRenderer.invoke('links:apple', track),
   openLink: (link) => ipcRenderer.invoke('open:link', link),
+  liveTracks: (channel) => ipcRenderer.invoke('live:tracks', channel),
+  desktop: {
+    state: (s) => ipcRenderer.invoke('desktop:state', s),
+    mini: (on) => ipcRenderer.invoke('desktop:mini', on),
+    settings: () => ipcRenderer.invoke('desktop:settings'),
+    set: (key, value) => ipcRenderer.invoke('desktop:set', key, value),
+    onCommand: (cb) => ipcRenderer.on('desktop:command', (_e, c) => cb(c)),
+    onMini: (cb) => ipcRenderer.on('desktop:mini', (_e, on) => cb(on))
+  },
   account: {
     episode: (show, episode) => ipcRenderer.invoke('account:episode', show, episode),
     toggle: (action) => ipcRenderer.invoke('account:toggle', action),

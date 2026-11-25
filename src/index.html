@@ -25,6 +25,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h4v16H3zM9 4h4v16H9zM15.2 4.6l3.9-1 4 15.5-3.9 1z"/></svg>
       <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
+    <button class="tab tab--settings" id="settingsBtn" title="Settings" aria-label="Settings" aria-haspopup="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>
+    </button>
     <button class="tab tab--expand" id="expandBtn" title="Wide view" aria-label="Wide view">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path id="expandIcon" d="M4 4h6v2H7.4l4.3 4.3-1.4 1.4L6 7.4V10H4zm16 16h-6v-2h2.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z"/></svg>
     </button>
@@ -109,6 +112,22 @@
     </div>
   </aside>
 
+  <!-- Settings: sleep timer, mini player, tray, start at login -->
+  <div class="settings" id="settings" hidden role="dialog" aria-label="Settings">
+    <div class="settings__row">
+      <span class="settings__label">Sleep timer</span>
+      <div class="settings__choices" id="sleepChoices">
+        <button data-sleep="off">Off</button><button data-sleep="15">15m</button><button data-sleep="30">30m</button>
+        <button data-sleep="60">1h</button><button data-sleep="episode">End of episode</button>
+      </div>
+      <span class="settings__hint" id="sleepHint"></span>
+    </div>
+    <button class="settings__item" id="miniBtn">Mini player</button>
+    <button class="settings__item notify-toggle" id="trayToggle">Keep playing when the window is closed</button>
+    <button class="settings__item notify-toggle" id="loginToggle">Start NTS Player when I log in</button>
+    <p class="settings__keys" id="shortcutHelp"></p>
+  </div>
+
   <div class="snackbar" id="snackbar" hidden>Track info copied</div>
 
   <!-- Now-playing bar: what you hear, what's next, volume -->
@@ -129,6 +148,9 @@
       <span class="nowbar__now"><span class="nowbar__kind" id="nowKind"></span><span id="nowLabel">Play NTS 1</span></span>
       <span class="nowbar__next" id="next"></span>
     </div>
+    <button class="mini-exit" id="miniExit" title="Full player" aria-label="Full player">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v2H7.4l4.3 4.3-1.4 1.4L6 7.4V10H4zm16 16h-6v-2h2.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z"/></svg>
+    </button>
     <div class="volume">
       <button class="volume__button" id="mute" aria-label="Mute">
         <svg viewBox="0 0 24 24"><path id="volIcon" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>

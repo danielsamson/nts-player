@@ -7,6 +7,11 @@ on:
   push:
     tags: ['v*']
 
+# Publishing a version tag puts the builds on a GitHub Release, which is where
+# the app's automatic updates come from.
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -22,9 +27,11 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build
-        run: npx electron-builder --publish never
+        # on a version tag: build and publish to a GitHub Release (draft); otherwise just build
+        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false   # unsigned builds
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: NTS-Player-${{ runner.os }}

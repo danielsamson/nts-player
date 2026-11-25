@@ -48,6 +48,7 @@ const Archive = (() => {
     else if (current.type === 'show') renderShow(current.show);
     else if (current.type === 'episode') renderEpisode(current.show, current.episode);
     else if (current.type === 'mynts') renderMyNts(current.kind);
+    else if (current.type === 'schedule') renderSchedule(current.channel);
     else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
   }
 
@@ -60,6 +61,17 @@ const Archive = (() => {
   }
 
   function sectionTitle(text) { return el('h2', 'archive__section', text); }
+
+  // A failed load: the message and a Try again button (offline-aware)
+  function failed(message) {
+    const box = el('div', 'archive__failed');
+    box.append(el('p', 'archive__status', navigator.onLine ? message : 'You’re offline. This will load when you’re back online.'));
+    const again = el('button', 'archive__more', 'Try again');
+    again.addEventListener('click', () => render());
+    box.append(again);
+    return box;
+  }
+  window.addEventListener('online', () => { if (root.querySelector('.archive__failed')) render(); });
 
   function loadMoreButton(onClick) {
     const b = el('button', 'archive__more', 'Load more');
@@ -318,6 +330,93 @@ const Archive = (() => {
     Stage.paintLinks(Stage.links(t, art, apple), linksList, linksLabel);
   }
 
+  // NTS sometimes sends titles with HTML entities ("Peterson &amp; Andras")
+  const decode = (x) => { const t = document.createElement('textarea'); t.innerHTML = x || ''; return t.value; };
+
+  // ---- Schedule: what's on, with reminders ----
+  function scheduleSection() {
+    const nav = el('div', 'mynts-nav');
+    [1, 2].forEach((ch) => {
+      const b = el('button', 'mynts-nav__item', `NTS ${ch} schedule`);
+      b.addEventListener('click', () => go({ type: 'schedule', channel: ch }));
+      nav.append(b);
+    });
+    return [sectionTitle('Schedule'), nav];
+  }
+
+  async function renderSchedule(ch) {
+    const bar = backBar(`Schedule · NTS ${ch}`);
+    root.replaceChildren(bar, loader('Loading the schedule'));
+    let res;
+    try { res = await api(`/api/v2/radio/schedule/${ch}`); } catch { root.replaceChildren(bar, failed('Couldn’t load the schedule.')); return; }
+    if (current.type !== 'schedule' || current.channel !== ch) return;
+
+    // Tabs to switch channel
+    const tabs = el('div', 'mynts-nav');
+    [1, 2].forEach((c) => {
+      const b = el('button', 'mynts-nav__item' + (c === ch ? ' mynts-nav__item--on' : ''), `NTS ${c}`);
+      b.addEventListener('click', () => { if (c !== ch) { current = { type: 'schedule', channel: c }; render(); } });
+      tabs.append(b);
+    });
+
+    const now = Date.now();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayName = (d) => {
+      const diff = Math.round((d - today) / 86400000);
+      return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+    };
+    // Group broadcasts by local day, from now on
+    const days = new Map();
+    (res.results || []).flatMap((d) => d.broadcasts || []).forEach((b) => {
+      const start = new Date(b.start_timestamp);
+      const end = new Date(b.end_timestamp);
+      if (end.getTime() < now) return;
+      const day = new Date(start); day.setHours(0, 0, 0, 0);
+      const k = day.getTime();
+      if (!days.has(k)) days.set(k, []);
+      const link = (b.links || []).find((l) => /\/shows\//.test(l.href || ''));
+      const p = link ? parsePath(new URL(link.href).pathname.replace('/api/v2', '')) : null;
+      days.get(k).push({ b, start, end, p });
+    });
+
+    const parts = [bar, tabs];
+    [...days.entries()].sort((a, b) => a[0] - b[0]).slice(0, 7).forEach(([k, items]) => {
+      parts.push(sectionTitle(dayName(new Date(k))));
+      const list = el('div', 'schedule');
+      items.sort((a, b) => a.start - b.start).forEach(({ b, start, end, p }) => {
+        const onNow = start.getTime() <= now && now < end.getTime();
+        const rowEl = el('div', 'schedule__item' + (onNow ? ' schedule__item--now' : ''));
+        const time = el('span', 'schedule__time', start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
+        const title = el('button', 'schedule__title', decode(b.broadcast_title));
+        title.title = p ? 'Open the show' : '';
+        if (p) title.addEventListener('click', () => go(onNow || !p.episode ? { type: 'show', show: p.show } : { type: 'episode', show: p.show, episode: p.episode }));
+        if (onNow) title.prepend(el('span', 'schedule__live', 'Live'));
+        rowEl.append(time, title);
+        if (p?.show) {
+          const bell = el('button', 'schedule__remind');
+          const paintBell = () => {
+            const on = Reminders.has(p.show);
+            bell.classList.toggle('schedule__remind--on', on);
+            bell.title = on ? 'Reminder set: you’ll be notified when this show goes live' : 'Remind me when this show goes live';
+            bell.setAttribute('aria-label', bell.title);
+          };
+          bell.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0"/></svg>';
+          bell.addEventListener('click', () => {
+            const on = Reminders.toggle(p.show, decode(b.broadcast_title).replace(/\s*\(R\)\s*$/, ''));
+            paintBell();
+            showSnack(on ? 'Reminder set' : 'Reminder removed');
+          });
+          paintBell();
+          rowEl.append(bell);
+        }
+        list.append(rowEl);
+      });
+      parts.push(list);
+    });
+    root.replaceChildren(...parts);
+    root.querySelector('.schedule__item--now')?.scrollIntoView({ block: 'center' });
+  }
+
   // ---- Home: recently added ----
   async function renderHome() {
     const list = el('div', 'items');
@@ -330,9 +429,9 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...historySection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...historySection(), ...scheduleSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
-    } catch { root.replaceChildren(el('p', 'archive__status', 'Could not load the archive.')); }
+    } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
 
   // ---- Search ----
@@ -363,7 +462,7 @@ const Archive = (() => {
     try {
       root.replaceChildren(backBar(`Search: ${q}`), list);
       await more();
-    } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Search failed. Try again.')); }
+    } catch { root.replaceChildren(backBar(), failed('Search didn’t work.')); }
   }
 
   // ---- Show page ----
@@ -395,7 +494,7 @@ const Archive = (() => {
       };
       root.replaceChildren(backBar('Show'), head, sectionTitle('Episodes'), list);
       await more();
-    } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Could not load this show.')); }
+    } catch { root.replaceChildren(backBar(), failed('Couldn’t load this show.')); }
   }
 
   function tagRow(genres) {
@@ -513,7 +612,7 @@ const Archive = (() => {
       MyNTS.mount(mynts, show, episode, { trackButtons: saveButtons, origin: info });
       paintPlay();
       highlight();
-    } catch { root.replaceChildren(backBar(), el('p', 'archive__status', 'Could not load this episode.')); }
+    } catch { root.replaceChildren(backBar(), failed('Couldn’t load this episode.')); }
   }
 
   // "Notify on track change" switch, shared by every episode

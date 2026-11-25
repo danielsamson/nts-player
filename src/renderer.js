@@ -562,7 +562,9 @@ const Stage = (() => {
     const im = $('stageArtImg');
     if (img) { if (im.getAttribute('src') !== img) im.src = img; } else im.removeAttribute('src');
     $('stageArt').classList.toggle('stage__art--wide', !square);
+    $('stageArt').classList.toggle('stage__art--album', !!square && !!img);
     $('stageArt').classList.toggle('stage__art--empty', !img);
+    $('stageRecordLabel').style.backgroundImage = img && square ? `url("${img}")` : '';
     $('stageKicker').textContent = kicker || '';
     $('stageTitle').textContent = title || '';
     $('stageTitle').classList.toggle('stage__title--long', (title || '').length > 26);
@@ -576,6 +578,8 @@ const Stage = (() => {
     if (!wideQuery.matches) return;
     const my = ++token;
     const a = ArchivePlayer.state;
+    // The record slides out and spins while an archive track plays
+    document.body.classList.toggle('stage-spinning', source === 'archive' && !!a.episode && a.playing);
 
     if (source === 'archive' && a.episode) {
       const ep = a.episode;
@@ -623,6 +627,34 @@ const Stage = (() => {
       linkItems: info.episode ? [['View on nts.live', `https://www.nts.live/shows/${info.show}/episodes/${info.episode}`]] : []
     });
   }
+
+  // Cover tilt and shine follow the cursor anywhere over the stage
+  (() => {
+    const stageEl = $('stage');
+    const art = $('stageArt');
+    const MAX_X = 9, MAX_Y = 12;   // degrees
+    let frame = null;
+    stageEl.addEventListener('pointermove', (e) => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        const r = art.getBoundingClientRect();
+        if (!r.width) return;
+        // -1..1 from the cover's centre, eased so it never flips hard
+        const nx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width * 0.9)));
+        const ny = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height * 0.9)));
+        art.classList.add('is-tracking');
+        art.style.setProperty('--ry', `${(nx * MAX_Y).toFixed(2)}deg`);
+        art.style.setProperty('--rx', `${(-ny * MAX_X).toFixed(2)}deg`);
+        art.style.setProperty('--gx', `${(50 + nx * 45).toFixed(1)}%`);
+        art.style.setProperty('--gy', `${(50 + ny * 45).toFixed(1)}%`);
+      });
+    });
+    stageEl.addEventListener('pointerleave', () => {
+      art.classList.remove('is-tracking');
+      ['--rx', '--ry', '--gx', '--gy'].forEach((p) => art.style.removeProperty(p));
+    });
+  })();
 
   // Expand / collapse button; the layout itself follows the window width
   function paintButton() {

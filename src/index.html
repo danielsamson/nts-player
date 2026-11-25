@@ -74,7 +74,12 @@
   <!-- Wide view: the stage. Big album art and the full track details -->
   <aside class="stage" id="stage" aria-label="Now playing">
     <div class="stage__body">
-      <div class="stage__art" id="stageArt"><img id="stageArtImg" alt=""></div>
+      <div class="stage__art" id="stageArt">
+        <div class="stage__tilt" id="stageTilt">
+          <div class="stage__record" aria-hidden="true"><span class="stage__record-label" id="stageRecordLabel"></span></div>
+          <div class="stage__cover"><img id="stageArtImg" alt=""><span class="stage__shine"></span></div>
+        </div>
+      </div>
       <div class="stage__info">
         <p class="stage__eyebrow">
           <span class="stage__label" id="stageLabel">Now playing</span>

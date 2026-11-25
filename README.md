@@ -31,8 +31,10 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
   come from Deezer (by the track's Deezer ID or ISRC from NTS, or a search) and iTunes
   Search as a fallback. Only artist and title are sent; results are cached locally.
 - **Wide view.** The thin strip is the default. The expand button in the header (or
-  just making the window wider) adds a stage with the current track's album art, the
-  full title, artist and album, where it sits in the mix and what's next, plus links to
+  just making the window wider) adds a stage with the current track's album art as the
+  centrepiece: a record sleeve that tilts toward your cursor with a soft shine, and a
+  vinyl that slides out and spins while the track plays. Below it: the full title,
+  artist and album, where it sits in the mix and what's next, plus links to
   Spotify, Apple Music, Deezer, YouTube, Bandcamp and Discogs. Deezer and Apple Music
   go straight to the track when it was found; the others open a search.
 - **Genre tags** and the show description, with a link to the episode on nts.live.

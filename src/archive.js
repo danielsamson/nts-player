@@ -343,9 +343,11 @@ const Archive = (() => {
     const album = el('p', 'detail__meta');
     const from = el('div', 'track-page__from');
     const actions = el('div', 'track-page__actions');
+    const save = el('button', 'mynts-btn');
+    save.hidden = true;
     const copy = el('button', 'mynts-btn', 'Copy artist & title');
     copy.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
-    actions.append(copy);
+    actions.append(save, copy);
     const linksNav = el('nav', 'track-page__links');
     const linksLabel = el('span', 'stage__links-label', 'Find it on');
     const linksList = el('span', 'stage__links-list');
@@ -385,6 +387,32 @@ const Archive = (() => {
         list.append(row({ title: pl.title, meta: pl.date, onClick: () => go({ type: 'episode', show: p.show, episode: p.episode }) }));
       });
       from.append(list);
+    }
+
+    // Save to My NTS, through the episode it was played on
+    if (o?.show && o?.episode && supporter) {
+      const ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
+      const paintSave = (saved, busy) => {
+        save.hidden = false;
+        save.innerHTML = `${ICON}<span>${saved ? 'Saved to My NTS' : 'Save to My NTS'}</span>`;
+        save.classList.toggle('mynts-btn--on', !!saved);
+        save.classList.toggle('mynts-btn--busy', !!busy);
+      };
+      paintSave(false, true);
+      MyNTS.getState(o.show, o.episode).then((st) => {
+        if (current.type !== 'track' || current.title !== t.title) return;
+        const tr = MyNTS.trackState(st, t);
+        if (!st?.signedIn || !tr?.canSave) { save.hidden = true; return; }
+        let saved = !!tr.saved;
+        paintSave(saved);
+        save.onclick = async () => {
+          paintSave(saved, true);
+          const res = await MyNTS.toggleTrack(o.show, o.episode, t, !saved, { show: o.show, episode: o.episode, title: o.title, date: o.date, offset: o.offset });
+          if (res && !res.error) saved = !saved;
+          paintSave(saved);
+          NowSave.update(true);
+        };
+      });
     }
 
     // Cover and album: with the exact IDs from the tracklist when we have them

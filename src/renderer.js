@@ -1131,7 +1131,16 @@ window.nts.desktop?.onCommand((c) => {
 
 // A live track can only be saved from an episode page: the live show's own (once NTS
 // has added it there) or an earlier episode that played the same track.
-async function liveSaveTarget(t) {
+const liveTargets = new Map();
+function liveSaveTarget(t) {
+  const k = `${channel}|${t.artist}|${t.title}`;
+  const hit = liveTargets.get(k);
+  if (hit && Date.now() - hit.at < 120000) return hit.p;
+  const p = findLiveSaveTarget(t);
+  liveTargets.set(k, { at: Date.now(), p });
+  return p;
+}
+async function findLiveSaveTarget(t) {
   const r = live?.results?.[channel];
   const info = r ? showInfo(r) : null;
   if (info?.show && info?.episode) {
@@ -1321,14 +1330,25 @@ const Stage = (() => {
   new ResizeObserver(fitInfo).observe($('stageInfo'));
 
   // Bookmark for the track on the stage (saved to My NTS)
-  async function paintSave(ep, t, my) {
+  async function paintSave(epOrPromise, t, my) {
     const box = $('stageSave');
     box.replaceChildren();
-    if (!t || !ep?.show || !ep?.episode) return;
+    if (!t || !supporter) return;
+    // Show it straight away (waiting), then enable once My NTS has answered
+    const wait = document.createElement('button');
+    wait.className = 'mynts-btn mynts-btn--busy';
+    wait.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><span>Save track</span>';
+    box.append(wait);
+    const ep = await epOrPromise;
+    if (my !== token) return;
+    if (!ep?.show || !ep?.episode) { box.replaceChildren(); return; }
+    if (ep.offset != null) t = { ...t, offset: ep.offset };
     const st = await MyNTS.getState(ep.show, ep.episode);
-    if (my !== token || !st?.available || !st.signedIn) return;
+    if (my !== token) return;
+    if (!st?.available || !st.signedIn) { box.replaceChildren(); return; }
     const tr = MyNTS.trackState(st, t);
-    if (!tr?.canSave) return;
+    if (!tr?.canSave) { box.replaceChildren(); return; }
+    box.replaceChildren();
     const b = document.createElement('button');
     b.className = 'mynts-btn' + (tr.saved ? ' mynts-btn--on' : '');
     b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg><span></span>';
@@ -1394,10 +1414,10 @@ const Stage = (() => {
     if (lt) {
       const base = { label: '', context: '', title: lt.title, artist: lt.artist, square: true };
       paint({ ...base, keepArt: true, linkItems: links(lt, null) });
-      liveSaveTarget(lt).then((ep) => { if (ep && my === token) paintSave(ep, { ...lt, offset: ep.offset }, my); });
+      paintSave(liveSaveTarget(lt), lt, my);
       const art = await Art.get(lt, 'high');
       if (my !== token) return;
-      paint({ ...base, img: art?.large || '', whitelabel: !art?.large, track: lt,
+      paint({ ...base, img: art?.large || '', whitelabel: !art?.large, track: lt, keepSave: true,
         context: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : (art?.year || ''), linkItems: links(lt, art) });
       document.body.classList.add('stage-spinning');
       return;

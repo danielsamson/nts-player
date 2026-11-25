@@ -190,7 +190,8 @@ function toggle({ show, episode, kind, artist, title, want }) {
 }
 
 // ---- Reading your My NTS lists ----
-const LIST_PATHS = { episodes: '/my-nts', shows: '/my-nts/favourites/shows', tracks: '/my-nts/tracks' };
+// (/my-nts itself is the account page)
+const LIST_PATHS = { episodes: '/my-nts/favourites/episodes', shows: '/my-nts/favourites/shows', tracks: '/my-nts/tracks' };
 
 const READ_LIST = `(() => {
   const page = document.querySelector('.page-my-nts, #react-content');
@@ -221,9 +222,18 @@ function getList(kind) {
     await open(LIST_PATHS[kind] || LIST_PATHS.episodes, true);
     await sleep(500);
     if (signedOutUrl()) { log('My NTS redirected to sign-in: not signed in'); return { signedIn: false }; }
-    // Wait for the list (or an empty My NTS page) to render
-    let res = await waitFor(`(() => { const r = ${READ_LIST}; return r && (r.items.length || r.tracks.length || r.ready) ? r : null; })()`, 12000);
+    // NTS loads the list after the page appears: wait for items, or settle on empty
+    let res = await waitFor(`(() => { const r = ${READ_LIST}; return r && (r.items.length || r.tracks.length) ? r : null; })()`, 12000);
     if (signedOutUrl()) return { signedIn: false };
+    if (!res) res = await js(READ_LIST).catch(() => null);
+    if (res && res.ready && !res.items.length && !res.tracks.length) {
+      log(`My NTS ${kind}: page loaded but no items found`);
+      if (DEBUG) {
+        log('page text:', (await js('document.body.innerText.slice(0, 600)').catch(() => '')).replace(/\n+/g, ' | '));
+        log('list classes seen:', await js(`[...new Set([...document.querySelectorAll('.page-my-nts [class]')].map((e) => String(e.className).split(' ')[0]))].slice(0, 50).join(' ')`).catch(() => ''));
+      }
+      return { signedIn: true, available: true, items: [], tracks: [] };
+    }
     if (!res) {
       log('My NTS list not recognised on', win?.webContents.getURL());
       if (DEBUG) log('page text:', (await js('document.body.innerText.slice(0, 600)').catch(() => '')).replace(/\n+/g, ' | '));

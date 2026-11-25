@@ -615,7 +615,10 @@ function renderTracks(info) {
   const shownKey = `${key}:${tl.tracks.length}`;
   if (list.dataset.key !== shownKey) {      // don't rebuild (and re-fetch art) every refresh
     list.dataset.key = shownKey;
-    list.replaceChildren(...tl.tracks.map((t) => trackRow(t)));
+    list.replaceChildren(...tl.tracks.map((t) => trackRow(t, {
+      title: 'Track details',
+      onClick: () => { Archive.showTrack(t.artist, t.title, { fromLive: true }); render(); }
+    })));
   }
 }
 
@@ -928,7 +931,10 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     if (k === listKey) return;
     listKey = k;
     ol.replaceChildren(...list.map((t, i) => {
-      const li = trackRow({ artist: t.artist, title: t.title, time: t.time }, { title: 'Click to copy' });
+      const li = trackRow({ artist: t.artist, title: t.title, time: t.time }, {
+        title: 'Track details',
+        onClick: () => { Archive.showTrack(t.artist, t.title, { fromLive: true }); render(); }
+      });
       if (i === 0) li.classList.add('track--now');
       return li;
     }));

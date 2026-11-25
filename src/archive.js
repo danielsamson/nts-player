@@ -35,6 +35,13 @@ const Archive = (() => {
     root.scrollTop = 0;
   }
   function back() {
+    // Opened from the live view: Back returns there
+    if (current.returnLive) {
+      current = history.pop() || { type: 'home' };
+      view = 'live';
+      if (typeof window.render === 'function') window.render(); else render();
+      return;
+    }
     if (!history.length) return;
     current = history.pop();
     render();
@@ -345,7 +352,7 @@ const Archive = (() => {
     linksNav.append(linksLabel, linksList);
     body.append(title, artist, album, from, linksNav, actions);
     wrap.append(picWrap, body);
-    root.replaceChildren(backBar('Saved track'), wrap);
+    root.replaceChildren(backBar(current.returnLive ? 'Track' : 'Saved track'), wrap);
 
     Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
     from.append(loader('Finding where it was played'));
@@ -871,7 +878,11 @@ const Archive = (() => {
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
-    showTrack(artist, title) { go({ type: 'track', artist, title }); },
+    showTrack(artist, title, { fromLive } = {}) {
+      started = true;
+      if (fromLive) { go({ type: 'track', artist, title, returnLive: true }); view = 'archive'; return; }
+      go({ type: 'track', artist, title });
+    },
     skipTrack
   };
 })();

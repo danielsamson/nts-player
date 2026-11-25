@@ -59,6 +59,11 @@
           <button class="supporter__button" id="signOut" hidden>Sign out</button>
         </div>
         <webview id="liveTracks" class="live-tracks" partition="persist:nts" hidden></webview>
+        <!-- Our own live tracklist (Supporters), from NTS's live track IDs -->
+        <div id="liveList" class="live-list" hidden>
+          <p class="tracks__note" id="liveNote"></p>
+          <ol class="tracks archive-tracks" id="liveTracksList"></ol>
+        </div>
         <div id="episodeTracks">
           <p class="tracks__note" id="tracksNote"></p>
           <ol class="tracks" id="tracks"></ol>

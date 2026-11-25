@@ -951,3 +951,12 @@ body.offline .nowbar__next { color: var(--live); }
 .onair__title:hover { text-decoration: underline; }
 .onair__where { font-size: 11px; line-height: 14px; color: var(--grey-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .onair__card--playing .onair__where { color: var(--grey-3); }
+
+/* ---- Our live tracklist ---- */
+#pane-tracks.live { display: block; overflow-y: auto; padding: 12px 0 16px; }
+
+.live-list .tracks__note:empty { display: none; }
+.live-list .loader { padding: 4px 0; }
+.live-list .archive-tracks { padding: 0; }
+body.playing .live-list .track--now { background: var(--black); color: var(--white); }
+body.playing .live-list .track--now .track__time, body.playing .live-list .track--now .track__copy { color: var(--white); }

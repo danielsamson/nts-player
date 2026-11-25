@@ -143,7 +143,7 @@ function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
   const text = document.createElement('span'); text.className = 'track__text';
   const top = document.createElement('span'); top.className = 'track__top';
   const time = document.createElement('span'); time.className = 'track__time';
-  time.textContent = fmtOffset(t.offset ?? t.offset_estimate);
+  time.textContent = t.time || fmtOffset(t.offset ?? t.offset_estimate);
   const artist = document.createElement('span'); artist.className = 'track__artist'; artist.textContent = t.artist;
   top.append(time, artist);
   const name = document.createElement('span'); name.className = 'track__title'; name.textContent = t.title;
@@ -631,18 +631,14 @@ function setSupporter(on) {
 }
 
 function renderSupporter() {
-  const showLive = supporter && pane === 'tracks';
-  $('pane-tracks').classList.toggle('live', supporter);
-  webview.hidden = !supporter;
+  const showLive = supporter && pane === 'tracks' && view === 'live';
+  webview.hidden = true;                  // NTS's page is no longer shown; we draw our own list
+  $('liveList').hidden = !supporter;
   $('episodeTracks').hidden = supporter;
   $('signIn').hidden = supporter;
   $('signOut').hidden = !supporter;
-  $('supporterLabel').textContent = supporter ? 'Live tracklist' : 'NTS Supporter?';
-  themeWebview();
-  if (showLive && webviewChannel !== channel) {
-    webviewChannel = channel;
-    webview.src = `https://www.nts.live/live-tracklist/${channel + 1}`;
-  }
+  $('supporterLabel').textContent = supporter ? `Live tracklist · NTS ${channel + 1}` : 'NTS Supporter?';
+  if (showLive) LiveNow.showList();
 }
 
 // When you're not signed in as a Supporter, NTS's page shows a "Dig deeper"
@@ -867,12 +863,50 @@ if ('mediaSession' in navigator) {
 var LiveNow = (() => {   // var: the now-playing bar may ask before this line has run
   let track = null;
   let key = '';
+  let list = [];
+  let listKey = '';
+  let listChannel = null;
+  let listState = 'loading';
+  const listOpen = () => supporter && view === 'live' && pane === 'tracks';
   async function poll() {
-    if (!(playing && source === 'live' && supporter && navigator.onLine)) return set(null);
+    const hearing = playing && source === 'live';
+    if (!supporter || !navigator.onLine || !(hearing || listOpen())) return set(null);
     const ch = channel;
     const r = await window.nts.liveTracks(ch + 1).catch(() => null);
-    if (ch !== channel || !playing) return;
-    set(r?.available && r.supporter ? r.tracks[0] || null : null);
+    if (ch !== channel) return;
+    if (r?.available && r.supporter === false) {         // signed out / not a Supporter
+      set(null);
+      setSupporter(false);
+      showSnack('Sign in as an NTS Supporter for live tracks');
+      return;
+    }
+    listChannel = ch;
+    listState = r?.available ? 'ok' : 'error';
+    list = r?.available ? r.tracks : list;
+    paintList();
+    set(hearing && r?.available ? r.tracks[0] || null : null);
+  }
+
+  // Our live tracklist: cover, time, artist, title; the newest is the one on now
+  function paintList() {
+    if (!listOpen()) return;
+    const ol = $('liveTracksList');
+    const note = $('liveNote');
+    if (listChannel !== channel) { note.replaceChildren(loader('Loading live tracks')); ol.replaceChildren(); listKey = ''; return; }
+    note.textContent = listState === 'error' ? 'Couldn’t reach the live tracklist. Trying again…'
+      : !list.length ? 'No tracks identified yet for this show.' : '';
+    const k = `${listChannel}|` + list.map((t) => t.time + t.title).join('|');
+    if (k === listKey) return;
+    listKey = k;
+    ol.replaceChildren(...list.map((t, i) => {
+      const li = trackRow({ artist: t.artist, title: t.title, time: t.time }, { title: 'Click to copy' });
+      if (i === 0) li.classList.add('track--now');
+      return li;
+    }));
+  }
+  function showList() {
+    paintList();
+    if (listChannel !== channel || !list.length) poll();
   }
   function set(t) {
     const k = t ? `${channel}|${t.time}|${t.artist}|${t.title}` : '';
@@ -896,7 +930,7 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     if (TrackNotify.enabled()) window.nts.notify({ title: `${t.artist} – ${t.title}`, body: `Live on NTS ${channel + 1}${show ? ' · ' + show : ''}`, art: art?.large || '' });
   }
   setInterval(poll, 20000);
-  return { get track() { return track; }, poll, clear: () => set(null) };
+  return { get track() { return track; }, poll, showList, clear: () => set(null) };
 })();
 
 // ---- Shows you follow in My NTS ----

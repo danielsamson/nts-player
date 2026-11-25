@@ -9,6 +9,8 @@ let channel = Number(localStorage.getItem('channel') || 0);
 let playing = false;
 let live = null;
 let pane = localStorage.getItem('pane') || 'about';
+// Set once you've signed in to NTS; cleared if NTS sends the tracklist to sign-in
+let supporter = localStorage.getItem('supporter') === '1';
 const tracklists = new Map();   // key -> { tracks, source, date, alias, show }
 
 audio.volume = Number(localStorage.getItem('volume') ?? 0.8);
@@ -66,7 +68,8 @@ function render() {
   document.querySelectorAll('.switch__item').forEach((b) => b.classList.toggle('active', b.dataset.pane === pane));
   $('pane-about').hidden = pane !== 'about';
   $('pane-tracks').hidden = pane !== 'tracks';
-  renderTracks(info);
+  renderSupporter();
+  if (!supporter) renderTracks(info);
   $('time').textContent = info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : '';
   if ($('art').getAttribute('src') !== info.img) $('art').setAttribute('src', info.img);
   $('next').textContent = info.next?.broadcast_title
@@ -144,13 +147,68 @@ function renderTracks(info) {
   }));
 }
 
+// ---- NTS Supporter live tracklist (NTS's own page, in your NTS session) ----
+const webview = $('liveTracks');
+let webviewChannel = null;
+
+function setSupporter(on) {
+  supporter = on;
+  try { localStorage.setItem('supporter', on ? '1' : '0'); } catch {}
+  if (!on) { webviewChannel = null; }
+  render();
+}
+
+function renderSupporter() {
+  const showLive = supporter && pane === 'tracks';
+  $('pane-tracks').classList.toggle('live', supporter);
+  webview.hidden = !supporter;
+  $('episodeTracks').hidden = supporter;
+  $('signIn').hidden = supporter;
+  $('signOut').hidden = !supporter;
+  $('supporterLabel').textContent = supporter ? `Live on ${channel + 1}` : 'NTS Supporter?';
+  if (showLive && webviewChannel !== channel) {
+    webviewChannel = channel;
+    webview.src = `https://www.nts.live/live-tracklist/${channel + 1}`;
+  }
+}
+
+// When you're not signed in as a Supporter, NTS's page shows a "Dig deeper"
+// promo instead of tracks. Spot it and fall back to the free episode tracklist.
+let promoCheck;
+function checkForPromo() {
+  clearTimeout(promoCheck);
+  let tries = 0;
+  const probe = async () => {
+    if (!supporter) return;
+    try {
+      const state = await webview.executeJavaScript(
+        `document.querySelector('.page-live-tracks__promo') ? 'promo'
+          : document.querySelector('.page-live-tracks') ? 'ok' : 'loading'`);
+      if (state === 'promo') { setSupporter(false); showSnack('Sign in as an NTS Supporter for live tracks'); return; }
+      if (state === 'ok' && tries > 2) return;
+    } catch {}
+    if (++tries < 8) promoCheck = setTimeout(probe, 1000);
+  };
+  probe();
+}
+webview.addEventListener('dom-ready', checkForPromo);
+webview.addEventListener('did-navigate-in-page', checkForPromo);
+
+$('signIn').addEventListener('click', () => window.nts.signIn());
+$('signOut').addEventListener('click', () => window.nts.signOut());
+window.nts.onAuthChanged?.((signedIn) => setSupporter(signedIn));
+
 let snackTimer;
 function copyTrack(text) {
   window.nts.copy(text);
+  showSnack('Track info copied');
+}
+function showSnack(message) {
   const sb = $('snackbar');
+  sb.textContent = message;
   sb.hidden = false;
   clearTimeout(snackTimer);
-  snackTimer = setTimeout(() => { sb.hidden = true; }, 1600);
+  snackTimer = setTimeout(() => { sb.hidden = true; }, 2200);
 }
 
 document.querySelectorAll('.switch__item').forEach((b) => b.addEventListener('click', () => {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self'; font-src 'self'; script-src 'self'">
+        content="default-src 'self'; img-src 'self' https: data:; media-src https:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
   <title>NTS Player</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -45,8 +45,16 @@
         <a class="text-link" id="episodeLink" target="_blank" hidden>View on nts.live</a>
       </div>
       <div class="pane" id="pane-tracks" hidden>
-        <p class="tracks__note" id="tracksNote"></p>
-        <ol class="tracks" id="tracks"></ol>
+        <div class="supporter" id="supporterBar">
+          <span class="supporter__label" id="supporterLabel">NTS Supporter?</span>
+          <button class="supporter__button" id="signIn">Sign in for live tracks</button>
+          <button class="supporter__button" id="signOut" hidden>Sign out</button>
+        </div>
+        <webview id="liveTracks" class="live-tracks" partition="persist:nts" hidden></webview>
+        <div id="episodeTracks">
+          <p class="tracks__note" id="tracksNote"></p>
+          <ol class="tracks" id="tracks"></ol>
+        </div>
       </div>
     </div>
     <div class="snackbar" id="snackbar" hidden>Track info copied</div>

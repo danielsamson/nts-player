@@ -212,3 +212,17 @@ body.playing .track { border-top-color: var(--grey-1); }
 
 /* Give the tracklist the room: hide the artwork while it's open */
 body.pane-tracks .picture { display: none; }
+
+/* ---- NTS Supporter live tracklist ---- */
+.supporter {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 0 0 12px; font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase;
+}
+.supporter__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.supporter__button {
+  flex-shrink: 0; padding: 6px 10px; border: 1px solid var(--fg); color: var(--fg);
+  font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase;
+}
+.supporter__button:hover { background: var(--fg); color: var(--bg); }
+#pane-tracks.live { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.live-tracks { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--black); }

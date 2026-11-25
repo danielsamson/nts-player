@@ -10,10 +10,14 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 - **Both live channels.** Switch between NTS 1 and NTS 2 with one click.
 - **Now playing.** Show title, artwork, location and time slot, plus what's on next.
   Refreshes every minute.
-- **Tracklists.** The Tracklist tab lists each track with its timestamp. Click a
-  track to copy "Artist - Title". Live track IDs are an
-  [NTS Supporter](https://www.nts.live/supporters) feature, so while a show is on air
-  the app shows the tracklist from that show's previous episode, labelled with its date.
+- **Live tracklists for NTS Supporters.** In the Tracklist tab, click
+  **Sign in for live tracks** and log in on NTS's own sign-in page. The tab then shows
+  NTS's live tracklist for the channel you're on. You stay signed in between launches,
+  and **Sign out** clears it. The app never sees your password: you sign in on
+  nts.live itself, in a browser session kept separate from the player.
+- **Tracklists for everyone else.** Without a Supporter sign-in, the Tracklist tab
+  shows the show's previous episode, labelled with its date, with timestamps. Click a
+  track to copy "Artist - Title".
 - **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.
@@ -66,6 +70,7 @@ it. Click **More info**, then **Run anyway**.
 | NTS 2 audio | `https://stream-relay-geo.ntslive.net/stream2`         |
 | Now playing | `https://www.nts.live/api/v2/live`                     |
 | Tracklists  | `https://www.nts.live/api/v2/shows/{show}/episodes/{episode}/tracklist` |
+| Live tracks | `https://www.nts.live/live-tracklist/{1,2}` (NTS Supporters, shown in an embedded view) |
 
 ```
 main.js          Electron window, and fetches "now playing" from the NTS API

@@ -20,6 +20,7 @@ function createWindow() {
     minHeight: 480,
     backgroundColor: '#000000',
     title: 'NTS Player',
+    icon: path.join(__dirname, 'build', 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

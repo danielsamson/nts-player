@@ -717,3 +717,69 @@ body.playing .track__art { background: var(--grey-1); }
 
 /* Stage info lines keep their height; if space runs out the links go first, not the title */
 .stage__info > * { flex-shrink: 0; }
+
+/* ======================================================================
+   The record sleeve as a physical object
+   ====================================================================== */
+@media (min-width: 720px) {
+  /* Shadow on the "floor" under the sleeve; shifts with the tilt */
+  .stage__art::after {
+    content: ""; position: absolute; left: 6%; right: 6%; bottom: -7%; height: 10%; z-index: -1;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, .9), transparent 70%);
+    filter: blur(8px); opacity: .9;
+    transform: translateX(calc(var(--ry, 0deg) / 1deg * -1.2px)) scaleX(calc(1 + var(--rx, 0deg) / 1deg * .01));
+    transition: transform .5s cubic-bezier(.2, .7, .2, 1);
+  }
+  .stage__art--wide::after { display: none; }
+
+  /* Lift toward you while the cursor is over the stage */
+  .stage__art.is-tracking .stage__tilt { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(18px); }
+
+  /* Sleeve front: card stock. Grain, a little warmth at the edges, and the opening's shadow */
+  .stage__cover { transform: translateZ(5px); backface-visibility: hidden; }
+  .stage__art--album .stage__cover::before {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, .06),
+      inset 0 1px 0 rgba(255, 255, 255, .14),
+      inset -3px 0 4px -1px rgba(0, 0, 0, .35),       /* the opening on the right */
+      inset 0 0 40px rgba(0, 0, 0, .18);              /* edges a touch darker, like printed card */
+  }
+  .stage__art--album .stage__cover::after {
+    content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .22; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+  /* Ring wear: the faint circle a record leaves on its sleeve */
+  .stage__wear { display: none; }
+  .stage__art--album .stage__wear {
+    display: block; position: absolute; inset: 4%; border-radius: 50%; z-index: 1; pointer-events: none;
+    background: radial-gradient(circle, transparent 0 64%, rgba(255, 255, 255, .07) 66%, transparent 69% 96%, rgba(255, 255, 255, .05) 98%, transparent 100%);
+    mix-blend-mode: screen;
+  }
+
+  /* Sleeve thickness: right and bottom edges, visible as it tilts */
+  .stage__edge { position: absolute; display: none; background: linear-gradient(#2c2a27, #1a1917); }
+  .stage__art--album .stage__edge { display: block; }
+  .stage__edge--right { top: 0; left: 100%; width: 10px; height: 100%; transform-origin: left center; transform: translateZ(5px) rotateY(90deg); background: linear-gradient(90deg, #34312c, #1c1b19); }
+  .stage__edge--bottom { left: 0; top: 100%; width: 100%; height: 10px; transform-origin: center top; transform: translateZ(5px) rotateX(-90deg); background: linear-gradient(#2a2825, #151412); }
+
+  /* The record: behind the sleeve, a bit smaller, slides out further and catches the sleeve's shadow */
+  .stage__record { top: 4%; left: 4%; width: 92%; height: 92%; transform: translateZ(-14px) translateX(0); }
+  body.stage-spinning .stage__art--album .stage__record { transform: translateZ(-14px) translateX(50%); }
+  body.stage-spinning .stage__art--album { transform: translateX(-20%); }
+  /* The sleeve's shadow falling across the record, strongest at the sleeve's edge */
+  .stage__record::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: linear-gradient(90deg, rgba(0, 0, 0, .85) 0 38%, rgba(0, 0, 0, .45) 50%, transparent 68%);
+  }
+  /* Light on vinyl stays put while the record turns: only the label (and grooves) spin */
+  body.stage-spinning .stage__art--album .stage__record::before { animation: none; }
+  .stage__record::before {
+    background:
+      conic-gradient(from 300deg at 50% 50%, transparent 0 4%, rgba(255, 255, 255, .14) 9%, transparent 15% 48%, rgba(255, 255, 255, .10) 56%, transparent 63%),
+      radial-gradient(circle at 70% 30%, rgba(255, 255, 255, .06), transparent 45%);
+  }
+  .stage__record-label { box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), inset 0 0 12px rgba(0, 0, 0, .35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage__art.is-tracking .stage__tilt { transform: none; }
+}

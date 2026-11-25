@@ -23,8 +23,11 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
   notification when it changes.
 - **Without a Supporter sign-in**, the Tracklist tab shows the show's previous episode.
 - **Schedule:** what's on NTS 1 and NTS 2 today and this week, in the archive. Tap the
-  bell on a show to be **reminded when it goes live**; shows you follow in My NTS remind
-  you automatically.
+  bell on a show to be **reminded when it goes live**.
+- **Shows you follow:** marked with a heart on the schedule (with a **Following only**
+  filter), listed under **Coming up from shows you follow** in the archive, and you get a
+  notification when one goes live (new broadcasts, not repeats). The app reads your
+  followed shows from My NTS in the background.
 
 ### Archive
 

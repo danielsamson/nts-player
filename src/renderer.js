@@ -893,6 +893,32 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
   return { get track() { return track; }, poll, clear: () => set(null) };
 })();
 
+// ---- Shows you follow in My NTS ----
+// Read from your My NTS page in the background (shortly after launch, then every few
+// hours) so the schedule and reminders know about them. Only read, never changed.
+const Following = (() => {
+  const read = () => { try { return JSON.parse(localStorage.getItem('mynts:shows')) || {}; } catch { return {}; } };
+  const aliasOf = (path) => (/^\/shows\/([^/]+)/.exec(path || '') || [])[1];
+  let aliases = new Set((read().items || []).map((it) => aliasOf(it.path)).filter(Boolean));
+  const listeners = new Set();
+  async function refresh() {
+    if (!navigator.onLine) return;
+    const res = await window.nts.account.list('shows').catch(() => null);
+    if (!res?.signedIn || !res.available) return;
+    try { localStorage.setItem('mynts:shows', JSON.stringify({ items: res.items, tracks: res.tracks })); } catch {}
+    aliases = new Set((res.items || []).map((it) => aliasOf(it.path)).filter(Boolean));
+    listeners.forEach((fn) => fn());
+  }
+  setTimeout(refresh, 15000);
+  setInterval(refresh, 4 * 3600 * 1000);
+  return {
+    has: (alias) => aliases.has(alias),
+    any: () => aliases.size > 0,
+    refresh,
+    onChange: (fn) => listeners.add(fn)
+  };
+})();
+
 // ---- Reminders: tell me when a show goes live ----
 // Shows you asked to be reminded about (from the schedule), plus the shows you follow
 // in My NTS. One notification per broadcast.
@@ -901,13 +927,12 @@ const Reminders = (() => {
   const shows = load('reminders', {});            // alias -> title
   const notified = load('remindedEpisodes', []);
   const save = () => { try { localStorage.setItem('reminders', JSON.stringify(shows)); localStorage.setItem('remindedEpisodes', JSON.stringify(notified.slice(-100))); } catch {} };
-  const followed = () => new Set((load('mynts:shows', {}).items || [])
-    .map((it) => (/^\/shows\/([^/]+)/.exec(it.path || '') || [])[1]).filter(Boolean));
   function check() {
-    const f = followed();
     (live?.results || []).slice(0, 2).forEach((r, i) => {
       const info = showInfo(r);
-      if (!info.show || !info.episode || !(shows[info.show] || f.has(info.show))) return;
+      // Bells you set cover every broadcast; followed shows only new ones (not repeats)
+      const isRepeat = /\(R\)\s*$/.test(r?.now?.broadcast_title || '');
+      if (!info.show || !info.episode || !(shows[info.show] || (Following.has(info.show) && !isRepeat))) return;
       const key = `${info.show}/${info.episode}`;
       if (notified.includes(key)) return;
       notified.push(key);

@@ -904,3 +904,12 @@ body.offline .nowbar__next { color: var(--live); }
 .schedule__remind--on, .schedule__remind--on:hover { color: var(--live) !important; }
 .schedule__remind--on svg { fill: currentColor; }
 .mynts-nav__item--on { background: var(--white); color: var(--black); }
+
+/* ---- Followed shows on the schedule ---- */
+.schedule__following { flex-shrink: 0; width: 20px; display: grid; place-items: center; color: var(--live); }
+.schedule__following svg { width: 14px; height: 14px; fill: currentColor; }
+.schedule__item--followed .schedule__title { color: var(--white); }
+.schedule__item--now.schedule__item--followed .schedule__title { color: var(--black); }
+.schedule__filter { margin: 10px 12px; }
+
+.item--nopic .item__pic { display: none; }

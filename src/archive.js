@@ -80,8 +80,8 @@ const Archive = (() => {
   }
 
   // An episode or show row: thumbnail, title, meta line
-  function row({ img, title, meta, kind, onClick, playing }) {
-    const r = el('button', 'item' + (playing ? ' item--playing' : ''));
+  function row({ img, title, meta, kind, onClick, playing, noPic }) {
+    const r = el('button', 'item' + (playing ? ' item--playing' : '') + (noPic ? ' item--nopic' : ''));
     const pic = el('span', 'item__pic');
     if (img) {
       const i = el('img'); i.alt = ''; i.loading = 'lazy';
@@ -333,6 +333,59 @@ const Archive = (() => {
   // NTS sometimes sends titles with HTML entities ("Peterson &amp; Andras")
   const decode = (x) => { const t = document.createElement('textarea'); t.innerHTML = x || ''; return t.value; };
 
+  // Schedules, cached for 10 minutes
+  const schedules = new Map();
+  function getSchedule(ch) {
+    const c = schedules.get(ch);
+    if (c && Date.now() - c.at < 600000) return c.p;
+    const p = api(`/api/v2/radio/schedule/${ch}`);
+    schedules.set(ch, { at: Date.now(), p });
+    p.catch(() => schedules.delete(ch));
+    return p;
+  }
+  // Broadcasts from a schedule response, with times and the show they belong to
+  function broadcasts(res, ch) {
+    return (res.results || []).flatMap((d) => d.broadcasts || []).map((b) => {
+      const link = (b.links || []).find((l) => /\/shows\//.test(l.href || ''));
+      const p = link ? parsePath(new URL(link.href).pathname.replace('/api/v2', '')) : null;
+      return { b, ch, title: decode(b.broadcast_title), start: new Date(b.start_timestamp), end: new Date(b.end_timestamp), p,
+        repeat: /\(R\)\s*$/.test(b.broadcast_title || '') };
+    });
+  }
+  const whenLabel = (d) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const day = new Date(d); day.setHours(0, 0, 0, 0);
+    const diff = Math.round((day - today) / 86400000);
+    const t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    return diff === 0 ? `Today ${t}` : diff === 1 ? `Tomorrow ${t}` : `${d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} ${t}`;
+  };
+
+  // ---- Coming up from shows you follow (both channels, this week) ----
+  async function comingUpSection() {
+    if (!Following.any()) return [];
+    const box = el('div', 'items');
+    const head = sectionTitle('Coming up from shows you follow');
+    (async () => {
+      const now = Date.now();
+      const all = (await Promise.all([1, 2].map((ch) => getSchedule(ch).then((r) => broadcasts(r, ch)).catch(() => []))))
+        .flat()
+        .filter((x) => x.p?.show && Following.has(x.p.show) && x.end.getTime() > now && !x.repeat)
+        .sort((a, b) => a.start - b.start)
+        .slice(0, 6);
+      if (!all.length) { box.append(el('p', 'archive__status', 'None of your shows are on this week. Repeats aren’t listed.')); return; }
+      all.forEach((x) => {
+        const live = x.start.getTime() <= now;
+        box.append(row({
+          title: x.title, noPic: true,
+          kind: live ? 'Live' : null,
+          meta: `${live ? 'On now' : whenLabel(x.start)} · NTS ${x.ch}`,
+          onClick: () => go({ type: 'show', show: x.p.show })
+        }));
+      });
+    })();
+    return [head, box];
+  }
+
   // ---- Schedule: what's on, with reminders ----
   function scheduleSection() {
     const nav = el('div', 'mynts-nav');
@@ -348,7 +401,7 @@ const Archive = (() => {
     const bar = backBar(`Schedule · NTS ${ch}`);
     root.replaceChildren(bar, loader('Loading the schedule'));
     let res;
-    try { res = await api(`/api/v2/radio/schedule/${ch}`); } catch { root.replaceChildren(bar, failed('Couldn’t load the schedule.')); return; }
+    try { res = await getSchedule(ch); } catch { root.replaceChildren(bar, failed('Couldn’t load the schedule.')); return; }
     if (current.type !== 'schedule' || current.channel !== ch) return;
 
     // Tabs to switch channel
@@ -358,6 +411,15 @@ const Archive = (() => {
       b.addEventListener('click', () => { if (c !== ch) { current = { type: 'schedule', channel: c }; render(); } });
       tabs.append(b);
     });
+
+    // "Following only" filter (remembered)
+    const filterFollowing = Following.any() && localStorage.getItem('scheduleFollowing') === '1';
+    const filter = el('button', 'notify-toggle schedule__filter' + (filterFollowing ? ' notify-toggle--on' : ''), 'Following only');
+    filter.addEventListener('click', () => {
+      try { localStorage.setItem('scheduleFollowing', filterFollowing ? '0' : '1'); } catch {}
+      render();
+    });
+    if (!Following.any()) filter.hidden = true;
 
     const now = Date.now();
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -379,9 +441,9 @@ const Archive = (() => {
       days.get(k).push({ b, start, end, p });
     });
 
-    const parts = [bar, tabs];
+    const parts = [bar, tabs, filter];
     [...days.entries()].sort((a, b) => a[0] - b[0]).slice(0, 7).forEach(([k, items]) => {
-      parts.push(sectionTitle(dayName(new Date(k))));
+      const dayTitle = sectionTitle(dayName(new Date(k)));
       const list = el('div', 'schedule');
       items.sort((a, b) => a.start - b.start).forEach(({ b, start, end, p }) => {
         const onNow = start.getTime() <= now && now < end.getTime();
@@ -392,6 +454,15 @@ const Archive = (() => {
         if (p) title.addEventListener('click', () => go(onNow || !p.episode ? { type: 'show', show: p.show } : { type: 'episode', show: p.show, episode: p.episode }));
         if (onNow) title.prepend(el('span', 'schedule__live', 'Live'));
         rowEl.append(time, title);
+        const followed = p?.show && Following.has(p.show);
+        if (followed) {
+          rowEl.classList.add('schedule__item--followed');
+          const heart = el('span', 'schedule__following');
+          heart.title = b.broadcast_title.match(/\(R\)\s*$/) ? 'A show you follow (repeat)' : 'A show you follow: you’ll be notified when it goes live';
+          heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.3 5 6.8 5c2 0 3.6 1.1 5.2 3 1.6-1.9 3.2-3 5.2-3 3.5 0 5.6 3.6 4.3 6.8C19.5 16.4 12 21 12 21z"/></svg>';
+          rowEl.append(heart);
+        }
+        if (filterFollowing && !followed) return;
         if (p?.show) {
           const bell = el('button', 'schedule__remind');
           const paintBell = () => {
@@ -411,8 +482,9 @@ const Archive = (() => {
         }
         list.append(rowEl);
       });
-      parts.push(list);
+      if (list.children.length) parts.push(dayTitle, list);
     });
+    if (parts.length === 3) parts.push(el('p', 'archive__status', 'None of the shows you follow are on this channel this week.'));
     root.replaceChildren(...parts);
     root.querySelector('.schedule__item--now')?.scrollIntoView({ block: 'center' });
   }
@@ -429,7 +501,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...historySection(), ...scheduleSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...historySection(), ...(await comingUpSection()), ...scheduleSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -681,6 +753,7 @@ const Archive = (() => {
   });
 
   ArchivePlayer.onChange(highlight);
+  Following.onChange(() => { if (current.type === 'home' || current.type === 'schedule') render(); });
 
   let started = false;
   // ---- Keep listening: what plays when an episode ends ----

@@ -43,7 +43,7 @@ NTS has no public API for this. The app uses NTS's own website, in your signed-i
 session, out of sight: it opens the page and presses NTS's own Save / Follow buttons,
 and reads your My NTS pages. If NTS changes its site, these buttons may stop working
 until the app is updated. To see what's happening, run `npm run debug`: the NTS window
-becomes visible and each step is logged in the terminal.
+opens next to the player so you can watch it, and each step is logged in the terminal.
 
 ### History and resume
 

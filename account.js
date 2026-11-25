@@ -27,13 +27,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function ensureWindow() {
   if (win && !win.isDestroyed()) return win;
   win = new BrowserWindow({
-    show: DEBUG, width: 1280, height: 900, title: 'My NTS (debug)',
+    show: false, width: 1280, height: 900, title: 'My NTS (debug view)',
     webPreferences: { partition: PARTITION, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
   win.webContents.setAudioMuted(true);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   if (DEBUG) {
-    win.webContents.openDevTools({ mode: 'detach' });
+    // Show it beside the player, smaller, without taking focus.
+    // Its developer console opens with Ctrl+Shift+I if you need it.
+    const { screen } = require('electron');
+    const player = BrowserWindow.getAllWindows().find((w) => w !== win && w.isVisible());
+    const area = screen.getPrimaryDisplay().workArea;
+    const pb = player ? player.getBounds() : { x: area.x, y: area.y, width: 0, height: 700 };
+    const height = Math.max(600, pb.height);
+    const roomRight = area.x + area.width - (pb.x + pb.width + 8);
+    const roomLeft = pb.x - 8 - area.x;
+    // right of the player if it fits, else left, else whichever side has more room
+    const right = roomRight >= 900 || roomRight >= roomLeft;
+    const width = Math.max(480, Math.min(900, right ? roomRight : roomLeft));
+    const x = right ? Math.min(pb.x + pb.width + 8, area.x + area.width - width) : Math.max(area.x, pb.x - 8 - width);
+    win.setBounds({ x, y: pb.y, width, height });
+    win.showInactive();
+    win.webContents.on('before-input-event', (_e, input) => {
+      if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'i') win.webContents.toggleDevTools();
+    });
     win.webContents.on('console-message', (_e, level, message) => {
       if (level >= 2 && !/Electron Security Warning/.test(message)) log('page console:', message.slice(0, 300));
     });

@@ -548,6 +548,7 @@ const Stage = (() => {
   }
 
   function paintLinks(items) {
+    $('stageLinksLabel').hidden = !items.length || items.length === 1;
     $('stageLinks').replaceChildren(...items.map(([name, href]) => {
       const a = document.createElement('a');
       a.className = 'stage__link'; a.href = href; a.target = '_blank'; a.textContent = name;

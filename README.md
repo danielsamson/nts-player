@@ -29,7 +29,6 @@ schedule, history and lists.
 - **Live track IDs for Supporters, everywhere:** the track playing on live radio shows in
   the now-playing bar and the wide view (with its cover and links), and you get a
   notification when it changes.
-- **Without a Supporter sign-in**, the Tracklist tab shows the show's previous episode.
 - **Schedule:** what's on NTS 1 and NTS 2 today and this week, in the archive. Tap the
   bell on a show to be **reminded when it goes live**.
 - **Shows you follow:** marked with a heart on the schedule (with a **Following only**

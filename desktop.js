@@ -10,7 +10,7 @@ let tray = null;
 let quitting = false;
 let mini = false;
 let normalBounds = null;
-const state = { playing: false, label: 'NTS Player', canSkip: false, sleep: 'off' };
+const state = { playing: false, label: 'NTS Player', canSkip: false, sleep: 'off', canSave: false, saved: false, track: '' };
 
 // ---- Settings that main needs before the window has loaded ----
 const SETTINGS = () => path.join(app.getPath('userData'), 'desktop-settings.json');
@@ -39,7 +39,9 @@ function updateThumbar() {
   win.setThumbarButtons([
     { tooltip: 'Previous track', icon: icon('prev'), flags: state.canSkip ? [] : ['disabled'], click: () => send('prev') },
     { tooltip: state.playing ? 'Pause' : 'Play', icon: icon(state.playing ? 'pause' : 'play'), click: () => send('toggle') },
-    { tooltip: 'Next track', icon: icon('next'), flags: state.canSkip ? [] : ['disabled'], click: () => send('next') }
+    { tooltip: 'Next track', icon: icon('next'), flags: state.canSkip ? [] : ['disabled'], click: () => send('next') },
+    { tooltip: state.saved ? `Saved to My NTS: ${state.track}` : `Save to My NTS${state.track ? ': ' + state.track : ''}`,
+      icon: icon(state.saved ? 'saved' : 'save'), flags: state.canSave ? [] : ['disabled'], click: () => send('save') }
   ]);
   win.setThumbnailToolTip(state.label);
 }
@@ -52,6 +54,7 @@ function updateDock() {
     { label: state.playing ? 'Pause' : 'Play', click: () => send('toggle') },
     { label: 'Next track', enabled: state.canSkip, click: () => send('next') },
     { label: 'Previous track', enabled: state.canSkip, click: () => send('prev') },
+    { label: state.saved ? 'Saved to My NTS' : 'Save track to My NTS', type: 'checkbox', checked: state.saved, enabled: state.canSave, click: () => send('save') },
     { type: 'separator' },
     { label: 'Listen to NTS 1', click: () => send('channel1') },
     { label: 'Listen to NTS 2', click: () => send('channel2') },
@@ -70,6 +73,7 @@ function buildTrayMenu() {
     { label: state.playing ? 'Pause' : 'Play', click: () => send('toggle') },
     { label: 'Next track', enabled: state.canSkip, click: () => send('next') },
     { label: 'Previous track', enabled: state.canSkip, click: () => send('prev') },
+    { label: state.saved ? 'Saved to My NTS' : 'Save track to My NTS', type: 'checkbox', checked: state.saved, enabled: state.canSave, click: () => send('save') },
     { type: 'separator' },
     { label: 'Listen to NTS 1', click: () => send('channel1') },
     { label: 'Listen to NTS 2', click: () => send('channel2') },
@@ -152,9 +156,12 @@ function init(mainWindow, ipcMain) {
   app.on('will-quit', () => globalShortcut.unregisterAll());
 
   ipcMain.handle('desktop:state', (_e, s = {}) => {
-    state.playing = !!s.playing;
-    state.label = String(s.label || 'NTS Player').slice(0, 120);
-    state.canSkip = !!s.canSkip;
+    if ('playing' in s) state.playing = !!s.playing;
+    if ('label' in s) state.label = String(s.label || 'NTS Player').slice(0, 120);
+    if ('canSkip' in s) state.canSkip = !!s.canSkip;
+    if ('canSave' in s) state.canSave = !!s.canSave;
+    if ('saved' in s) state.saved = !!s.saved;
+    if ('track' in s) state.track = String(s.track || '').slice(0, 120);
     buildTrayMenu();
   });
   ipcMain.handle('desktop:mini', (_e, on) => setMini(!!on));

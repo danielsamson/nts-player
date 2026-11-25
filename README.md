@@ -96,8 +96,8 @@ Deezer, YouTube, Bandcamp and Discogs.
 - **Tray / menu bar icon** with play, pause, tracks and channels. Closing the window
   keeps the music playing (switch off in Settings).
 - **Mini player:** just the now-playing bar, always on top.
-- **System media controls:** previous / play-pause / next on the Windows taskbar
-  thumbnail, a Dock menu and Playback menu on macOS, and the now-playing controls in
+- **System media controls:** previous / play-pause / next and **save to My NTS** on the
+  Windows taskbar thumbnail, a Dock menu and Playback menu on macOS, and the now-playing controls in
   macOS Control Center and Linux desktops.
 - **Global shortcuts** that work from any app (see below).
 - **Sleep timer:** 15, 30 or 60 minutes, or the end of the episode, with a gentle fade.

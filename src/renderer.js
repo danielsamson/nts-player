@@ -1120,6 +1120,7 @@ window.nts.desktop?.onMini((on) => document.body.classList.toggle('mini', on));
 window.nts.desktop?.onCommand((c) => {
   const archive = source === 'archive' && ArchivePlayer.state.episode;
   if (c === 'toggle') togglePlayback();
+  else if (c === 'save') NowSave.toggle();
   else if (c === 'next' || c === 'prev') { if (archive) Archive.skipTrack(c === 'next' ? 1 : -1); else setChannel(channel ? 0 : 1); }
   else if (c === 'channel1' || c === 'channel2') { setChannel(c === 'channel1' ? 0 : 1); if (!playing) play(); }
 });
@@ -1137,7 +1138,7 @@ const NowSave = (() => {
     if (s === sig && !force) return;
     sig = s;
     current = null;
-    btn.hidden = true;
+    paint();
     if (!cur || !supporter) return;          // needs your NTS sign-in
     const st = await MyNTS.getState(ep.show, ep.episode);
     if (s !== sig) return;
@@ -1148,6 +1149,8 @@ const NowSave = (() => {
   }
   function paint() {
     btn.hidden = !current;
+    // taskbar thumbnail / tray / Dock save button
+    window.nts.desktop?.state({ canSave: !!current, saved: !!current?.saved, track: current ? `${current.t.artist} – ${current.t.title}` : '' });
     if (!current) return;
     btn.classList.toggle('nowbar__save--on', current.saved);
     btn.title = `${current.saved ? 'Saved: click to remove' : 'Save to My NTS'} · ${current.t.artist} – ${current.t.title}`;
@@ -1163,7 +1166,7 @@ const NowSave = (() => {
     if (res && !res.error && current?.t === t) { current.saved = !saved; paint(); if (typeof Stage !== 'undefined') Stage.render(); }
   });
   ArchivePlayer.onChange(() => update());
-  return { update };
+  return { update, toggle: () => btn.click() };
 })();
 
 // ---- Wide view: the stage ----

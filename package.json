@@ -1,7 +1,7 @@
 {
   "name": "nts-player",
   "productName": "NTS Player",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A small desktop player for NTS Radio: live channels and the archive",
   "main": "main.js",
   "scripts": {

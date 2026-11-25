@@ -709,3 +709,8 @@ body.playing .track__art { background: var(--grey-1); }
 .track-page__links .stage__links-label { font-size: 11px; line-height: 16px; font-weight: 700; text-transform: uppercase; color: var(--grey-3); }
 .track-page__links .stage__links-list { display: contents; }
 .track-page__actions { display: flex; gap: 8px; margin-top: 4px; }
+
+.track-page__played { font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); margin-top: 6px; }
+.track-page__plays { margin: 0 -12px; border-top: 1px solid var(--grey-4); }
+.track-page__plays .item__pic { display: none; }
+.track-page .loader { padding: 4px 0; }

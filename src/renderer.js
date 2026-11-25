@@ -100,7 +100,7 @@ function render() {
 // ---- Album art for tracks (looked up in the main process, see art.js) ----
 const Art = (() => {
   const memo = new Map();
-  const key = (t) => `${t.artist}|${t.title}`;
+  const key = (t) => `${t.artist}|${t.title}|${t.deezer_track_id || ''}|${t.isrc_id || ''}`;
   // priority 'high' for the track you're listening to; tracklist rows use 'low'
   function get(t, priority = 'low') {
     if (!t?.artist || !t?.title) return Promise.resolve(null);
@@ -134,12 +134,12 @@ const Art = (() => {
 })();
 
 // One tracklist row: album art, time, artist, title, copy button
-function trackRow(t, { onClick, title, saveButtons } = {}) {
+function trackRow(t, { onClick, title, saveButtons, deferArt } = {}) {
   const li = document.createElement('li');
   li.className = 'track';
   li.title = title || 'Click to copy';
   const art = document.createElement('span'); art.className = 'track__art';
-  Art.attach(art, t);
+  if (deferArt) li._artBox = art; else Art.attach(art, t);
   const text = document.createElement('span'); text.className = 'track__text';
   const top = document.createElement('span'); top.className = 'track__top';
   const time = document.createElement('span'); time.className = 'track__time';

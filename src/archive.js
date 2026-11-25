@@ -10,6 +10,9 @@ const Archive = (() => {
   let episodeView = null;      // { show, episode, tracks } while an episode page is open
 
   const api = (path) => window.nts.api(path);
+  // Like encodeURIComponent, but also encodes ! ' ( ) * so search terms such as
+  // "Sweetie (IZCO Remix)" or "Don't" pass the main process's API path check
+  const enc = (x) => encodeURIComponent(x).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -154,10 +157,14 @@ const Archive = (() => {
       const ol = el('ol', 'tracks archive-tracks');
       (res.tracks || []).forEach((t) => {
         const p = parsePath(t.path);
-        ol.append(trackRow({ artist: t.artist, title: t.title }, {
-          title: 'Open track',
+        const li = trackRow({ artist: t.artist, title: t.title }, {
+          title: 'Open track', deferArt: true,
           onClick: () => go({ type: 'track', artist: t.artist, title: t.title })
-        }));
+        });
+        // look up the track's IDs first, so its cover is the exact one
+        TrackInfo.find(t).then((info) => Art.attach(li._artBox, { artist: t.artist, title: t.title,
+          isrc_id: info.match?.isrc_id, deezer_track_id: info.match?.deezer_track_id }));
+        ol.append(li);
       });
       if (ol.children.length) list.append(ol);
     } else {
@@ -198,6 +205,50 @@ const Archive = (() => {
     root.replaceChildren(bar(), myNtsList(kind, res));
   }
 
+  // ---- Where a track was played, via NTS's public track search ----
+  // Gives the episodes a track was played on and its tracklist entry there (with the
+  // Deezer ID / ISRC for an exact cover, and its timestamp for "Play from"). Cached.
+  const TrackInfo = (() => {
+    const KEY = 'trackInfo:v1';
+    let cache;
+    try { cache = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { cache = {}; }
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {} };
+    const inflight = new Map();
+    const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+    const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1));
+
+    function find(t) {
+      const key = `${n(t.artist)}|${n(t.title)}`;
+      if (cache[key]) return Promise.resolve(cache[key]);
+      if (inflight.has(key)) return inflight.get(key);
+      const p = (async () => {
+        const res = await api(`/api/v2/search?q=${enc(`${t.artist} ${t.title}`.slice(0, 200))}&version=2&offset=0&limit=20&types[]=track`);
+        const wantTitle = n(t.title);
+        const wantArtist = words(t.artist);
+        const plays = (res.results || [])
+          .filter((x) => x.article_type === 'track' && n(x.title) === wantTitle &&
+            (!wantArtist.size || (x.artists || []).some((a) => [...words(a.name)].some((w) => wantArtist.has(w)))))
+          .map((x) => ({ path: x.article?.path, title: x.article?.title, date: x.local_date, uid: x.track_uid }))
+          .filter((x, i, all) => parsePath(x.path)?.episode && all.findIndex((y) => y.path === x.path) === i);   // each episode once
+        let match = null;
+        if (plays[0]) {
+          const ep = parsePath(plays[0].path);
+          const tl = await api(`/api/v2/shows/${ep.show}/episodes/${ep.episode}/tracklist`).catch(() => ({ results: [] }));
+          const e = (tl.results || []).find((r) => r.uid === plays[0].uid) || (tl.results || []).find((r) => n(r.title) === wantTitle);
+          if (e) match = { show: ep.show, episode: ep.episode, title: plays[0].title, date: plays[0].date,
+            offset: e.offset ?? e.offset_estimate, isrc_id: e.isrc_id, deezer_track_id: e.deezer_track_id };
+        }
+        const info = { plays: plays.slice(0, 8), match };
+        cache[key] = info;
+        save();
+        return info;
+      })().catch(() => ({ plays: [], match: null })).finally(() => inflight.delete(key));
+      inflight.set(key, p);
+      return p;
+    }
+    return { find };
+  })();
+
   // ---- Track page: big cover, details, links, where it was played ----
   async function renderTrack(t) {
     const wrap = el('div', 'detail track-page');
@@ -222,30 +273,43 @@ const Archive = (() => {
     wrap.append(picWrap, body);
     root.replaceChildren(backBar('Saved track'), wrap);
 
-    // Where you saved it from (remembered when you saved it in this app)
-    const o = MyNTS.originOf(t);
-    if (o?.show && o?.episode) {
-      const openEp = el('button', 'detail__show', `From ${o.title || 'the episode'}${o.date ? ' · ' + o.date : ''} ›`);
-      openEp.addEventListener('click', () => go({ type: 'episode', show: o.show, episode: o.episode }));
-      from.append(openEp);
-      if (o.offset != null) {
-        const playFrom = el('button', 'episode-play', `Play from ${fmtOffset(o.offset)}`);
-        playFrom.addEventListener('click', async () => {
-          playFrom.textContent = 'Loading…';
-          try {
-            const { info } = await fetchEpisode(o.show, o.episode);
-            if (!info.url) { playFrom.textContent = 'Not available to stream'; playFrom.disabled = true; return; }
-            playArchive(info, o.offset * 1000);
-          } catch { showSnack('Couldn’t load the episode'); }
-          playFrom.textContent = `Play from ${fmtOffset(o.offset)}`;
-        });
-        from.append(playFrom);
-      }
+    Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
+    from.append(loader('Finding where it was played'));
+
+    // Episodes it was played on (NTS track search) and the one you saved it from
+    const info = await TrackInfo.find(t);
+    if (current.type !== 'track' || current.title !== t.title) return;
+    const remembered = MyNTS.originOf(t);
+    const o = remembered?.show ? remembered : info.match;
+    from.replaceChildren();
+    if (o?.show && o?.episode && o.offset != null) {
+      const playFrom = el('button', 'episode-play', `Play from ${fmtOffset(o.offset)}${o.title ? ' · ' + o.title : ''}`);
+      playFrom.addEventListener('click', async () => {
+        const label = playFrom.textContent;
+        playFrom.textContent = 'Loading…';
+        try {
+          const { info: ep } = await fetchEpisode(o.show, o.episode);
+          if (!ep.url) { playFrom.textContent = 'Not available to stream'; playFrom.disabled = true; return; }
+          playArchive(ep, o.offset * 1000);
+        } catch { showSnack('Couldn’t load the episode'); }
+        playFrom.textContent = label;
+      });
+      from.append(playFrom);
+    }
+    if (info.plays.length) {
+      from.append(el('p', 'track-page__played', info.plays.length > 1 ? 'Played on' : 'Played on'));
+      const list = el('div', 'items track-page__plays');
+      info.plays.forEach((pl) => {
+        const p = parsePath(pl.path);
+        list.append(row({ title: pl.title, meta: pl.date, onClick: () => go({ type: 'episode', show: p.show, episode: p.episode }) }));
+      });
+      from.append(list);
     }
 
-    Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
+    // Cover and album: with the exact IDs from the tracklist when we have them
+    const exact = { artist: t.artist, title: t.title, isrc_id: info.match?.isrc_id, deezer_track_id: info.match?.deezer_track_id };
     const [art, apple] = await Promise.all([
-      Art.get(t, 'high'),
+      Art.get(exact, 'high'),
       window.nts.appleLink({ artist: t.artist, title: t.title }).catch(() => null)
     ]);
     if (current.type !== 'track' || current.title !== t.title) return;
@@ -276,7 +340,7 @@ const Archive = (() => {
     const list = el('div', 'items');
     let offset = 0;
     const more = async (btn) => {
-      const res = await api(`/api/v2/search?q=${encodeURIComponent(q)}&version=2&offset=${offset}&limit=20&types[]=show&types[]=episode`);
+      const res = await api(`/api/v2/search?q=${enc(q)}&version=2&offset=${offset}&limit=20&types[]=show&types[]=episode`);
       offset += 20;
       const rows = (res.results || []).map((x) => {
         const p = parsePath(x.article?.path);

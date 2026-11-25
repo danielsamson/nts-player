@@ -167,7 +167,8 @@ function pump() {
 
 function getArt(track, priority = 'low') {
   if (!track || typeof track.artist !== 'string' || typeof track.title !== 'string') return Promise.resolve(null);
-  const key = `${norm(track.artist)}|${norm(track.title)}`;
+  // Lookups with an exact ID are cached separately, so a miss by name never blocks them
+  const key = track.deezer ? `dz:${track.deezer}` : track.isrc ? `isrc:${track.isrc}` : `${norm(track.artist)}|${norm(track.title)}`;
   const c = loadCache();
   const hit = c[key];
   if (hit && (hit.art || Date.now() - hit.at < MISS_TTL)) return Promise.resolve(hit.art);

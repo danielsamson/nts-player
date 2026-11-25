@@ -465,7 +465,19 @@ const Archive = (() => {
         } else playArchive(info, 0);
       });
       const mynts = el('div');
-      body.append(playBtn, startOver, mynts);
+      const autoplay = el('button', 'notify-toggle episode-autoplay');
+      const paintAuto = () => {
+        const on = localStorage.getItem('autoplay') !== '0';
+        autoplay.classList.toggle('notify-toggle--on', on);
+        autoplay.textContent = 'Autoplay next episode';
+        autoplay.setAttribute('aria-pressed', String(on));
+      };
+      autoplay.addEventListener('click', () => {
+        try { localStorage.setItem('autoplay', localStorage.getItem('autoplay') === '0' ? '1' : '0'); } catch {}
+        paintAuto();
+      });
+      paintAuto();
+      body.append(playBtn, startOver, autoplay, mynts);
       if (ep.description) body.append(el('p', 'broadcast-description detail__desc', ep.description));
       if (url) {
         const sc = el('a', 'text-link detail__source', 'Audio via SoundCloud');
@@ -572,6 +584,41 @@ const Archive = (() => {
   ArchivePlayer.onChange(highlight);
 
   let started = false;
+  // ---- Keep listening: what plays when an episode ends ----
+  // The show's next older episode; when the show runs out, the newest in the archive.
+  // Episodes without audio are skipped.
+  async function nextEpisodes(show, episode) {
+    const out = [];
+    try {
+      const res = await api(`/api/v2/shows/${show}/episodes?limit=50&offset=0`);
+      const eps = res.results || [];
+      const i = eps.findIndex((e) => e.episode_alias === episode);
+      if (i >= 0) out.push(...eps.slice(i + 1, i + 6).map((e) => ({ show, episode: e.episode_alias })));
+    } catch {}
+    try {
+      const res = await api('/api/v2/collections/recently-added?limit=10&offset=0');
+      (res.results || []).forEach((e) => {
+        if (e.episode_alias !== episode) out.push({ show: e.show_alias, episode: e.episode_alias });
+      });
+    } catch {}
+    return out;
+  }
+
+  async function playNext(finished) {
+    for (const cand of await nextEpisodes(finished.show, finished.episode)) {
+      try {
+        const { info } = await fetchEpisode(cand.show, cand.episode);
+        if (!info.url) continue;
+        playArchive(info, 0);
+        showSnack(`Up next: ${info.title}${info.date ? ' · ' + info.date : ''}`);
+        if (current.type === 'episode' && current.show === finished.show && current.episode === finished.episode) {
+          go({ type: 'episode', show: cand.show, episode: cand.episode });   // follow along if you were watching it
+        }
+        return;
+      } catch {}
+    }
+  }
+
   // On launch: if you were listening to an archive episode, open it paused where you left off
   async function resumeLast() {
     const s = Session.load();
@@ -594,6 +641,7 @@ const Archive = (() => {
 
   return {
     resumeLast,
+    playNext,
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },

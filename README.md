@@ -25,6 +25,8 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 - **Browse and search** every NTS show and episode: recently added, search, and show
   pages with all their episodes.
 - **Play episodes** in the app with a seek bar, and previous / next track buttons.
+- **Keep listening.** When an episode ends, the show's previous episode starts (then the
+  newest in the archive). Switch it off with **Autoplay next episode** on any episode page.
 - **Tracklists that follow the mix.** The track playing is highlighted; click any track
   to jump to it. Media keys skip between tracks.
 - **Track-change notifications** with the album cover (switch off with

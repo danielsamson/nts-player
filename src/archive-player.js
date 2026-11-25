@@ -51,7 +51,7 @@ const ArchivePlayer = (() => {
       emit();
     });
     widget.bind(E.PAUSE, () => { state.playing = false; emit(); });
-    widget.bind(E.FINISH, () => { state.playing = false; state.position = state.duration; emit(); });
+    widget.bind(E.FINISH, () => { state.playing = false; state.position = state.duration; state.finished = true; emit(); });
     widget.bind(E.PLAY_PROGRESS, (e) => {
       if (seekTarget != null) {
         if (Math.abs(e.currentPosition - seekTarget) < 4000 || seekTries >= 12) seekTarget = null;   // landed (or give up)
@@ -76,6 +76,7 @@ const ArchivePlayer = (() => {
   function load(episode, startMs = 0) {
     primed = null;
     seekTarget = null;
+    state.finished = false;
     state.episode = episode;
     state.playing = false;
     state.loading = true;

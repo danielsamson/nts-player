@@ -235,6 +235,19 @@ function togglePlayback() {
 
 ArchivePlayer.onChange(renderNowbar);
 
+// When an episode ends, keep listening (unless Autoplay is switched off)
+(() => {
+  let handled = null;
+  ArchivePlayer.onChange((a) => {
+    if (!a.finished || !a.episode || source !== 'archive') return;
+    const key = `${a.episode.show}/${a.episode.episode}`;
+    if (handled === key) return;
+    handled = key;
+    if (localStorage.getItem('autoplay') === '0') return;
+    Archive.playNext(a.episode);
+  });
+})();
+
 // A small NTS-style loader: three blinking squares and a label
 function loader(text) {
   const d = document.createElement('div');
@@ -861,17 +874,46 @@ const Stage = (() => {
       $('wlTitle').textContent = whitelabel ? track?.title || '' : '';
       art.classList.remove('stage__art--swapping');
     };
-    if (img && $('stageArtImg').getAttribute('src') !== img) {
-      const pre = new Image();
-      pre.onload = () => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wasRecord = art.classList.contains('stage__art--album');
+    const isRecord = !!square && (!!img || !!whitelabel);
+    const changing = img ? $('stageArtImg').getAttribute('src') !== img
+      : whitelabel ? !art.classList.contains('stage__art--whitelabel') || $('wlTitle').textContent !== (track?.title || '')
+      : true;
+
+    // Record to record: tuck the disc in, slide the sleeve out, bring the new one in
+    const swapRecords = () => {
+      art.classList.add('is-tucking');                                  // disc slides back into the sleeve
+      setTimeout(() => {
         if (my !== artToken) return;
-        art.classList.add('stage__art--swapping');            // quick fade out…
-        setTimeout(apply, 140);                                // …swap, fade back in
-      };
+        art.classList.add('is-leaving');                                // sleeve leaves to the left
+        setTimeout(() => {
+          if (my !== artToken) return;
+          art.classList.add('is-arriving');                             // jump to the right, out of view
+          art.classList.remove('is-leaving');
+          apply();
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (my !== artToken) return;
+            art.classList.remove('is-arriving');                        // slide in…
+            setTimeout(() => { if (my === artToken) art.classList.remove('is-tucking'); }, 420);   // …then the disc comes out
+          }));
+        }, 320);
+      }, 380);
+    };
+    const go = () => {
+      if (!changing) return apply();
+      if (wasRecord && isRecord && !reduce && wideQuery.matches) return swapRecords();
+      art.classList.add('stage__art--swapping');                        // otherwise a quick cross-fade
+      setTimeout(apply, 140);
+    };
+
+    if (img && changing) {
+      const pre = new Image();                                          // load it before anything moves
+      pre.onload = () => { if (my === artToken) go(); };
       pre.onerror = () => { if (my === artToken) setArt({ square, whitelabel: square, track }); };
       pre.src = img;
     } else {
-      apply();
+      go();
     }
   }
 
@@ -926,18 +968,18 @@ const Stage = (() => {
       const label = a.playing || a.loading ? 'Now playing' : 'Paused';
       const context = `Archive · ${ep.title}${ep.date ? ' · ' + ep.date : ''}`;
       if (!cur) {
-        paint({ label, context, img: ep.img, kicker: tracks.length ? 'Before the first track' : 'NTS Archive',
+        paint({ label, context, img: ep.img, kicker: '',
           title: ep.title, artist: [ep.location, ep.date].filter(Boolean).join(' · '),
-          next: tracks[0] ? `First track ${fmtOffset(tracks[0].offset ?? tracks[0].offset_estimate)} · ${tracks[0].artist} – ${tracks[0].title}` : '' });
+          next: '' });
         return;
       }
       const t = cur.track;
       const nt = tracks[cur.idx + 1];
       const base = {
         label, context,
-        kicker: `Track ${cur.idx + 1} of ${tracks.length} · ${fmtOffset(t.offset ?? t.offset_estimate)}`,
+        kicker: '',
         title: t.title, artist: t.artist,
-        next: nt ? `Up next ${fmtOffset(nt.offset ?? nt.offset_estimate)} · ${nt.artist} – ${nt.title}` : 'Last track in the tracklist',
+        next: '',
         square: true
       };
       // keep the previous cover on screen while this track's cover is looked up
@@ -965,11 +1007,11 @@ const Stage = (() => {
       label: playing ? 'Now playing' : `NTS ${channel + 1}`,
       context: `Live on ${channel + 1}${info.location ? ' · ' + info.location : ''}`,
       img: info.img, square: false,
-      kicker: info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : 'Live',
+      kicker: '',
       title: info.title,
       artist: '',
       album: info.genres.slice(0, 4).join(' · '),
-      next: nextText,
+      next: '',
       linkItems: info.episode ? [['View on nts.live', `https://www.nts.live/shows/${info.show}/episodes/${info.episode}`]] : []
     });
   }

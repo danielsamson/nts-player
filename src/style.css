@@ -814,3 +814,24 @@ body.playing .track__art { background: var(--grey-1); }
   .stage__wl-title { grid-row: 3; align-self: start; }
   .stage__art--whitelabel .stage__record-label { background: radial-gradient(circle, #111 0 3.5%, #f2efe8 3.6%) !important; }
 }
+
+/* ======================================================================
+   Stage: more room for the artwork (less text) and the record change
+   ====================================================================== */
+@media (min-width: 720px) {
+  .stage { --info-h: 210px; }
+  .stage__art { --size: min(calc(100vh - 45px - var(--bar) - 48px - var(--info-h)), 60%, 720px); }
+  .stage__body { gap: 22px; }
+
+  /* Record change */
+  .stage__art { transition: transform .45s cubic-bezier(.4, 0, .2, 1), opacity .3s linear; }
+  .stage__art.is-tucking .stage__record { transform: translateZ(-14px) translateX(0) !important; transition-duration: .38s; }
+  body.stage-spinning .stage__art--album.is-tucking { transform: translateX(0); }
+  .stage__art.is-leaving { transform: translateX(-70%) rotate(-2deg) !important; opacity: 0; transition-duration: .32s; }
+  .stage__art.is-arriving { transform: translateX(70%) rotate(2deg) !important; opacity: 0; transition: none !important; }
+  .stage__art.is-arriving .stage__record { transition: none !important; }
+}
+@media (min-width: 720px) and (max-height: 700px) {
+  .stage { --info-h: 180px; }
+}
+.episode-autoplay { display: flex; margin: 12px auto 0; }

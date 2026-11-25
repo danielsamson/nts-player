@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('nts', {
   api: (path) => ipcRenderer.invoke('nts:api', path),
   copy: (text) => ipcRenderer.invoke('clipboard:write', text),
   focus: () => ipcRenderer.invoke('win:focus'),
+  setWide: (wide) => ipcRenderer.invoke('win:set-wide', wide),
   art: (track) => ipcRenderer.invoke('art:lookup', track),
   notify: (n) => ipcRenderer.invoke('notify', n),
   signIn: () => ipcRenderer.invoke('nts:sign-in'),

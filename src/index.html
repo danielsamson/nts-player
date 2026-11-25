@@ -25,6 +25,9 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h4v16H3zM9 4h4v16H9zM15.2 4.6l3.9-1 4 15.5-3.9 1z"/></svg>
       <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
     </button>
+    <button class="tab tab--expand" id="expandBtn" title="Wide view" aria-label="Wide view">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path id="expandIcon" d="M4 4h6v2H7.4l4.3 4.3-1.4 1.4L6 7.4V10H4zm16 16h-6v-2h2.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z"/></svg>
+    </button>
   </header>
 
   <main class="channel" id="channel">
@@ -67,6 +70,25 @@
     </div>
     <div class="archive__content" id="archiveContent"></div>
   </section>
+
+  <!-- Wide view: the stage. Big album art and the full track details -->
+  <aside class="stage" id="stage" aria-label="Now playing">
+    <div class="stage__bar">
+      <span class="stage__label" id="stageLabel">Now playing</span>
+      <span class="stage__context" id="stageContext"></span>
+    </div>
+    <div class="stage__body">
+      <div class="stage__art" id="stageArt"><img id="stageArtImg" alt=""></div>
+      <div class="stage__info">
+        <p class="stage__kicker" id="stageKicker"></p>
+        <h2 class="stage__title" id="stageTitle"></h2>
+        <p class="stage__artist" id="stageArtist"></p>
+        <p class="stage__album" id="stageAlbum"></p>
+        <p class="stage__next" id="stageNext"></p>
+      </div>
+    </div>
+    <nav class="stage__links" id="stageLinks" aria-label="Listen elsewhere"></nav>
+  </aside>
 
   <div class="snackbar" id="snackbar" hidden>Track info copied</div>
 

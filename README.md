@@ -5,6 +5,8 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
 
 <img src="docs/screenshot.png" alt="NTS Player showing channel 1 live" width="320"> <img src="docs/archive.png" alt="An archive episode playing, with the current track highlighted" width="320">
 
+<img src="docs/wide.png" alt="Wide view with album art and links" width="660">
+
 ## Features
 
 - **Both live channels.** Switch between NTS 1 and NTS 2 with one click.
@@ -28,6 +30,11 @@ for Windows, where there's no NTS app, but it runs anywhere Electron does.
   the now-playing bar, the Windows media overlay and track-change notifications. Covers
   come from Deezer (by the track's Deezer ID or ISRC from NTS, or a search) and iTunes
   Search as a fallback. Only artist and title are sent; results are cached locally.
+- **Wide view.** The thin strip is the default. The expand button in the header (or
+  just making the window wider) adds a stage with the current track's album art, the
+  full title, artist and album, where it sits in the mix and what's next, plus links to
+  Spotify, Apple Music, Deezer, YouTube, Bandcamp and Discogs. Deezer and Apple Music
+  go straight to the track when it was found; the others open a search.
 - **Genre tags** and the show description, with a link to the episode on nts.live.
 - **Always live.** Stopping drops the stream, so pressing play again picks up what's
   on air now, not where you left off.

@@ -155,6 +155,20 @@ ipcMain.handle('notify', async (_e, { title, body, art } = {}) => {
   lastNote.show();
 });
 
+// Thin strip (default) or wide view with the stage. Grows to the right, kept on screen.
+const STRIP_WIDTH = 380;
+const WIDE_WIDTH = 1040;
+ipcMain.handle('win:set-wide', (_e, wide) => {
+  if (!win) return;
+  const { screen } = require('electron');
+  const b = win.getBounds();
+  const area = screen.getDisplayMatching(b).workArea;
+  const width = Math.min(wide ? WIDE_WIDTH : STRIP_WIDTH, area.width);
+  const x = Math.max(area.x, Math.min(b.x, area.x + area.width - width));
+  if (win.isMaximized()) win.unmaximize();
+  win.setBounds({ x, y: b.y, width, height: b.height }, true);
+});
+
 ipcMain.handle('win:focus', () => {
   if (!win) return;
   if (win.isMinimized()) win.restore();

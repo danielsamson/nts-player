@@ -11,7 +11,8 @@ const { net, app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache.json');
+// v2: entries also carry album, year and links to the track on Deezer / Apple Music
+const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache-v2.json');
 const MISS_TTL = 14 * 24 * 3600 * 1000;   // retry misses after two weeks
 let cache = null;
 let saveTimer = null;
@@ -53,17 +54,22 @@ function matches(track, resArtist, resTitle) {
   return want.artist.size && want.title.size && hit(want.artist) && hit(want.title);
 }
 
-const fromDeezer = (album) => album?.cover_medium
-  ? { small: album.cover_small || album.cover_medium, large: album.cover_xl || album.cover_big || album.cover_medium }
-  : null;
+// Deezer track (from /track or /search) -> { small, large, album, year, deezerUrl }
+const fromDeezer = (t) => t?.album?.cover_medium ? {
+  small: t.album.cover_small || t.album.cover_medium,
+  large: t.album.cover_xl || t.album.cover_big || t.album.cover_medium,
+  album: t.album.title || '',
+  year: (t.release_date || t.album.release_date || '').slice(0, 4),
+  deezerUrl: t.link || (t.id ? `https://www.deezer.com/track/${t.id}` : '')
+} : null;
 
 async function lookup(track) {
   const { deezer, isrc } = track;
   if (deezer) {
-    try { const r = fromDeezer((await getJson(`https://api.deezer.com/track/${encodeURIComponent(deezer)}`)).album); if (r) return r; } catch {}
+    try { const r = fromDeezer(await getJson(`https://api.deezer.com/track/${encodeURIComponent(deezer)}`)); if (r) return r; } catch {}
   }
   if (isrc) {
-    try { const r = fromDeezer((await getJson(`https://api.deezer.com/track/isrc:${encodeURIComponent(isrc)}`)).album); if (r) return r; } catch {}
+    try { const r = fromDeezer(await getJson(`https://api.deezer.com/track/isrc:${encodeURIComponent(isrc)}`)); if (r) return r; } catch {}
   }
   const artist = firstArtist(track.artist);
   const title = cleanTitle(track.title);
@@ -72,14 +78,18 @@ async function lookup(track) {
     const q = encodeURIComponent(`artist:"${artist}" track:"${title}"`);
     const d = await getJson(`https://api.deezer.com/search?q=${q}&limit=5`);
     const hit = (d.data || []).find((x) => matches(track, x.artist?.name, x.title));
-    if (hit) return fromDeezer(hit.album);
+    if (hit) return fromDeezer(hit);
   } catch {}
   try {
     const q = encodeURIComponent(`${artist} ${title}`);
     const d = await getJson(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`);
     const hit = (d.results || []).find((x) => matches(track, x.artistName, x.trackName));
     if (hit?.artworkUrl100) {
-      return { small: hit.artworkUrl100, large: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.') };
+      return {
+        small: hit.artworkUrl100, large: hit.artworkUrl100.replace(/\/\d+x\d+bb\./, '/600x600bb.'),
+        album: hit.collectionName || '', year: (hit.releaseDate || '').slice(0, 4),
+        appleUrl: (hit.trackViewUrl || '').split('?')[0]
+      };
     }
   } catch {}
   return null;

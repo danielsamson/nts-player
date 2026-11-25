@@ -81,6 +81,7 @@ function render() {
   nextText = info.next?.broadcast_title
     ? `Next ${fmtTime(info.next.start_timestamp)} · ${info.next.broadcast_title}` : '';
   renderNowbar();
+  if (typeof Stage !== 'undefined') Stage.render();
 
   if (source === 'live' && 'mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -264,7 +265,7 @@ const TrackNotify = (() => {
     }, 1500);
   });
 
-  return { enabled, setEnabled };
+  return { enabled, setEnabled, currentTrack };
 })();
 
 // Seek bar (archive only): click or drag
@@ -522,6 +523,135 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('nexttrack', () => (isArchive() ? Archive.skipTrack(1) : setChannel(channel ? 0 : 1)));
   navigator.mediaSession.setActionHandler('previoustrack', () => (isArchive() ? Archive.skipTrack(-1) : setChannel(channel ? 0 : 1)));
 }
+
+// ---- Wide view: the stage ----
+// Big album art and full details for what's playing, with links to find the
+// track elsewhere. Spotify, YouTube, Bandcamp and Discogs open a search;
+// Deezer and Apple Music go straight to the track when the lookup found it.
+const Stage = (() => {
+  const wideQuery = window.matchMedia('(min-width: 720px)');
+  let token = 0;
+
+  const cleanTitle = (t) => (t || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+(ft\.?|feat\.?|featuring|prod\.?( by)?)\s.*$/i, '').trim();
+  const firstArtist = (a) => (a || '').split(/,|&| x | ft\.? | feat\.? /i)[0].trim();
+
+  function links(track, art) {
+    const q = encodeURIComponent(`${firstArtist(track.artist)} ${cleanTitle(track.title)}`.trim());
+    return [
+      ['Spotify', `https://open.spotify.com/search/${q}`],
+      ['Apple Music', art?.appleUrl || `https://music.apple.com/us/search?term=${q}`],
+      ['Deezer', art?.deezerUrl || `https://www.deezer.com/search/${q}`],
+      ['YouTube', `https://www.youtube.com/results?search_query=${q}`],
+      ['Bandcamp', `https://bandcamp.com/search?q=${q}`],
+      ['Discogs', `https://www.discogs.com/search/?q=${q}&type=all`]
+    ];
+  }
+
+  function paintLinks(items) {
+    $('stageLinks').replaceChildren(...items.map(([name, href]) => {
+      const a = document.createElement('a');
+      a.className = 'stage__link'; a.href = href; a.target = '_blank'; a.textContent = name;
+      return a;
+    }));
+  }
+
+  function paint({ label, context, img, kicker, title, artist, album, next, linkItems, square }) {
+    $('stageLabel').textContent = label;
+    $('stageContext').textContent = context || '';
+    const im = $('stageArtImg');
+    if (img) { if (im.getAttribute('src') !== img) im.src = img; } else im.removeAttribute('src');
+    $('stageArt').classList.toggle('stage__art--wide', !square);
+    $('stageArt').classList.toggle('stage__art--empty', !img);
+    $('stageKicker').textContent = kicker || '';
+    $('stageTitle').textContent = title || '';
+    $('stageTitle').classList.toggle('stage__title--long', (title || '').length > 26);
+    $('stageArtist').textContent = artist || '';
+    $('stageAlbum').textContent = album || '';
+    $('stageNext').textContent = next || '';
+    paintLinks(linkItems || []);
+  }
+
+  async function render() {
+    if (!wideQuery.matches) return;
+    const my = ++token;
+    const a = ArchivePlayer.state;
+
+    if (source === 'archive' && a.episode) {
+      const ep = a.episode;
+      const cur = TrackNotify.currentTrack();
+      const tracks = ep.tracks || [];
+      const label = a.playing || a.loading ? 'Now playing' : 'Paused';
+      const context = `Archive · ${ep.title}${ep.date ? ' · ' + ep.date : ''}`;
+      if (!cur) {
+        paint({ label, context, img: ep.img, kicker: tracks.length ? 'Before the first track' : 'NTS Archive',
+          title: ep.title, artist: [ep.location, ep.date].filter(Boolean).join(' · '),
+          next: tracks[0] ? `First track ${fmtOffset(tracks[0].offset ?? tracks[0].offset_estimate)} · ${tracks[0].artist} – ${tracks[0].title}` : '' });
+        return;
+      }
+      const t = cur.track;
+      const nt = tracks[cur.idx + 1];
+      const base = {
+        label, context,
+        kicker: `Track ${cur.idx + 1} of ${tracks.length} · ${fmtOffset(t.offset ?? t.offset_estimate)}`,
+        title: t.title, artist: t.artist,
+        next: nt ? `Up next ${fmtOffset(nt.offset ?? nt.offset_estimate)} · ${nt.artist} – ${nt.title}` : 'Last track in the tracklist',
+        square: true
+      };
+      paint({ ...base, img: '', linkItems: links(t, null) });
+      const art = await Art.get(t);
+      if (my !== token) return;
+      paint({ ...base, img: art?.large || ep.img, square: !!art,
+        album: art?.album ? `${art.album}${art.year ? ' · ' + art.year : ''}` : '',
+        linkItems: links(t, art) });
+      return;
+    }
+
+    // Live radio (or nothing yet): the selected channel's show
+    const r = live?.results?.[channel];
+    if (!r) { paint({ label: 'NTS Radio', title: 'Loading…' }); return; }
+    const info = showInfo(r);
+    paint({
+      label: playing ? 'Now playing' : `NTS ${channel + 1}`,
+      context: `Live on ${channel + 1}${info.location ? ' · ' + info.location : ''}`,
+      img: info.img, square: false,
+      kicker: info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : 'Live',
+      title: info.title,
+      artist: '',
+      album: info.genres.slice(0, 4).join(' · '),
+      next: nextText,
+      linkItems: info.episode ? [['View on nts.live', `https://www.nts.live/shows/${info.show}/episodes/${info.episode}`]] : []
+    });
+  }
+
+  // Expand / collapse button; the layout itself follows the window width
+  function paintButton() {
+    const wide = wideQuery.matches;
+    $('expandBtn').title = wide ? 'Thin strip' : 'Wide view';
+    $('expandBtn').setAttribute('aria-label', $('expandBtn').title);
+    $('expandIcon').setAttribute('d', wide
+      ? 'M10 10H4V8h2.6L2.3 3.7l1.4-1.4L8 6.6V4h2zm4 4h6v2h-2.6l4.3 4.3-1.4 1.4-4.3-4.3V20h-2z'
+      : 'M4 4h6v2H7.4l4.3 4.3-1.4 1.4L6 7.4V10H4zm16 16h-6v-2h2.6l-4.3-4.3 1.4-1.4 4.3 4.3V14h2z');
+  }
+  $('expandBtn').addEventListener('click', () => {
+    const wide = !wideQuery.matches;
+    try { localStorage.setItem('wide', wide ? '1' : '0'); } catch {}
+    window.nts.setWide(wide);
+  });
+  wideQuery.addEventListener('change', () => { paintButton(); render(); });
+  paintButton();
+  // Reopen in the view you used last (thin strip unless you chose wide)
+  try { if (localStorage.getItem('wide') === '1' && !wideQuery.matches) window.nts.setWide(true); } catch {}
+
+  // Re-render on track changes, not on every progress tick
+  let lastSig = '';
+  ArchivePlayer.onChange((a) => {
+    const cur = TrackNotify.currentTrack();
+    const sig = `${a.episode?.episode}|${cur?.idx}|${a.playing}|${a.loading}|${source}`;
+    if (sig !== lastSig) { lastSig = sig; render(); }
+  });
+
+  return { render };
+})();
 
 render();
 refresh();

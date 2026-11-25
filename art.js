@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 
 // v2: entries also carry album, year and links to the track on Deezer / Apple Music
-// v3: dropped misses cached while lookups were Deezer-only
-const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache-v3.json');
+// v4: dropped Deezer's grey placeholder covers saved as if they were real
+const CACHE_FILE = () => path.join(app.getPath('userData'), 'art-cache-v4.json');
 const MISS_TTL = 3 * 24 * 3600 * 1000;    // retry misses after three days
 let cache = null;
 let saveTimer = null;
@@ -95,8 +95,16 @@ function matches(track, resArtist, resTitle) {
   return want.artist.size && want.title.size && hit(want.artist) && hit(want.title);
 }
 
+// Deezer serves a grey placeholder for releases without a cover: its image id is blank or
+// d41d8cd98f00b204e9800998ecf8427e (the hash of nothing). Treat those as no cover.
+const DEEZER_EMPTY = 'd41d8cd98f00b204e9800998ecf8427e';
+const hasDeezerCover = (album) => {
+  const id = album?.md5_image || (/\/images\/cover\/([0-9a-f]*)\//.exec(album?.cover_medium || '') || [])[1] || '';
+  return /^[0-9a-f]{32}$/.test(id) && id !== DEEZER_EMPTY;
+};
+
 // Deezer track (from /track or /search) -> { small, large, album, year, deezerUrl }
-const fromDeezer = (t) => t?.album?.cover_medium ? {
+const fromDeezer = (t) => t?.album?.cover_medium && hasDeezerCover(t.album) ? {
   small: t.album.cover_small || t.album.cover_medium,
   large: t.album.cover_xl || t.album.cover_big || t.album.cover_medium,
   album: t.album.title || '',

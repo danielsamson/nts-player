@@ -4,6 +4,28 @@ Each version's notes become its GitHub Release. To release, bump `version` in
 `package.json`, add a section here for it, and push to `main`: the Build workflow
 tags it and publishes the release automatically.
 
+## 1.2.1
+
+**Discover**
+- Explore by mood and genre: NTS's moods and every genre and subgenre lead to their episodes, and genre tags are clickable everywhere
+- I'm feeling lucky on Home: a random episode from anywhere in the archive
+- Track web (prototype, in the wide view): explore NTS through what DJs played. Search a track or a show, expand tracks into the episodes that played them and episodes into their tracklists, see which tracks are shared and how often they've been played, and play any track from the episode you found it in
+
+**Listening**
+- The now-playing bar shows the track playing in an archive episode
+- The artwork box in the bar is always there, with a white label when there's no cover, and covers fade in without flashing
+- Live track covers in the bar (Supporters)
+
+**First launch and accessibility**
+- A short welcome on first launch
+- Everything works from the keyboard, with a visible focus outline; buttons are labelled for screen readers; small text has more contrast
+
+**Fixes**
+- macOS no longer says the app "is damaged": Mac builds now have an ad-hoc signature (allow it once in System Settings > Privacy & Security)
+- Play from now lands at the right time, instead of sometimes starting the episode from 0:00
+- Track play counts no longer count different tracks with similar names
+- HTML codes like "&amp;" no longer show in titles
+
 ## 1.2.0
 
 **Home**

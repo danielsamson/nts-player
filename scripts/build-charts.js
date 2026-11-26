@@ -161,7 +161,7 @@ function same(artist, title, rArtist, rTitle) {
   const a = words(artist), b = words(rArtist);
   return !a.size || [...a].some((w) => b.has(w));
 }
-async function getJson(url, tries = 5) {
+async function getJson(url, tries = 7) {
   for (let i = 0; i < tries; i++) {
     let r;
     try { r = await fetch(url, { headers: UA }); } catch { await sleep(2000 * 2 ** i); continue; }   // network hiccup: try again

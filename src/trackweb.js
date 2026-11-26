@@ -199,9 +199,12 @@ const TrackWeb = (() => {
     gNodes = gZoom.append('g').attr('class', 'tw-nodes');
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
       gZoom.attr('transform', e.transform);
-      const z = e.transform.k > 1.3;                      // zoomed in: every track may show its label
-      if (z !== zoomed) { zoomed = z; cullLabels(); }
-      else cullLabelsSoon();
+      zoomed = e.transform.k > 1.3;
+      // names stay close to the same size on screen, so zooming in makes room for more of them
+      const fs = 9 / Math.pow(Math.max(1, e.transform.k), .8);
+      svg.node().style.setProperty('--tw-fs', `${fs}px`);
+      svg.node().style.setProperty('--tw-sw', `${fs * .55}px`);
+      cullLabelsSoon();
     });
     svg.call(zoom).on('dblclick.zoom', null);
     svg.on('click', (e) => { if (e.target === svg.node()) select(null); });
@@ -262,7 +265,7 @@ const TrackWeb = (() => {
       badge.append('text').attr('y', 9.5).attr('text-anchor', 'middle');
       const label = g.append('text').attr('class', 'tw-label').attr('text-anchor', 'middle');
       label.append('tspan').attr('class', 'tw-label__title').attr('x', 0);
-      label.append('tspan').attr('class', 'tw-label__sub').attr('x', 0).attr('dy', 11);
+      label.append('tspan').attr('class', 'tw-label__sub').attr('x', 0).attr('dy', '1.22em');
       g.append('title');
       // artwork that fails to load: fall back to the plain node
       g.select('image').on('error', function () { d3.select(this).attr('href', null); d.img = ''; });
@@ -299,7 +302,7 @@ const TrackWeb = (() => {
   // Which labels show: every node that usually has one (all tracks when zoomed in), minus
   // those that would overlap a more important one. Labels fade in and out (CSS); one
   // that's showing keeps its place over an equal newcomer, so they don't swap as nodes drift.
-  const wantsLabel = (d) => labelled(d) || (zoomed && d.type === 'track');
+  const wantsLabel = () => true;
   let cullQueued = false, cullTimer = null;
   function cullLabelsSoon() { clearTimeout(cullTimer); cullTimer = setTimeout(cullLabels, 250); }
   function cullLabels() {
@@ -318,7 +321,7 @@ const TrackWeb = (() => {
         const up = (-d.r - 6) - (b.y + b.height);
         const spots = [0, up].map((dy) => ({ dy, x: d.x + b.x - 2, y: d.y + b.y + dy - 1, w: b.width + 4, h: b.height + 2 }));
         if (d.labelUp) spots.reverse();          // keep the side it's on unless it has to move
-        items.push({ label, d, spots, p: labelPriority(d) + (was ? .5 : 0) });
+        items.push({ label, d, spots, p: labelPriority(d) + (was ? .1 : 0) });
       });
       items.sort((a, b) => b.p - a.p || (b.d.plays || 0) - (a.d.plays || 0));
       const kept = [];
@@ -328,13 +331,21 @@ const TrackWeb = (() => {
       for (const it of items) {
         const free = (box) => !kept.some((k) => hit(box, k)) && (it.p >= 5 || !bodies.some((b) => b.n !== it.d && hit(box, b)));
         // tracks only use the spot below; shows and episodes may move above
-        const spot = (it.d.type === 'track' ? it.spots.filter((x) => x.dy === 0) : it.spots).find(free);
+        const clearOfLabels = (box) => !kept.some((k) => hit(box, k));
+        const spot = it.d.type === 'track' ? it.spots.filter((x) => x.dy === 0).find(free)
+          // shows and episodes: last resort, over another node's cover rather than nameless
+          : it.spots.find(free) || it.spots.find(clearOfLabels);
         it.label.classList.toggle('is-on', !!spot);
         if (!spot) continue;
         it.d.labelUp = spot.dy !== 0;
         it.label.setAttribute('transform', spot.dy ? `translate(0,${spot.dy})` : '');
         kept.push(spot);
       }
+      // say so when names are hidden, so it doesn't look like a bug
+      const hidden = items.length - kept.length;
+      const note = host.querySelector('.trackweb__crowd');
+      note.hidden = hidden === 0;
+      note.textContent = hidden ? `${hidden} name${hidden === 1 ? '' : 's'} hidden · zoom in or hover to see` : '';
     });
   }
 

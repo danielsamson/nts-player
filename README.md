@@ -99,9 +99,9 @@ shared between them light up, and the show's panel lists the ones it played most
 carry their stand-in popularity: how many episodes, since when, how often, ★ if featured
 by NTS, and a red outline if you follow them.
 
-When the web gets crowded, labels that would overlap fade out, keeping the most useful
-(the selected node, your starting track, expanded and shared tracks). Rest on a node to
-see its label and its connections, or zoom in.
+Every node is named when there's room. Where names would overlap, the less important ones
+fade out (shows and episodes are always named), and a note says how many are hidden.
+Zoom in to make room for them, or rest on a node to see its name and connections.
 
 ### Wide view
 

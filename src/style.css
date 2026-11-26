@@ -1156,7 +1156,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-badge text { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--black); pointer-events: none; }
 /* labels */
 /* Labels fade in and out; a thick black outline keeps lines from cutting through the text */
-.tw-label { pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 5px; stroke-linejoin: round;
+.tw-label { pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: var(--tw-sw, 5px); stroke-linejoin: round;
   opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility 0s linear .3s; }
 .tw-label.is-on, .tw-node.is-hover .tw-label, .tw-node.is-selected .tw-label {
   opacity: 1; visibility: visible; transition: opacity .3s ease, visibility 0s; }
@@ -1165,8 +1165,8 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-node--track:not(.has-img) .tw-shape { fill: #1c1c1c; stroke: var(--grey-3); stroke-width: 1; }
 .tw-hole { fill: var(--grey-2); }
 .tw-node--track.has-img .tw-hole { display: none; }
-.tw-label__title { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); }
-.tw-label__sub { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); }
+.tw-label__title { font: 700 var(--tw-fs, 9px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); }
+.tw-label__sub { font: 400 var(--tw-fs, 9px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); }
 @media (prefers-reduced-motion: reduce) { .tw-node.is-loading .tw-body { animation: none; opacity: .6; } }
 
 /* Track labels only where they help: root, selected, expanded, hovered, or zoomed in */
@@ -1193,3 +1193,6 @@ body.playing .channel .track__time { color: var(--grey-3); }
 }
 
 /* Label collisions: hidden labels come back on hover */
+
+/* "Names hidden" note in the track web's top bar */
+.trackweb__crowd { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--grey-2); text-align: right; max-width: 260px; }

@@ -1048,6 +1048,7 @@ const Archive = (() => {
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
+    showShow(show) { started = true; go({ type: 'show', show }); },
     showTrack(artist, title, { fromLive } = {}) {
       started = true;
       if (fromLive) { go({ type: 'track', artist, title, returnLive: true }); view = 'archive'; return; }

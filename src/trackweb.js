@@ -87,6 +87,7 @@ const TrackWeb = (() => {
     n.loading = true; paintNodes();
     const tl = await window.nts.api(`/api/v2/shows/${n.show}/episodes/${n.episode}/tracklist`).catch(() => null);
     n.loading = false; n.expanded = true;
+    n.trackCount = (tl?.results || []).length;
     (tl?.results || []).forEach((t) => {
       if (!t.title) return;
       const tn = addNode({ id: trackId(t), type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id, near: n.id });
@@ -253,7 +254,9 @@ const TrackWeb = (() => {
     if (!d) { box.append(hint); return; }
     const title = el('p', 'trackweb__title', d.title);
     const playsText = d.plays ? ` · played in ${d.plays >= 50 ? '50+' : d.plays} NTS episode${d.plays === 1 ? '' : 's'}` : '';
-    const sub = el('p', 'trackweb__sub', d.type === 'track' ? `${d.artist}${playsText}` : `Episode${d.date ? ' · ' + d.date : ''}`);
+    // An episode node is one broadcast: say which, and offer the rest of the show
+    const sub = el('p', 'trackweb__sub', d.type === 'track' ? `${d.artist}${playsText}`
+      : `${d.date ? `Episode of ${d.date}` : 'Episode'}${d.trackCount ? ` · ${d.trackCount} tracks` : ''}`);
     const actions = el('div', 'trackweb__actions');
     if (d.type === 'track') {
       const p = playableEpisode(d);
@@ -271,6 +274,7 @@ const TrackWeb = (() => {
     } else {
       actions.append(btn('▶ Play episode', () => Archive.playFrom(d.show, d.episode, 0)));
       actions.append(btn('Open episode', () => openInPanel(() => Archive.showEpisode(d.show, d.episode))));
+      actions.append(btn('More from this show', () => openInPanel(() => Archive.showShow(d.show))));
     }
     if (d.loading) actions.prepend(loader(d.type === 'track' ? 'Finding episodes' : 'Loading tracklist'));
     box.append(title, sub, actions);

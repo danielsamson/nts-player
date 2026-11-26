@@ -12,7 +12,7 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 ### Home
 
 The app opens on Home (or click the NTS logo): **On air** with NTS 1 and NTS 2 and a
-play button each, **Continue listening**, **Coming up from shows you follow**, **Explore** (with **I'm feeling lucky**),
+play button each, **Continue listening**, **Coming up from shows you follow**, **Explore** (with **I'm feeling lucky**), **Most played on NTS**,
 **My NTS** and **Recently added**, with search at the top. "See all" links lead to the full
 schedule, history and lists.
 
@@ -38,6 +38,11 @@ schedule, history and lists.
 
 ### Archive
 
+- **Most played on NTS** on Home: the tracks played by the most different shows in the
+  last 30 days, worked out from every episode's tracklist (NTS doesn't publish a chart).
+  **See all** for the top 100, and pick any month back to 2015. Click a track for its
+  details or press play to hear it in the latest episode that played it. The episodes in
+  a period come from nts.live's sitemap; past months are worked out once and kept.
 - **I'm feeling lucky** on Home plays a random episode from anywhere in the archive: any
   show, any year.
 - **Explore by mood and genre:** NTS's moods (Sedative, Lean Back, Music To Dance To…) and
@@ -262,6 +267,7 @@ allows them for signed apps, so Mac users download new versions from the release
 | Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
 | Apple Music links | iTunes Search, for the track you're listening to |
 | My NTS | NTS's own pages and buttons on `www.nts.live`, in your signed-in session |
+| Most played | Episode dates from `www.nts.live/sitemap.xml.gz`, tracklists from the NTS API |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist
@@ -278,6 +284,7 @@ src/index.html         Layout
 src/renderer.js        Live radio, now-playing bar, history, wide view
 src/archive.js         Archive: browse, search, show and episode pages
 src/archive-player.js  Plays archive episodes via SoundCloud's embed player
+src/chart.js           Most played on NTS: a chart from tracklists (sitemap.js: episodes by date)
 src/trackweb.js        Track web
 src/style.css          Styling (design tokens at the top)
 src/fonts/             Roboto Condensed (SIL Open Font License)

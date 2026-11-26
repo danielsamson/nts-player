@@ -110,6 +110,13 @@ ipcMain.handle('nts:api', async (_e, apiPath) => {
   return res.json();
 });
 
+// Episodes broadcast between two dates (ms), from nts.live's sitemap: for the monthly chart
+const sitemap = require('./sitemap');
+ipcMain.handle('nts:episodes-between', async (_e, from, to) => {
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 40 * 864e5) throw new Error('Invalid date range');
+  return sitemap.episodesBetween(from, to);
+});
+
 // ---- NTS Supporter sign-in ----
 function openSignIn() {
   if (signInWin && !signInWin.isDestroyed()) { signInWin.focus(); return; }

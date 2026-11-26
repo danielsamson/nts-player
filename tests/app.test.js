@@ -158,6 +158,30 @@ async function mockAccount() {
     await win.waitForSelector('#archiveContent .detail', { timeout: 30000 });
   });
 
+  await test('Most played on NTS: ranks tracks by how many shows played them', async () => {
+    // a small made-up set of recent tracklists (the real one reads ~700 episodes)
+    await win.evaluate(() => {
+      const now = Date.now();
+      const ep = (s, e, tr) => ({ d: now - 86400000, s, e, tr });
+      localStorage.setItem('chart:v2', JSON.stringify({ at: now, eps: {
+        'a/1': ep('a', 'a-1', [['Kokoroko', 'Sweetie', 10], ['ID', 'ID', 20], ['Theme', 'Show A Theme', 30]]),
+        'a/2': ep('a', 'a-2', [['Theme', 'Show A Theme', 30], ['Kokoroko', 'Sweetie', 40]]),
+        'a/3': ep('a', 'a-3', [['Theme', 'Show A Theme', 30]]),
+        'b/1': ep('b', 'b-1', [['Kokoroko', 'Sweetie', 50], ['Camille Munn', 'See It Thru', 60]]),
+        'c/1': ep('c', 'c-1', [['Camille Munn', 'See It Thru', 70]])
+      } }));
+      Chart.reload();
+      Archive.home();
+    });
+    await waitFor(() => document.querySelectorAll('.chart-row').length > 0, null, { timeout: 15000, what: 'the chart on Home' });
+    const rows = await win.evaluate(() => [...document.querySelectorAll('.chart-row')].map((r) => r.querySelector('.track__title').textContent + ' / ' + r.querySelector('.chart-row__count').textContent));
+    // Sweetie: 2 shows beats the theme tune (1 show, 3 episodes); the placeholder "ID" is left out
+    expect(rows[0].startsWith('Sweetie') && rows[1].startsWith('See It Thru') && !rows.some((r) => /^ID/.test(r)), `unexpected chart: ${rows.join(' | ')}`);
+    // the full chart has a month picker
+    await win.evaluate(() => document.querySelector('.chart-box').previousElementSibling.querySelector('.archive__see').click());
+    await waitFor(() => document.querySelector('.chart-pick')?.options.length > 12, null, { timeout: 10000, what: 'the month picker' });
+  });
+
   await test('Schedule lists upcoming shows', async () => {
     await win.click('#homeBtn');
     await win.click('.archive__see >> text=Schedule');

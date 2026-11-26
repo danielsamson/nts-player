@@ -51,6 +51,10 @@ async function run() {
   const explore = await getJson('/api/v2/search/episodes?moods[]=sedative&offset=0&limit=1').catch(() => null);
   check('API: genres, moods, explore', genres?.results?.length && moods?.results?.length && explore?.results?.length, '/genres, /moods, /search/episodes');
 
+  // Most played on NTS: episodes by date come from the sitemap
+  const week = await require('../sitemap').episodesBetween(Date.now() - 7 * 864e5, Date.now() + 864e5).catch(() => []);
+  check('Sitemap: episodes by date (Most played)', week.length > 50 && week[0].show && week[0].episode, `${week.length} episodes in the last week, from /sitemap.xml.gz`);
+
   // ---- Episode page (Save episode, Follow, Save track buttons) ----
   const epPage = await inPage(`${SITE}/shows/motive/episodes/motive-30th-september-2026`, `(() => {
     const root = document.querySelector('#episode-container');

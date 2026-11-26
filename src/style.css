@@ -1294,3 +1294,10 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-shade { fill: rgba(0, 0, 0, .5); opacity: 0; pointer-events: none; transition: opacity .15s; }
 .tw-node__play { fill: var(--white); opacity: 0; }
 .trackweb__svg.is-timeline .tw-node--track:hover .tw-shade, .trackweb__svg.is-timeline .tw-node--track:hover .tw-node__play { opacity: 1; }
+
+/* Most played on NTS */
+.chart-box__span { padding: 8px 12px 0; font-size: 12px; line-height: 16px; color: var(--grey-2); }
+.chart-list .track__time { min-width: 18px; font-weight: 700; color: var(--white); }
+.chart-row__count { font-size: 11px; line-height: 14px; color: var(--grey-2); }
+.chart-head { padding: 10px 12px 0; }
+.chart-pick { height: var(--btn-m); padding: 0 8px; background: var(--black); color: var(--white); border: var(--rule); font: 700 12px/14px "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }

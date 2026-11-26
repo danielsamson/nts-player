@@ -29,6 +29,7 @@
       "account.js",
       "live-tracks.js",
       "desktop.js",
+      "sitemap.js",
       "src/**/*",
       "build/icon.png",
       "build/thumb-*.png"

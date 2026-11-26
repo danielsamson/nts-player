@@ -1173,3 +1173,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
   height: var(--btn-m); max-width: 280px; background: var(--black); color: var(--grey-1); border: 1px solid var(--grey-3);
   font: 700 12px/14px "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; padding: 0 6px;
 }
+
+/* Label collisions: hidden labels come back on hover */
+.tw-label.is-culled { display: none !important; }
+.tw-node:hover .tw-label.is-culled, .tw-node.is-selected .tw-label.is-culled { display: block !important; }

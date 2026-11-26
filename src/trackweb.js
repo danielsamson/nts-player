@@ -199,17 +199,19 @@ const TrackWeb = (() => {
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
       gZoom.attr('transform', e.transform);
       svg.classed('is-zoomed', e.transform.k > 1.3);      // zoomed in: show every track label
+      cullLabels();
     });
     svg.call(zoom).on('dblclick.zoom', null);
     svg.on('click', (e) => { if (e.target === svg.node()) select(null); });
     sim = d3.forceSimulation()
       .force('link', d3.forceLink().id((d) => d.id).distance((l) => (l.kind === 'show' ? 120 : 90)).strength((l) => (l.kind === 'show' ? .3 : .5)))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('collide', d3.forceCollide((d) => d.r + 12).strength(1).iterations(2))
+      .force('charge', d3.forceManyBody().strength(-340))
+      .force('collide', d3.forceCollide(spaceFor).strength(1).iterations(2))
       .force('x', d3.forceX(0).strength(.03))
       .force('y', d3.forceY(0).strength(.03))
       .velocityDecay(.6)           // more damping: drift, don't jump
-      .on('tick', ticked);
+      .on('tick', ticked)
+      .on('end', cullLabels);
     new ResizeObserver(center).observe(host);
   }
   function center() {
@@ -280,6 +282,43 @@ const TrackWeb = (() => {
   }
 
   const clip = (x, n) => (x && x.length > n ? x.slice(0, n - 1) + '…' : x || '');
+  // Room a node needs: its size, plus space for its label when it usually shows one
+  function labelled(d) {
+    return d.type !== 'track' || d.id === rootId || d === selected || d.expanded || d.plays >= 3 || d.inWeb >= 2;
+  }
+  function spaceFor(d) { return d.r + (labelled(d) ? 30 : 12); }
+
+  // Labels that would overlap are hidden, most important first. Hover still shows any.
+  function labelPriority(d) {
+    return d === selected ? 6 : d.id === rootId ? 5 : d.expanded ? 4 : d.inWeb >= 2 ? 3 : (d.plays || 0) >= 3 ? 2 : d.type !== 'track' ? 1 : 0;
+  }
+  let cullQueued = false;
+  function cullLabels() {
+    if (cullQueued || !gNodes) return;
+    cullQueued = true;
+    requestAnimationFrame(() => {
+      cullQueued = false;
+      const items = [];
+      gNodes.selectAll('g.tw-node').each(function (d) {
+        const label = this.querySelector('.tw-label');
+        label.classList.remove('is-culled');
+        if (getComputedStyle(label).display === 'none') return;
+        const b = label.getBBox();
+        if (!b.width) return;
+        items.push({ label, d, x: d.x + b.x - 2, y: d.y + b.y - 1, w: b.width + 4, h: b.height + 2, p: labelPriority(d) });
+      });
+      items.sort((a, b) => b.p - a.p || (b.d.plays || 0) - (a.d.plays || 0));
+      const kept = [];
+      // labels also shouldn't sit on top of other nodes' artwork
+      const bodies = nodes.map((n) => ({ x: n.x - n.r, y: n.y - n.r, w: n.r * 2, h: n.r * 2, n }));
+      const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      for (const it of items) {
+        const clash = kept.some((k) => hit(it, k)) || (it.p < 5 && bodies.some((b) => b.n !== it.d && hit(it, b)));
+        if (clash) it.label.classList.add('is-culled'); else kept.push(it);
+      }
+    });
+  }
+
   // Cross-breeding: how many of the web's episodes played each track
   function epDegrees() {
     const deg = new Map();
@@ -305,7 +344,7 @@ const TrackWeb = (() => {
         d.r = 12 + Math.min(10, d.shared * 1.5);
       }
     });
-    sim?.force('collide')?.radius((d) => d.r + 12);
+    sim?.force('collide')?.radius(spaceFor);
     gNodes.selectAll('g.tw-node')
       .classed('is-root', (d) => d.id === rootId)
       .classed('is-selected', (d) => d === selected)
@@ -352,7 +391,9 @@ const TrackWeb = (() => {
       });
   }
 
+  let lastCull = 0;
   function ticked() {
+    if (Date.now() - lastCull > 400) { lastCull = Date.now(); cullLabels(); }
     gLinks.selectAll('line')
       .attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
@@ -374,7 +415,7 @@ const TrackWeb = (() => {
     else if (d.type === 'episode') expandEpisode(d);
     else addShowEpisodes(d);
   }
-  function select(d) { selected = d; paintNodes(); paintInfo(); }
+  function select(d) { selected = d; paintNodes(); paintInfo(); sim?.force('collide')?.radius(spaceFor); cullLabels(); }
 
   // Episodes this track can be played from (with its position), the one we found it
   // through first; for a searched-for track, its latest episode

@@ -98,6 +98,10 @@ shared between them light up, and the show's panel lists the ones it played most
 carry their stand-in popularity: how many episodes, since when, how often, ★ if featured
 by NTS, and a red outline if you follow them.
 
+When the web gets crowded, labels that would overlap are hidden, keeping the most useful
+(the selected node, your starting track, expanded and shared tracks). Hover a node to see
+any label, or zoom in.
+
 ### Wide view
 
 The thin strip is the default. The expand button in the header (or a wider window) adds

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, net, Menu, shell, clipboard, session, Notification, nativeImage, webContents } = require('electron');
 const { getArt, getAppleLink } = require('./art');
 const account = require('./account');
 const liveTracks = require('./live-tracks');
@@ -258,6 +258,14 @@ app.whenReady().then(() => {
   nts.setPermissionRequestHandler((_wc, permission, cb) => cb(permission !== 'notifications'));
   nts.setPermissionCheckHandler((_wc, permission) => permission !== 'notifications');
   nts.setUserAgent(nts.getUserAgent().replace(/\s(Electron|nts-player)\/\S+/g, ''));
+  // The hidden nts.live pages (live track IDs, My NTS) are drawn in memory but never seen:
+  // skip their images and video. They only need the text and links, and drawing long
+  // image-heavy pages could exceed Chromium's graphics memory ("tile memory limits exceeded").
+  nts.webRequest.onBeforeRequest({ urls: ['https://*/*'] }, (d, cb) => {
+    if (d.resourceType !== 'image' && d.resourceType !== 'media') return cb({});
+    const wc = d.webContentsId ? webContents.fromId(d.webContentsId) : null;
+    cb({ cancel: !!wc && !wc.isDestroyed() && wc.isOffscreen() });
+  });
   createWindow();
   desktop.init(win, ipcMain);
 });

@@ -748,7 +748,62 @@ const Archive = (() => {
   function exploreSection() {
     const box = el('div', 'moods moods--row');
     getMoods().then((ms) => box.replaceChildren(...ms.map(moodTile))).catch(() => box.remove());
-    return [sectionTitle('Explore', 'All genres', () => go({ type: 'genres' })), box];
+    return [sectionTitle('Explore', 'All genres', () => go({ type: 'genres' })), box, luckyButton()];
+  }
+
+  // ---- Feeling lucky: a random episode from anywhere in the archive ----
+  // NTS's show list only pages through its first 1,000 shows (A to N), so the rest
+  // (O to Z) come from show search. Then any episode in that show's history.
+  const pickOne = (xs) => xs[Math.floor(Math.random() * xs.length)];
+  const LIST_CAP = 1000;
+  async function randomShow() {
+    const meta = await api('/api/v2/shows?offset=0&limit=1');
+    const total = meta.metadata?.resultset?.count || LIST_CAP;
+    const i = Math.floor(Math.random() * total);
+    if (i <= LIST_CAP) {
+      const r = await api(`/api/v2/shows?offset=${i}&limit=1`);
+      return r.results?.[0]?.show_alias;
+    }
+    const q = pickOne('abcdefghijklmnopqrstuvwxyz'.split(''));
+    const r = await api(`/api/v2/search?q=${q}&version=2&offset=0&limit=50&types[]=show`);
+    const aliases = (r.results || []).map((x) => parsePath(x.article?.path)?.show).filter(Boolean);
+    const late = aliases.filter((a) => a > 'ninja-tune-takeover');     // past where the list stops
+    return pickOne(late.length ? late : aliases);
+  }
+  async function randomEpisode() {
+    for (let tries = 0; tries < 6; tries++) {
+      const show = await randomShow().catch(() => null);
+      if (!show) continue;
+      const first = await api(`/api/v2/shows/${show}/episodes?offset=0&limit=1`).catch(() => null);
+      const count = first?.metadata?.resultset?.count || 0;
+      if (!count) continue;
+      for (let j = 0; j < 3; j++) {
+        const off = Math.floor(Math.random() * count);
+        const r = off === 0 ? first : await api(`/api/v2/shows/${show}/episodes?offset=${off}&limit=1`).catch(() => null);
+        const ep = r?.results?.[0];
+        if (ep?.episode_alias && (ep.audio_sources || []).length) return { show, episode: ep.episode_alias };
+      }
+    }
+    return null;
+  }
+  function luckyButton() {
+    const b = el('button', 'lucky');
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17"/><circle cx="8.5" cy="8.5" r="1.4"/><circle cx="15.5" cy="15.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="15.5" cy="8.5" r="1.4"/><circle cx="8.5" cy="15.5" r="1.4"/></svg>';
+    const label = el('span', 'lucky__label', 'I’m feeling lucky');
+    const sub = el('span', 'lucky__sub', 'A random episode from anywhere in the archive');
+    b.append(label, sub);
+    b.addEventListener('click', async () => {
+      if (b.classList.contains('is-busy')) return;
+      b.classList.add('is-busy');
+      sub.textContent = 'Digging through the archive…';
+      const ep = await randomEpisode();
+      b.classList.remove('is-busy');
+      sub.textContent = 'A random episode from anywhere in the archive';
+      if (!ep) { showSnack('Couldn’t find one this time. Try again'); return; }
+      go({ type: 'episode', show: ep.show, episode: ep.episode });
+      Archive.playFrom(ep.show, ep.episode, 0);
+    });
+    return b;
   }
 
   async function renderGenres() {

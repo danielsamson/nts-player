@@ -138,6 +138,15 @@ async function mockAccount() {
     await waitFor(() => document.querySelectorAll('#archiveContent .item').length > 5, null, { timeout: 30000 });
   });
 
+  await test('Feeling lucky plays a random archive episode', async () => {
+    await win.evaluate(() => Archive.home());
+    await win.waitForSelector('.lucky', { timeout: 15000 });
+    const before = await win.evaluate(() => ArchivePlayer.state.episode?.episode);
+    await win.click('.lucky');
+    await waitFor((b) => ArchivePlayer.state.episode && ArchivePlayer.state.episode.episode !== b, before, { timeout: 60000, what: 'a random episode to start' });
+    await win.waitForSelector('#archiveContent .detail', { timeout: 30000 });
+  });
+
   await test('Schedule lists upcoming shows', async () => {
     await win.click('#homeBtn');
     await win.click('.archive__see >> text=Schedule');

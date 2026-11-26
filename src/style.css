@@ -1196,3 +1196,18 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* "Names hidden" note in the track web's top bar */
 .trackweb__crowd { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--grey-2); text-align: right; max-width: 260px; }
+
+/* Home: I'm feeling lucky (a random episode) */
+.lucky {
+  display: grid; grid-template-columns: 24px 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center;
+  width: 100%; padding: 12px; text-align: left; border-bottom: var(--rule);
+}
+.lucky svg { grid-row: 1 / 3; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+.lucky svg circle { fill: currentColor; stroke: none; }
+.lucky__label { font-size: 14px; line-height: 18px; font-weight: 700; text-transform: uppercase; }
+.lucky__sub { font-size: 12px; line-height: 16px; color: var(--grey-2); }
+.lucky:hover { background: var(--white); color: var(--black); }
+.lucky:hover .lucky__sub { color: var(--grey-3); }
+.lucky.is-busy svg { animation: luckyRoll .6s linear infinite; }
+@keyframes luckyRoll { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lucky.is-busy svg { animation: none; } }

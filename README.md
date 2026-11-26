@@ -12,7 +12,7 @@ archive, in one compact window. Runs on Windows, macOS and Linux.
 ### Home
 
 The app opens on Home (or click the NTS logo): **On air** with NTS 1 and NTS 2 and a
-play button each, **Continue listening**, **Coming up from shows you follow**, **Explore**,
+play button each, **Continue listening**, **Coming up from shows you follow**, **Explore** (with **I'm feeling lucky**),
 **My NTS** and **Recently added**, with search at the top. "See all" links lead to the full
 schedule, history and lists.
 
@@ -38,6 +38,8 @@ schedule, history and lists.
 
 ### Archive
 
+- **I'm feeling lucky** on Home plays a random episode from anywhere in the archive: any
+  show, any year.
 - **Explore by mood and genre:** NTS's moods (Sedative, Lean Back, Music To Dance To…) and
   every genre and subgenre lead to their episodes. Genre tags anywhere in the app are
   clickable too.

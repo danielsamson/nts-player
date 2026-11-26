@@ -1272,3 +1272,16 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-lane__track:hover .tw-lane__shade, .tw-lane__track:hover .tw-play-icon { opacity: 1; }
 .tw-lane.is-approx .tw-lane__line { stroke-dasharray: 4 4; }
 .tw-lane.is-approx .tw-lane__title { fill: var(--grey-3); }
+
+/* Timeline lanes: tracks in more than one of the sets */
+.tw-lane__track.is-shared .tw-lane__ring { stroke: var(--white); stroke-width: 1.5; }
+.tw-lane__track.is-shared .tw-lane__label { opacity: 1; fill: var(--white); }
+.tw-shared-link { fill: none; stroke: var(--white); stroke-width: 1; opacity: .35; pointer-events: none; }
+.tw-shared-mark { fill: none; stroke: var(--white); stroke-width: 1; stroke-dasharray: 2 2; opacity: .6; pointer-events: none; }
+.tw-lanes.has-focus .tw-shared-link, .tw-lanes.has-focus .tw-shared-mark { opacity: .08; }
+.tw-lanes.has-focus .tw-lane__track { opacity: .35; }
+.tw-lanes.has-focus .tw-lane__track.is-anchor, .tw-lanes.has-focus .is-focus { opacity: 1; }
+.tw-lanes.has-focus .tw-shared-link.is-focus { opacity: 1; stroke-width: 1.5; }
+.tw-lanes.has-focus .tw-shared-mark.is-focus { opacity: 1; }
+.trackweb__shared { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.trackweb__shared .tag.tag--on { background: var(--white); color: var(--black); border-color: var(--white); }

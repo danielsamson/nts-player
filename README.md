@@ -105,7 +105,10 @@ track in the timeline and every other episode that played it appears above (up t
 lined up so that track sits right above it: see what other DJs played around it, and
 press play on any of their tracks to jump into that episode (it becomes the timeline you
 follow). Episodes whose tracklist has no times are shown too, dashed, with their tracks
-spaced evenly.
+spaced evenly. The sets are stacked by date (newest nearest yours), each says where the track fell
+("opened with it", "62% in", "closed with it"), and tracks that turn up in more than
+one of the sets are highlighted and joined across them; the panel lists them, click one
+to follow just that track.
 
 Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
 or **Explore this show** on any episode, to bring in its episodes six at a time: tracks

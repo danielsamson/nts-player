@@ -583,6 +583,16 @@ const TrackWeb = (() => {
     if (d.loading) actions.prepend(loader(d.type === 'track' ? 'Finding episodes' : 'Loading tracklist'));
     box.append(title, sub, actions);
     if (compare?.track === d && compare.status) box.append(el('p', 'trackweb__lanes-note', compare.status));
+    if (compare?.track === d && compare.shared?.length) {
+      const wrap = el('div', 'trackweb__shared');
+      wrap.append(el('span', 'trackweb__top-label', 'Also in several of these sets'));
+      compare.shared.slice(0, 8).forEach((s) => {
+        const b = el('button', `tag${compare.focus === s.id ? ' tag--on' : ''}`, `${s.title} · ${s.artist} (${s.sets} sets)`);
+        b.addEventListener('click', () => { compare.focus = compare.focus === s.id ? null : s.id; focusShared(); paintInfo(); });
+        wrap.append(b);
+      });
+      box.append(wrap);
+    }
   }
   // A show: its facts, more episodes, and the tracks its episodes share most
   function paintShowInfo(box, d) {
@@ -917,7 +927,8 @@ const TrackWeb = (() => {
     }));
     if (token !== compareToken) return;
     const found = lanes.filter(Boolean);
-    const ok = found.filter((l) => !l.approx).concat(found.filter((l) => l.approx));   // timed ones first
+    const when = (l) => Date.parse(l.ep.date) || 0;
+    const ok = found.sort((a, b) => when(b) - when(a));      // newest just above your episode, oldest at the top
     compare.lanes = ok;
     const approx = ok.filter((l) => l.approx).length;
     compare.status = ok.length
@@ -934,6 +945,26 @@ const TrackWeb = (() => {
     const TOP = -235, GAP = 85;
     const lastY = TOP - (compare.lanes.length - 1) * GAP;
     gLanes.append('line').attr('class', 'tw-lane__align').attr('x1', ax).attr('x2', ax).attr('y1', -20).attr('y2', lastY - 26);
+    // tracks that turn up in more than one of these sets (yours included), and where
+    const mainTracks = follow?.kind === 'archive' ? (ArchivePlayer.state.episode?.tracks || []).filter((t) => t.title) : [];
+    const sets = new Map();          // track id -> number of sets it's in
+    const bump = (ids) => ids.forEach((id) => sets.set(id, (sets.get(id) || 0) + 1));
+    bump(new Set(mainTracks.map(trackId)));
+    compare.lanes.forEach((l) => bump(new Set(l.rows.map(trackId))));
+    // the selected track itself, under any of its credits, isn't a neighbour
+    const self = new Set([d.id, ...compare.lanes.map((l) => trackId(l.hit))]);
+    const isShared = (id) => !self.has(id) && (sets.get(id) || 0) >= 2;
+    const seen = new Map();          // track id -> [{ x, y }] where it appears
+    const at = (id, p) => { if (!seen.has(id)) seen.set(id, []); seen.get(id).push(p); };
+    mainTracks.forEach((t, i) => {
+      const id = trackId(t);
+      if (!isShared(id)) return;
+      const n = byId.get(id);
+      const off = t.offset ?? t.offset_estimate;
+      if (n && n.tx != null) at(id, { x: n.tx, y: n.ty });
+      else if (tl.timed && Number.isFinite(off)) at(id, { x: tl.x(off), y: rowY(i) });
+    });
+    const gLinksShared = gLanes.append('g').attr('class', 'tw-shared-links');
     compare.lanes.forEach((lane, k) => {
       const y = TOP - k * GAP;
       const x = (sec) => ax + (sec - lane.anchor) * pps;
@@ -941,12 +972,19 @@ const TrackWeb = (() => {
       const g = gLanes.append('g').attr('class', `tw-lane${lane.approx ? ' is-approx' : ''}`).attr('transform', `translate(0,${y})`).style('--lane-delay', `${k * 90}ms`);
       g.append('line').attr('class', 'tw-lane__line').attr('x1', x(0)).attr('x2', x(last + 240)).attr('y1', 0).attr('y2', 0);
       // the episode's name next to the lined-up track (the lane's start may be off screen)
+      // where it fell in that set
+      const hi = lane.rows.indexOf(lane.hit);
+      const where = hi <= 0 ? 'opened with it' : hi >= lane.rows.length - 1 ? 'closed with it'
+        : `${Math.round((lane.anchor / (last + 240)) * 100)}% in`;
       g.append('text').attr('class', 'tw-lane__title').attr('x', ax + 18).attr('y', -16)
-        .text(`${clip(lane.ep.title, 44)}${lane.ep.date ? ' · ' + lane.ep.date : ''}${lane.approx ? ' · no times listed' : ''}`);
+        .text(`${clip(lane.ep.title, 40)}${lane.ep.date ? ' · ' + lane.ep.date : ''} · ${where}${lane.approx ? ' · no times listed' : ''}`);
       lane.rows.forEach((row) => {
         const anchor = row === lane.hit;
-        const r = anchor ? 12 : 8;
-        const t = g.append('g').attr('class', `tw-lane__track${anchor ? ' is-anchor' : ''}`).attr('transform', `translate(${x(row.at)},0)`)
+        const id = trackId(row);
+        const shared = isShared(id);
+        const r = anchor ? 12 : shared ? 10 : 8;
+        if (shared) at(id, { x: x(row.at), y });
+        const t = g.append('g').attr('class', `tw-lane__track${anchor ? ' is-anchor' : ''}${shared ? ' is-shared' : ''}`).attr('data-id', id).attr('transform', `translate(${x(row.at)},0)`)
           .on('click', (e) => { e.stopPropagation(); Archive.playFrom(lane.ep.show, lane.ep.episode, lane.approx ? 0 : row.at); });
         t.append('circle').attr('class', 'tw-lane__dot').attr('r', r);
         const img = t.append('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2)
@@ -963,11 +1001,30 @@ const TrackWeb = (() => {
           Art.get({ artist: row.artist, title: row.title, isrc_id: row.isrc_id, deezer_track_id: row.deezer_track_id })
             .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
         };
-        if (k < FIT_LANES * 2 && Math.abs(lane.rows.indexOf(row) - lane.rows.indexOf(lane.hit)) <= 4) loadCover();
+        if (shared || (k < FIT_LANES * 2 && Math.abs(lane.rows.indexOf(row) - lane.rows.indexOf(lane.hit)) <= 4)) loadCover();
         else t.on('mouseenter', loadCover);
       });
     });
+    // join each shared track's appearances, top to bottom
+    const line = d3.line().curve(d3.curveMonotoneY);
+    gLinksShared.selectAll('path').data([...seen].filter(([, pts]) => pts.length >= 2)).join('path')
+      .attr('class', 'tw-shared-link').attr('data-id', ([id]) => id)
+      .attr('d', ([, pts]) => line(pts.slice().sort((a, b) => a.y - b.y).map((p) => [p.x, p.y])));
+    // markers on your own timeline for the shared ones
+    gLinksShared.selectAll('circle').data([...seen].filter(([, pts]) => pts.length >= 2).map(([id, pts]) => ({ id, p: pts.find((q) => q.y > TOP + 40) })).filter((m) => m.p))
+      .join('circle').attr('class', 'tw-shared-mark').attr('data-id', (m) => m.id).attr('r', 13).attr('cx', (m) => m.p.x).attr('cy', (m) => m.p.y);
+    // the list in the panel: most sets first
+    const byTrack = new Map();
+    compare.lanes.forEach((l) => l.rows.forEach((r) => { const id = trackId(r); if (isShared(id) && !byTrack.has(id)) byTrack.set(id, { id, title: r.title, artist: r.artist, sets: sets.get(id) }); }));
+    compare.shared = [...byTrack.values()].sort((a, b) => b.sets - a.sets);
+    focusShared();
     refitTimeline(TOP - (Math.min(compare.lanes.length, FIT_LANES) - 1) * GAP - 40);
+  }
+  // one shared track picked in the panel: light it up, fade the rest
+  function focusShared() {
+    const f = compare?.focus;
+    gLanes.classed('has-focus', !!f);
+    gLanes.selectAll('[data-id]').classed('is-focus', function () { return !!f && this.getAttribute('data-id') === f; });
   }
   // fit the timeline (and any lanes above it) in view, unless you've zoomed yourself
   function refitTimeline(topY) {

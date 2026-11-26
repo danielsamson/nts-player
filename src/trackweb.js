@@ -158,7 +158,7 @@ const TrackWeb = (() => {
     // a track found by search: default to its latest episode (we know its position there)
     const m0 = info?.match;
     if (m0 && !n.via) { n.viaMatch = { show: m0.show, episode: m0.episode, title: m0.title, date: m0.date, offset: m0.offset }; }
-    if (!plays.length) showSnack('No other NTS episodes found for this track');
+    n.noOtherPlays = !plays.some((p) => !byId.has(epId(...((/^\/shows\/([^/]+)\/episodes\/([^/]+)/.exec(p.path || '') || []).slice(1)))));
     plays.forEach((p) => {
       const m = /^\/shows\/([^/]+)\/episodes\/([^/]+)/.exec(p.path || '');
       if (!m) return;
@@ -294,7 +294,10 @@ const TrackWeb = (() => {
     if (!gNodes) return;
     const deg = epDegrees();
     nodes.forEach((d) => {
-      if (d.type === 'track') d.inWeb = deg.get(d.id) || 0;
+      if (d.type === 'track') {
+        d.inWeb = deg.get(d.id) || 0;
+        if (d.plays != null && d.inWeb > d.plays) d.plays = d.inWeb;   // search can lag behind brand-new episodes
+      }
       if (d.type === 'episode') {
         // bigger episode = more of its tracks are shared with other episodes in the web
         d.shared = links.filter((l) => l.kind !== 'show' && (l.source === d || l.target === d))
@@ -404,7 +407,7 @@ const TrackWeb = (() => {
     if (d.type === 'show') return paintShowInfo(box, d);
     const playsText = d.plays ? ` · played in ${d.plays >= 50 ? '50+' : d.plays} NTS episode${d.plays === 1 ? '' : 's'}` : '';
     // An episode node is one broadcast: say which, and offer the rest of the show
-    const inWebText = d.inWeb >= 2 ? ` · in ${d.inWeb} episodes here` : '';
+    const inWebText = d.inWeb >= 2 ? ` · in ${d.inWeb} episodes here` : d.expanded && d.noOtherPlays ? ' · not found in any other NTS episode' : '';
     const sub = el('p', 'trackweb__sub', d.type === 'track' ? `${d.artist}${playsText}${inWebText}`
       : `${d.date ? `Episode of ${d.date}` : 'Episode'}${d.trackCount ? ` · ${d.trackCount} tracks` : ''}${d.shared ? ` · ${d.shared} shared` : ''}`);
     const actions = el('div', 'trackweb__actions');
@@ -499,10 +502,17 @@ const TrackWeb = (() => {
     nodes = []; links = []; byId = new Map(); linkIds = new Set(); selected = null; rootId = null;
     if (gNodes) { gNodes.selectAll('*').remove(); gLinks.selectAll('*').remove(); svg.call(zoom.transform, d3.zoomIdentity); }
   }
-  function start(t) {
+  // origin (optional): the episode we know it's in { show, episode, title, date, offset }
+  function start(t, origin) {
     build(); center(); clear();
     const n = addNode({ id: trackId(t), type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id });
     rootId = n.id;
+    if (origin?.show && origin?.episode) {
+      const e = addNode({ id: epId(origin.show, origin.episode), type: 'episode', show: origin.show, episode: origin.episode,
+        title: origin.title || origin.show, date: origin.date || '', near: n.id });
+      addLink(n, e, { offset: origin.offset ?? null });
+      if (origin.offset != null) n.via = e.id;
+    }
     update();
     select(n);
     expandTrack(n);
@@ -573,8 +583,18 @@ const TrackWeb = (() => {
 
   host.querySelector('.trackweb__now').addEventListener('click', () => {
     const t = currentTrack();
-    if (t) start(t); else showSnack('Nothing with a track ID is playing right now');
+    if (t) start(t, currentOrigin(t)); else showSnack('Nothing with a track ID is playing right now');
   });
+  // The episode the current track is playing in
+  function currentOrigin(t) {
+    if (source === 'archive' && ArchivePlayer.state.episode) {
+      const ep = ArchivePlayer.state.episode;
+      return { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: t.offset ?? t.offset_estimate };
+    }
+    const r = live?.results?.[channel];
+    const info = r ? showInfo(r) : null;
+    return info?.episode ? { show: info.show, episode: info.episode, title: info.title, date: info.start ? fmtDate(info.start) : '' } : null;
+  }
 
   // The track you're hearing (archive track, or a live track ID)
   function currentTrack() {
@@ -587,7 +607,7 @@ const TrackWeb = (() => {
     start,
     startShow,
     // open with the current track if the web is empty
-    show() { build(); center(); if (!nodes.length) { const t = currentTrack(); if (t) start(t); else paintInfo(); } },
+    show() { build(); center(); if (!nodes.length) { const t = currentTrack(); if (t) start(t, currentOrigin(t)); else paintInfo(); } },
     get empty() { return !nodes.length; }
   };
 })();

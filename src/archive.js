@@ -292,13 +292,23 @@ const Archive = (() => {
   // Gives the episodes a track was played on and its tracklist entry there (with the
   // Deezer ID / ISRC for an exact cover, and its timestamp for "Play from"). Cached.
   const TrackInfo = (() => {
-    const KEY = 'trackInfo:v1';
+    const KEY = 'trackInfo:v2';
     let cache;
     try { cache = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { cache = {}; }
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {} };
     const inflight = new Map();
     const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
     const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1));
+
+    // Is a search result this track? Same title and an overlapping artist, or the same
+    // with artist and title swapped (it happens in hand-typed tracklists)
+    function sameTrack(x, t) {
+      const wantTitle = n(t.title), wantArtist = words(t.artist);
+      const artists = (x.artists || []).map((a) => a.name).join(' ');
+      const overlaps = (a, b) => !a.size || [...a].some((w) => b.has(w));
+      if (n(x.title) === wantTitle && overlaps(wantArtist, words(artists))) return true;
+      return n(artists) === wantTitle && overlaps(wantArtist, words(x.title));
+    }
 
     function find(t) {
       const key = `${n(t.artist)}|${n(t.title)}`;
@@ -309,15 +319,14 @@ const Archive = (() => {
         const wantTitle = n(t.title);
         const wantArtist = words(t.artist);
         const plays = (res.results || [])
-          .filter((x) => x.article_type === 'track' && n(x.title) === wantTitle &&
-            (!wantArtist.size || (x.artists || []).some((a) => [...words(a.name)].some((w) => wantArtist.has(w)))))
+          .filter((x) => x.article_type === 'track' && sameTrack(x, t))
           .map((x) => ({ path: x.article?.path, title: x.article?.title, date: x.local_date, uid: x.track_uid }))
           .filter((x, i, all) => parsePath(x.path)?.episode && all.findIndex((y) => y.path === x.path) === i);   // each episode once
         let match = null;
         if (plays[0]) {
           const ep = parsePath(plays[0].path);
           const tl = await api(`/api/v2/shows/${ep.show}/episodes/${ep.episode}/tracklist`).catch(() => ({ results: [] }));
-          const e = (tl.results || []).find((r) => r.uid === plays[0].uid) || (tl.results || []).find((r) => n(r.title) === wantTitle);
+          const e = (tl.results || []).find((r) => r.uid === plays[0].uid) || (tl.results || []).find((r) => n(r.title) === wantTitle || n(r.artist) === wantTitle);
           if (e) match = { show: ep.show, episode: ep.episode, title: plays[0].title, date: plays[0].date,
             offset: e.offset ?? e.offset_estimate, isrc_id: e.isrc_id, deezer_track_id: e.deezer_track_id };
         }
@@ -330,7 +339,7 @@ const Archive = (() => {
       return p;
     }
     // How many NTS episodes played this track (from one track search; 50 means 50+)
-    const COUNTS = 'trackCount:v1';
+    const COUNTS = 'trackCount:v2';
     let counts;
     try { counts = JSON.parse(localStorage.getItem(COUNTS)) || {}; } catch { counts = {}; }
     const countQueue = [];
@@ -344,8 +353,7 @@ const Archive = (() => {
           const wantTitle = n(job.t.title);
           const wantArtist = words(job.t.artist);
           const eps = new Set((res.results || [])
-            .filter((x) => x.article_type === 'track' && n(x.title) === wantTitle &&
-              (!wantArtist.size || (x.artists || []).some((a) => [...words(a.name)].some((w) => wantArtist.has(w)))))
+            .filter((x) => x.article_type === 'track' && sameTrack(x, job.t))
             .map((x) => x.article?.path).filter(Boolean));
           return eps.size;
         })().then((c) => {
@@ -380,7 +388,10 @@ const Archive = (() => {
     const save = el('button', 'mynts-btn');
     save.hidden = true;
     const web = el('button', 'mynts-btn', 'Open in Track web');
-    web.addEventListener('click', () => openTrackWeb({ artist: t.artist, title: t.title, isrc_id: current.origin?.isrc_id, deezer_track_id: current.origin?.deezer_track_id }));
+    web.addEventListener('click', () => {
+      const o = current.origin || MyNTS.originOf(t);
+      openTrackWeb({ artist: t.artist, title: t.title, isrc_id: o?.isrc_id, deezer_track_id: o?.deezer_track_id }, o);
+    });
     const copy = el('button', 'mynts-btn', 'Copy artist & title');
     copy.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
     actions.append(save, web, copy);

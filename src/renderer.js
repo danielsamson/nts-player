@@ -1283,10 +1283,10 @@ function setStageMode(mode) {
 }
 document.querySelectorAll('.stage__mode').forEach((b) => b.addEventListener('click', () => setStageMode(b.dataset.mode)));
 // Open the track web on a track (switches to the wide view if needed)
-function openTrackWeb(t) {
+function openTrackWeb(t, origin) {
   if (!window.matchMedia('(min-width: 720px)').matches) window.nts.setWide(true);
   setStageMode('web');
-  setTimeout(() => TrackWeb.start(t), 250);
+  setTimeout(() => TrackWeb.start(t, origin), 250);
 }
 
 // ---- Wide view: the stage ----

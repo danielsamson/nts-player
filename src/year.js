@@ -207,6 +207,89 @@ const Year = (() => {
     return svg.node();
   }
 
+  // ---- Stories: a headline, the numbers, one small chart ----
+  function storyCards(s) {
+    if (!s.stories?.length) return [card(`NTS in ${s.year}`, 'No stories yet', el('p', 'year__note', 'There isn’t enough of the year yet to tell its stories.'))];
+    return s.stories.map((st) => card(st.kicker, st.headline, storyViz(st.viz, s), el('p', 'year__story', st.body)));
+  }
+  function storyViz(v, s) {
+    const svgOf = (h) => d3.create('svg').attr('class', 'year__svg').attr('viewBox', `0 0 ${W} ${h}`);
+    if (v.type === 'waffle') {
+      const g = el('div', 'year__waffle');
+      for (let i = 0; i < 100; i++) g.append(el('span', i < v.value ? 'is-on' : ''));
+      return g;
+    }
+    if (v.type === 'leap') {
+      const d = el('div', 'year__leap');
+      const c = cover(v.t, 'small'); c.classList.add('year__cover--mid');
+      const nums = el('div', 'year__leapnums');
+      nums.append(el('span', 'year__leapfrom', `#${v.from}`), el('span', 'year__leaparrow', '→'), el('span', 'year__big', `#${v.to}`));
+      d.append(c, nums);
+      return d;
+    }
+    if (v.type === 'versus') {
+      const d = el('div', 'year__versus');
+      [v.a, v.b].forEach((x) => { const b = el('div', 'year__num'); b.append(el('span', 'year__big', String(x.value)), el('span', 'year__label', `${x.unit} · ${x.label}`), el('span', 'year__rowsub', x.note)); d.append(b); });
+      return d;
+    }
+    if (v.type === 'cover') { const c = cover(v.t); c.classList.add('year__cover--mid'); return c; }
+    if (v.type === 'tracks') { const l = el('div', 'year__list'); v.rows.forEach((t, i) => l.append(trackLine(t, i))); return l; }
+    if (v.type === 'bars' || v.type === 'decades') {
+      const rows = v.type === 'bars' ? v.rows.map((r) => ({ k: shortMonth(r.m), v: r.v, on: r.m === v.peak })) : v.rows.map(([d, c]) => ({ k: `${String(d).slice(2)}s`, v: c }));
+      const H = 160, B = 18;
+      const x = d3.scaleBand().domain(rows.map((r) => r.k)).range([0, W]).padding(0.2);
+      const y = d3.scaleLinear().domain([0, d3.max(rows, (r) => r.v)]).range([H - B, 6]);
+      const svg = svgOf(H);
+      svg.selectAll('rect').data(rows).join('rect').attr('class', (r) => `year__bar${r.on ? ' is-on' : ''}`).attr('x', (r) => x(r.k)).attr('width', x.bandwidth()).attr('y', (r) => y(r.v)).attr('height', (r) => H - B - y(r.v))
+        .append('title').text((r) => `${r.k}: ${r.v}`);
+      svg.selectAll('text').data(rows).join('text').attr('class', 'year__axis').attr('x', (r) => x(r.k) + x.bandwidth() / 2).attr('y', H - 5).attr('text-anchor', 'middle').text((r) => r.k);
+      return svg.node();
+    }
+    if (v.type === 'runs') {
+      const ROW = 24, H = v.rows.length * ROW + 20, L = 160;
+      const x = d3.scalePoint().domain(v.months).range([L + 8, W - 8]);
+      const svg = svgOf(H);
+      v.months.forEach((m) => svg.append('text').attr('class', 'year__axis').attr('x', x(m)).attr('y', H - 4).attr('text-anchor', 'middle').text(shortMonth(m).slice(0, 1)));
+      v.rows.forEach((r, i) => {
+        const yy = i * ROW + 12;
+        svg.append('text').attr('class', 'year__lifelabel').attr('x', 0).attr('y', yy + 4).text(r.t.title.slice(0, 26));
+        r.on.forEach((rk, j) => svg.append('circle').attr('class', rk ? 'year__lifedot' : 'year__emptydot').attr('cx', x(v.months[j])).attr('cy', yy).attr('r', rk ? 5 : 2).append('title').text(rk ? `${shortMonth(v.months[j])}: #${rk}` : shortMonth(v.months[j])));
+      });
+      return svg.node();
+    }
+    if (v.type === 'strip') {
+      const H = 90, start = Date.UTC(v.year, 0, 1), end = Date.UTC(v.year + 1, 0, 1);
+      const x = d3.scaleTime().domain([start, end]).range([10, W - 10]);
+      const svg = svgOf(H);
+      svg.append('line').attr('class', 'year__lifebar').attr('x1', 10).attr('x2', W - 10).attr('y1', 50).attr('y2', 50);
+      d3.range(12).forEach((i) => svg.append('text').attr('class', 'year__axis').attr('x', x(Date.UTC(v.year, i, 15))).attr('y', H - 6).attr('text-anchor', 'middle').text(shortMonth(`${v.year}-${String(i + 1).padStart(2, '0')}`).slice(0, 1)));
+      v.firsts.forEach((f, i) => svg.append('circle').attr('class', i === 0 ? 'year__stripfirst' : 'year__lifedot').attr('cx', x(f.d)).attr('cy', 50).attr('r', i === 0 ? 7 : 4).append('title').text(`${f.show}: ${new Date(f.d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })}`));
+      svg.append('text').attr('class', 'year__striplabel').attr('x', x(v.firsts[0].d)).attr('y', 30).attr('text-anchor', 'middle').text(`${v.firsts[0].show.slice(0, 28)} · first`);
+      return svg.node();
+    }
+    if (v.type === 'stream') {
+      const H = 220, B = 18;
+      const stack = d3.stack().keys(v.keys).offset(d3.stackOffsetWiggle).order(d3.stackOrderInsideOut)(v.rows);
+      const x = d3.scalePoint().domain(v.rows.map((r) => r.m)).range([0, W]);
+      const y = d3.scaleLinear().domain([d3.min(stack, (l) => d3.min(l, (p) => p[0])), d3.max(stack, (l) => d3.max(l, (p) => p[1]))]).range([H - B, 4]);
+      const area = d3.area().x((p) => x(p.data.m)).y0((p) => y(p[0])).y1((p) => y(p[1])).curve(d3.curveBasis);
+      const shade = d3.scaleLinear().domain([0, v.keys.length - 1]).range([0.95, 0.22]);
+      const svg = svgOf(H);
+      svg.selectAll('path').data(stack).join('path').attr('class', 'year__stream').attr('d', area).attr('fill', (l, i) => `rgba(255,255,255,${shade(i)})`)
+        .append('title').text((l) => l.key);
+      svg.selectAll('text.year__axis').data(v.rows).join('text').attr('class', 'year__axis').attr('x', (r) => x(r.m)).attr('y', H - 4).attr('text-anchor', 'middle').text((r) => shortMonth(r.m).slice(0, 1));
+      // name each band where it's widest
+      stack.forEach((l, i) => {
+        const p = l.reduce((b, q) => (q[1] - q[0] > b[1] - b[0] ? q : b), l[0]);
+        if (y(p[0]) - y(p[1]) < 11) return;
+        svg.append('text').attr('class', 'year__streamlabel').attr('x', Math.min(W - 40, Math.max(40, x(p.data.m)))).attr('y', (y(p[0]) + y(p[1])) / 2 + 3).attr('text-anchor', 'middle')
+          .attr('fill', shade(i) > 0.55 ? '#000' : '#fff').text(l.key);
+      });
+      return svg.node();
+    }
+    return el('div');
+  }
+
   // ---- the timeline: months side by side, top 8 each, lines following a track ----
   let tlMonths = [];
   async function timeline(year) {
@@ -271,12 +354,14 @@ const Year = (() => {
       if (!wrap.dataset.kept) setTimeout(() => { scroller.scrollLeft = scroller.scrollWidth; }, 30);   // newest at the right
     });
   }
-  let mode = 'cards';
+  let mode = 'cards', deck = { cards: [], stories: [] };
   function setMode(m) {
     mode = m;
     box.querySelectorAll('.year__mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
     box.classList.toggle('is-timeline', m === 'timeline');
-    if (m === 'timeline') timeline(y); else if (cards.length) show(at);
+    if (m === 'timeline') { timeline(y); return; }
+    cards = deck[m] || [];
+    if (cards.length) show(0);
   }
 
   function show(i) {
@@ -301,7 +386,7 @@ const Year = (() => {
     if (!box) {
       box = el('div', 'year');
       box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', `NTS in ${year}`);
-      box.innerHTML = '<div class="year__top"><select class="year__pick" aria-label="Year"></select><div class="year__modes"><button class="year__mode active" data-mode="cards">Cards</button><button class="year__mode" data-mode="timeline">Timeline</button></div><span class="year__count"></span><button class="year__close" aria-label="Close">×</button></div>'
+      box.innerHTML = '<div class="year__top"><select class="year__pick" aria-label="Year"></select><div class="year__modes"><button class="year__mode active" data-mode="cards">Cards</button><button class="year__mode" data-mode="stories">Stories</button><button class="year__mode" data-mode="timeline">Timeline</button></div><span class="year__count"></span><button class="year__close" aria-label="Close">×</button></div>'
         + '<button class="year__prev" aria-label="Previous">‹</button><div class="year__stage"></div><button class="year__next" aria-label="Next">›</button>';
       box.querySelector('.year__close').addEventListener('click', close);
       box.querySelectorAll('.year__mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
@@ -319,8 +404,9 @@ const Year = (() => {
     const s = await Chart.year(year);
     if (y !== year || !box) return;
     monthList = s?.monthList || [];
-    cards = s ? build(s) : [card(`NTS in ${year}`, 'Not ready yet', el('p', 'year__note', 'This year’s charts haven’t been worked out yet. They fill in a year at a time; try again tomorrow.'))];
-    if (mode === 'timeline') timeline(year); else show(0);
+    deck.stories = s ? storyCards(s) : [];
+    deck.cards = cards = s ? build(s) : [card(`NTS in ${year}`, 'Not ready yet', el('p', 'year__note', 'This year’s charts haven’t been worked out yet. They fill in a year at a time; try again tomorrow.'))];
+    if (mode === 'timeline') timeline(year); else { cards = deck[mode]?.length ? deck[mode] : deck.cards; show(0); }
   }
   function close() {
     if (!box) return;

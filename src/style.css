@@ -1418,3 +1418,23 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tl__more { align-self: center; height: var(--btn-m); padding: 0 12px; border: var(--rule); font-size: 12px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
 .tl__more:hover { background: var(--white); color: var(--black); }
 .tl__note { padding: 8px 24px 14px; }
+
+/* Stories */
+.year__story { font-size: 15px; line-height: 21px; color: var(--grey-1); }
+.year__waffle { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.year__waffle span { aspect-ratio: 1; background: var(--grey-4); }
+.year__waffle span.is-on { background: var(--grey-2); }
+.year__waffle span:not(.is-on) { background: var(--live); }
+.year__leap { display: flex; align-items: center; gap: 20px; }
+.year__cover--mid { width: 160px; height: 160px; flex: 0 0 160px; aspect-ratio: auto; }
+.year__leapnums { display: flex; align-items: baseline; gap: 10px; }
+.year__leapfrom { font-size: 26px; font-weight: 700; color: var(--grey-2); }
+.year__leaparrow { font-size: 26px; color: var(--live); }
+.year__versus { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.year__bar { fill: var(--grey-3); }
+.year__bar.is-on { fill: var(--live); }
+.year__emptydot { fill: var(--grey-4); }
+.year__stripfirst { fill: var(--live); }
+.year__striplabel { font: 700 10px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--white); text-transform: uppercase; }
+.year__stream { stroke: var(--black); stroke-width: 0.5; }
+.year__streamlabel { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; pointer-events: none; }

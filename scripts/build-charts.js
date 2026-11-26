@@ -6,7 +6,8 @@
 //   node scripts/build-charts.js [--out DIR] [periods...]
 //   periods: recent | 2026-10 | 2024-01..2024-12 | auto (default: recent, this month,
 //            and last month while it may still be settling) | backfill (the newest year
-//            back to 2016 that's still missing months)
+//            back to 2016 that's still missing months, or has them from an older version) |
+//            years (add release years to a few months that don't have them yet)
 //
 // For each period: the episodes broadcast in it (from nts.live's sitemap), their
 // tracklists (NTS API), and per track how many episodes and which shows played it.
@@ -16,6 +17,9 @@ const sitemap = require('../sitemap');
 
 const API = 'https://www.nts.live/api/v2';
 const KEEP_TRACKS = 2000;            // per file, most played first (enough to merge into a year)
+const VERSION = 2;                   // bump when files gain data: older ones are rebuilt a year at a time
+const DAY = 864e5;
+const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const JUNK = new Set(['id', 'unknown', 'untitled', 'tba', 'tbc', 'track id', 'unreleased', 'n a', 'na', 'various', 'various artists', 'unknown artist']);
 
@@ -64,10 +68,16 @@ async function build(period) {
 
   const showEps = new Map();
   const tracks = new Map();
+  const genres = new Map();            // genre -> episodes tagged with it
+  const artists = new Map();           // artist -> { name, tracks: Set, shows: Set }
   let plays = 0, read = 0;
   await pool(refs, 3, async (r) => {
     showEps.set(r.show, (showEps.get(r.show) || 0) + 1);
-    const tl = await get(`${API}/shows/${r.show}/episodes/${r.episode}/tracklist`);
+    const [tl, ep] = await Promise.all([
+      get(`${API}/shows/${r.show}/episodes/${r.episode}/tracklist`),
+      get(`${API}/shows/${r.show}/episodes/${r.episode}`)
+    ]);
+    for (const g of new Set((ep?.genres || []).map((x) => String(x.value || '').trim()).filter(Boolean))) genres.set(g, (genres.get(g) || 0) + 1);
     read++;
     if (read % 100 === 0) console.log(`  ${read} / ${refs.length}`);
     const seen = new Set();
@@ -79,9 +89,17 @@ async function build(period) {
       if (seen.has(k)) continue;                       // once per episode
       seen.add(k);
       let m = tracks.get(k);
-      if (!m) { m = { a: x.artist, t: x.title, e: 0, shows: new Set(), latest: null, first: r.d }; tracks.set(k, m); }
+      if (!m) { m = { a: x.artist, t: x.title, e: 0, shows: new Set(), firstBy: new Map(), latest: null, first: r.d }; tracks.set(k, m); }
       m.e++;
       m.shows.add(r.show);
+      if (!m.firstBy.has(r.show) || r.d < m.firstBy.get(r.show)) m.firstBy.set(r.show, r.d);
+      for (const name of splitArtists(x.artist)) {
+        const ak = n(name);
+        if (!ak || JUNK.has(ak)) continue;
+        let ar = artists.get(ak);
+        if (!ar) { ar = { name, tracks: new Set(), shows: new Set() }; artists.set(ak, ar); }
+        ar.tracks.add(t); ar.shows.add(r.show);
+      }
       m.first = Math.min(m.first, r.d);
       if (!m.latest || r.d > m.latest.d) m.latest = { s: r.show, ep: r.episode, o: x.offset ?? x.offset_estimate ?? null, d: r.d };
     }
@@ -107,28 +125,87 @@ async function build(period) {
   const realBusiest = busiest.filter(([s]) => !special(s));
   const realDebuts = debuts.filter((s) => !special(s));
   return {
+    v: VERSION,
     period, from, to: Math.min(to, now), generated: now, complete: to <= now,
     episodes: refs.length, shows: showEps.size, plays, uniqueTracks: tracks.size,
     showList,
-    // [artist, title, episodes, [show indexes], [latest show index, episode, offset, date], first played]
-    tracks: top.map((m) => [m.a, m.t, m.e, [...m.shows].map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first]),
+    // [artist, title, episodes, [show indexes], [latest show index, episode, offset, date], first played,
+    //  [day each of those shows first played it (days since 1970)]]
+    tracks: top.map((m) => { const ss = [...m.shows]; return [m.a, m.t, m.e, ss.map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first, ss.map((s) => Math.floor(m.firstBy.get(s) / DAY))]; }),
+    // genres by number of episodes tagged with them
+    genres: [...genres].sort((a, b) => b[1] - a[1]).slice(0, 60),
+    // artists with the most different tracks played (from every play): [name, tracks, [show indexes]]
+    artists: [...artists.values()].sort((a, b) => b.tracks.size - a.tracks.size || b.shows.size - a.shows.size).slice(0, 150)
+      .map((ar) => [ar.name, ar.tracks.size, [...ar.shows].map(si)]),
     busiest: realBusiest, debuts: realDebuts, names,
     // every show that broadcast, with its number of episodes (for the year's totals)
     showEps: [...showEps].sort((a, b) => b[1] - a[1])
   };
 }
 
+// ---- release years (MusicBrainz: the first release of each recording, not a reissue) ----
+// One request a second, as MusicBrainz asks; results cached in charts/years.json so a track
+// is only looked up once. A few months per run; gives up quietly if MusicBrainz is unreachable.
+const YEARS_PER_RUN = Number(process.env.YEARS_MONTHS) || 3, YEAR_TOP = 100;
+async function releaseYear(artist, title) {
+  const clean = (x) => String(x).replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/"/g, '').trim();
+  const q = `recording:"${clean(title)}" AND artist:"${clean(splitArtists(artist)[0] || artist)}"`;
+  const r = await fetch(`https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(q)}&fmt=json&limit=5`, { headers: { 'User-Agent': 'nts-player-charts/1.0', Accept: 'application/json' } });
+  if (r.status === 503) { await new Promise((res) => setTimeout(res, 3000)); return undefined; }   // busy: try another time
+  if (!r.ok) throw new Error(`MusicBrainz ${r.status}`);
+  const recs = ((await r.json()).recordings || []).filter((x) => x.score >= 90 && x['first-release-date']);
+  const years = recs.map((x) => parseInt(x['first-release-date'], 10)).filter((y) => y > 1900);
+  return years.length ? Math.min(...years) : 0;
+}
+async function fillYears() {
+  const dir = path.join(OUT, 'charts');
+  const cacheFile = path.join(dir, 'years.json');
+  let cache = {};
+  try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch {}
+  const todo = fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).sort().reverse()
+    .filter((f) => { try { const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); return d.v >= VERSION && !d.years; } catch { return false; } })
+    .slice(0, YEARS_PER_RUN);
+  for (const f of todo) {
+    const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    const years = {};
+    let i = 0, failed = false;
+    for (const t of d.tracks) {
+      if (t[2] < 2) continue;
+      if (i >= YEAR_TOP) break;
+      const k = `${n(t[0])}|${n(t[1])}`;
+      if (!(k in cache)) {
+        let y;
+        try { y = await releaseYear(t[0], t[1]); } catch (e) { console.log(`years: ${e.message}, stopping`); failed = true; break; }
+        await new Promise((res) => setTimeout(res, 1100));
+        if (y !== undefined) cache[k] = y;
+      }
+      if (cache[k]) years[i] = cache[k];
+      i++;
+    }
+    fs.writeFileSync(cacheFile, JSON.stringify(cache));
+    if (failed) return;
+    d.years = years;                    // chart row index -> first release year
+    fs.writeFileSync(path.join(dir, f), JSON.stringify(d));
+    console.log(`years: ${f} (${Object.keys(years).length} of ${i})`);
+  }
+}
+
 function periods() {
   const list = args.length ? args : ['auto'];
   const out = [];
   for (const p of list) {
+    if (p === 'years') continue;          // a separate step, after building
     if (p === 'auto') {
       const d = new Date();
       out.push('recent', ym(d));
       if (d.getUTCDate() <= 7) out.push(ym(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1))));   // last month may still be filling in
     } else if (p === 'backfill') {
       // the newest year (2016 on) still missing months: one year per run, so NTS isn't hit all at once
-      const have = new Set(fs.existsSync(path.join(OUT, 'charts')) ? fs.readdirSync(path.join(OUT, 'charts')).map((f) => f.slice(0, 7)) : []);
+      // months we have at the current version (older versions get rebuilt with the new data)
+      const dir = path.join(OUT, 'charts');
+      const have = new Set((fs.existsSync(dir) ? fs.readdirSync(dir) : []).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).filter((f) => {
+        try { return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).v >= VERSION; } catch { return false; }
+      }).map((f) => f.slice(0, 7)));
       const thisYear = new Date().getUTCFullYear();
       for (let y = thisYear; y >= 2016; y--) {
         const missing = [];
@@ -150,6 +227,7 @@ function periods() {
     if (!res.episodes) { console.log(`${p}: no episodes, skipped`); continue; }
     fs.writeFileSync(path.join(OUT, 'charts', `${p}.json`), JSON.stringify(res));
   }
+  if (args.includes('years')) await fillYears().catch((e) => console.log(`years: ${e.message}`));
   const months = fs.readdirSync(path.join(OUT, 'charts')).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).map((f) => f.slice(0, 7)).sort().reverse();
   fs.writeFileSync(path.join(OUT, 'charts', 'index.json'), JSON.stringify({ months, updated: Date.now() }));
   console.log(`index: ${months.length} months`);

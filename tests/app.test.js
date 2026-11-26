@@ -188,6 +188,9 @@ async function mockAccount() {
     await win.keyboard.press('ArrowRight');
     const track = await win.evaluate(() => document.querySelector('.year__track')?.textContent);
     expect(track === 'Sweetie' || track === 'See It Thru', `track of the year: ${track}`);
+    // stories: written headlines from the data
+    await win.click('.year__mode[data-mode="stories"]');
+    await waitFor(() => document.querySelector('.year__story'), null, { timeout: 10000, what: 'a story card' });
     // the timeline: a column per month
     await win.click('.year__mode[data-mode="timeline"]');
     await waitFor(() => document.querySelectorAll('.tl__col').length === 2, null, { timeout: 10000, what: 'the timeline' });

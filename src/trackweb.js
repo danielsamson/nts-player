@@ -790,7 +790,7 @@ const TrackWeb = (() => {
       const x = timed ? (sec) => (sec / durSec) * W - W / 2 : null;
       items.forEach((n, i) => {
         n.tx = timed ? x(n.fOffset) : i * 95 - ((items.length - 1) * 95) / 2;
-        n.ty = (i % 2 ? 1 : -1) * (i % 4 >= 2 ? 150 : 85);   // alternate above and below, two rows each
+        n.ty = rowY(n.fIndex ?? i);
       });
       const start = timed ? x(0) : (items[0]?.tx ?? 0) - 40;
       const end = timed ? x(durSec) : (items[items.length - 1]?.tx ?? 0) + 40;
@@ -820,6 +820,28 @@ const TrackWeb = (() => {
     sim.alpha(.6).restart();
     schedulePaint();
   }
+  // alternate above and below the axis, two rows each (by place in the tracklist)
+  const rowY = (i) => (i % 2 ? 1 : -1) * (i % 4 >= 2 ? 150 : 85);
+  // Tracks still to come in the episode: grey circles where they'll pop in. Click one to skip there.
+  function drawUpcoming() {
+    const a = ArchivePlayer.state;
+    const tracks = follow?.kind === 'archive' && tl?.timed ? (a.episode?.tracks || []).filter((t) => t.title) : [];
+    const ahead = tracks.map((t, i) => ({ t, i, off: t.offset ?? t.offset_estimate }))
+      .filter((u) => Number.isFinite(u.off) && !follow.shown.has(trackId(u.t)));
+    const sel = gAxis.selectAll('g.tw-ahead').data(ahead, (u) => trackId(u.t));
+    sel.exit().remove();
+    const en = sel.enter().append('g').attr('class', 'tw-ahead')
+      .on('click', (e, u) => { e.stopPropagation(); Archive.playFrom(follow.ep.show, follow.ep.episode, u.off); });
+    en.append('line').attr('class', 'tw-ahead__stem');
+    en.append('circle').attr('r', 7);
+    en.append('title');
+    en.merge(sel)
+      .attr('transform', (u) => `translate(${tl.x(u.off)},${rowY(u.i)})`)
+      .each(function (u) {
+        d3.select(this).select('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', -rowY(u.i));
+        d3.select(this).select('title').text(`Coming up at ${fmtOffset(u.off)}: ${u.t.artist} – ${u.t.title}. Click to skip to it`);
+      });
+  }
   function drawAxis(items) {
     gAxis.selectAll('line.tw-axis__line').data([0]).join('line').attr('class', 'tw-axis__line')
       .attr('x1', tl.start).attr('x2', tl.end).attr('y1', 0).attr('y2', 0);
@@ -831,6 +853,7 @@ const TrackWeb = (() => {
       .select('text').text((s) => fmtOffset(s));
     gAxis.selectAll('line.tw-stem').data(items, (d) => d.id).join('line').attr('class', 'tw-stem')
       .attr('x2', (d) => d.tx).attr('y2', 0).attr('x1', (d) => d.x).attr('y1', (d) => d.y);
+    drawUpcoming();
     movePlayhead();
   }
   // ---------- timeline: the same track in other episodes, lined up above ----------
@@ -977,7 +1000,7 @@ const TrackWeb = (() => {
       n.popDelay = Math.min(added, 20) * 60;     // several at once (seeking ahead): one after another
       if (!n.via) n.via = follow.ep.id;
       n.fOffset = t.offset ?? t.offset_estimate ?? null;
-      n.fIndex = follow.shown.size;
+      n.fIndex = i;            // its place in the tracklist (sets its row on the timeline)
       addLink(n, follow.ep, { offset: n.fOffset });
       added++;
     });

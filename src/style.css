@@ -1257,3 +1257,9 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-lane__track:hover .tw-lane__label, .tw-lane__track.is-anchor .tw-lane__label { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .tw-lane { animation: none; } }
 .trackweb__lanes-note { margin-top: 10px; font-size: 12px; line-height: 16px; color: var(--grey-2); }
+
+/* Timeline: tracks still to come */
+.tw-ahead { cursor: pointer; }
+.tw-ahead circle { fill: var(--black); stroke: var(--grey-3); stroke-width: 1; transition: stroke .2s, fill .2s; }
+.tw-ahead:hover circle { stroke: var(--white); fill: var(--grey-4); }
+.tw-ahead__stem { stroke: #262626; stroke-width: 1; stroke-dasharray: 2 3; }

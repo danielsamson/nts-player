@@ -99,7 +99,8 @@ point** in the episode you found it through (or choose another), open its detail
 puts the show in the middle and each track pops in around it as it plays, the current
 one pulsing red. It starts by itself when you open the track web while something plays;
 skip ahead and the tracks you skipped appear. Switch between **Web** and **Timeline**: the
-timeline lays the tracks out along the episode's running time, with a playhead. Click a
+timeline lays the tracks out along the episode's running time, with a playhead; tracks
+still to come show as grey circles (click one to skip to it). Click a
 track in the timeline and up to four other episodes that played it appear above, each
 lined up so that track sits right above it: see what other DJs played around it, and
 click any of their tracks to play it from there.

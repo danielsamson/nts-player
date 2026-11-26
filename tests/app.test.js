@@ -190,6 +190,10 @@ async function mockAccount() {
     const before = await win.evaluate(() => document.querySelectorAll('.tw-node--track').length);
     await win.click('#nextTrack');
     await waitFor((n) => document.querySelectorAll('.tw-node--track').length > n, before, { timeout: 30000, what: 'the next track to pop in' });
+    // the timeline view: tracks along the episode, with a playhead
+    await win.click('.trackweb__layout-btn[data-layout="timeline"]');
+    await waitFor(() => document.querySelector('.trackweb__svg.is-timeline') && document.querySelector('.tw-playhead') && document.querySelectorAll('.tw-stem').length > 2, null, { timeout: 10000, what: 'the timeline' });
+    await win.click('.trackweb__layout-btn[data-layout="web"]');
     await win.click('.trackweb__follow');
     await win.click('.stage__mode[data-mode="now"]');
     await win.click('#expandBtn');

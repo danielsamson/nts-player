@@ -42,7 +42,7 @@ const TrackWeb = (() => {
     m.frequency && m.frequency !== 'none' ? m.frequency : '', m.featured ? '★ featured by NTS' : ''].filter(Boolean).join(' · ');
 
   let nodes = [], links = [], byId = new Map(), linkIds = new Set();
-  let selected = null, rootId = null, sim = null, svg, gZoom, gLinks, gNodes, zoom;
+  let selected = null, rootId = null, sim = null, svg, gZoom, gLinks, gNodes, gAxis, zoom;
   let zoomed = false, hovered = null;
   let built = false;
   let holdTimer = null;
@@ -195,6 +195,7 @@ const TrackWeb = (() => {
     defs.append('clipPath').attr('id', 'tw-circle').attr('clipPathUnits', 'objectBoundingBox')
       .append('circle').attr('cx', .5).attr('cy', .5).attr('r', .5);
     gZoom = svg.append('g');
+    gAxis = gZoom.append('g').attr('class', 'tw-axis');      // timeline view: time axis, stems, playhead
     gLinks = gZoom.append('g').attr('class', 'tw-links');
     gNodes = gZoom.append('g').attr('class', 'tw-nodes');
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
@@ -202,7 +203,8 @@ const TrackWeb = (() => {
       if (e.sourceEvent && follow) follow.userZoomed = true;      // you zoomed: stop zooming for you
       zoomed = e.transform.k > 1.3;
       // names stay close to the same size on screen, so zooming in makes room for more of them
-      const fs = 9 / Math.pow(Math.max(1, e.transform.k), .8);
+      // (in the timeline, also when zoomed out to fit the whole episode)
+      const fs = 9 / Math.pow(timelineOn() ? Math.max(.45, e.transform.k) : Math.max(1, e.transform.k), .8);
       svg.node().style.setProperty('--tw-fs', `${fs}px`);
       svg.node().style.setProperty('--tw-sw', `${fs * .55}px`);
       cullLabelsSoon();
@@ -386,6 +388,7 @@ const TrackWeb = (() => {
       .classed('is-popular', (d) => d.plays >= 3)
       .classed('is-shared', (d) => d.type === 'track' && d.inWeb >= 2)
       .classed('is-playing', (d) => !!follow && d.id === follow.playingId)
+      .classed('is-off', (d) => timelineOn() && d !== follow.ep && !follow.shown.has(d.id))
       .classed('is-new', (d) => !!d.popAt && Date.now() - d.popAt < 900)
       .style('--pop-delay', (d) => (d.popDelay ? `${d.popDelay}ms` : null))
       .classed('is-followed', (d) => d.type !== 'track' && typeof Following !== 'undefined' && Following.has(d.show))
@@ -429,6 +432,7 @@ const TrackWeb = (() => {
 
   let lastCull = 0;
   function ticked() {
+    if (timelineOn()) gAxis.selectAll('line.tw-stem').attr('x1', (d) => d.x).attr('y1', (d) => d.y);
     if (Date.now() - lastCull > 700) { lastCull = Date.now(); cullLabels(); }
     cullLabelsSoon();     // and once more when the movement stops, from where nodes ended up
     gLinks.selectAll('line')
@@ -737,6 +741,7 @@ const TrackWeb = (() => {
     followBtn.classList.add('mynts-btn--on'); followBtn.textContent = 'Following'; followBtn.setAttribute('aria-pressed', 'true');
     update();
     followTick(true);
+    applyLayout(true);
     paintInfo();
     return true;
   }
@@ -745,7 +750,96 @@ const TrackWeb = (() => {
     if (follow.ep) { follow.ep.fx = null; follow.ep.fy = null; }
     follow = null;
     followBtn.classList.remove('mynts-btn--on'); followBtn.textContent = 'Follow along'; followBtn.setAttribute('aria-pressed', 'false');
+    applyLayout();
     schedulePaint();
+  }
+
+  // ---------- layouts: web, or a timeline of the episode ----------
+  let layout = (() => { try { return localStorage.getItem('trackwebLayout') === 'timeline' ? 'timeline' : 'web'; } catch { return 'web'; } })();
+  const layoutBox = host.querySelector('.trackweb__layout');
+  layoutBox.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-layout]');
+    if (!b || b.dataset.layout === layout) return;
+    layout = b.dataset.layout;
+    try { localStorage.setItem('trackwebLayout', layout); } catch {}
+    if (follow) follow.userZoomed = false;
+    applyLayout(true);
+  });
+  const timelineOn = () => !!follow && layout === 'timeline';
+  // where a followed track sits on the timeline
+  let tl = null;     // { x: sec -> x, start, end, timed, dur }
+  function timelineItems() { return nodes.filter((n) => follow.shown.has(n.id)).sort((a, b) => a.fIndex - b.fIndex); }
+  function applyLayout(refit) {
+    layoutBox.hidden = !follow;
+    layoutBox.querySelectorAll('[data-layout]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.layout === layout);
+      b.setAttribute('aria-selected', String(b.dataset.layout === layout));
+    });
+    if (!sim) return;
+    svg.classed('is-timeline', timelineOn());
+    if (timelineOn()) {
+      const items = timelineItems();
+      const timed = items.length > 0 && items.every((n) => Number.isFinite(n.fOffset));
+      const durSec = follow.kind === 'archive' && ArchivePlayer.state.duration ? ArchivePlayer.state.duration / 1000
+        : Math.max(600, ...items.map((n) => (n.fOffset || 0) + 300));
+      const W = Math.max(900, (durSec / 60) * 16);          // 16 px a minute
+      const x = timed ? (sec) => (sec / durSec) * W - W / 2 : null;
+      items.forEach((n, i) => {
+        n.tx = timed ? x(n.fOffset) : i * 95 - ((items.length - 1) * 95) / 2;
+        n.ty = (i % 2 ? 1 : -1) * (i % 4 >= 2 ? 150 : 85);   // alternate above and below, two rows each
+      });
+      const start = timed ? x(0) : (items[0]?.tx ?? 0) - 40;
+      const end = timed ? x(durSec) : (items[items.length - 1]?.tx ?? 0) + 40;
+      tl = { x, start, end, timed, dur: durSec };
+      follow.ep.fx = start - 80; follow.ep.fy = 0;
+      sim.force('x', d3.forceX((d) => d.tx ?? 0).strength((d) => (d.tx != null ? .4 : 0)));
+      sim.force('y', d3.forceY((d) => d.ty ?? 0).strength((d) => (d.ty != null ? .4 : 0)));
+      sim.force('link').strength(0);
+      sim.force('charge').strength(-30);
+      drawAxis(items);
+      if (refit || !follow.userZoomed) {
+        const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
+        const span = end - (start - 80) + 140;
+        const k = Math.max(0.3, Math.min(1.6, Math.min(r.width / span, r.height / 420)));
+        const cx = (start - 80 + end) / 2;
+        svg.transition().duration(refit ? 600 : 900).call(zoom.transform, d3.zoomIdentity.scale(k).translate(-cx, 0));
+      }
+    } else {
+      tl = null;
+      nodes.forEach((n) => { n.tx = undefined; n.ty = undefined; });
+      sim.force('x', d3.forceX(0).strength(.03));
+      sim.force('y', d3.forceY(0).strength(.03));
+      sim.force('link').strength((l) => (l.kind === 'show' ? .3 : .5));
+      sim.force('charge').strength(-340);
+      if (follow) { follow.ep.fx = 0; follow.ep.fy = 0; }
+      gAxis.selectAll('*').remove();
+      if (follow && refit && !follow.userZoomed) {
+        const k = Math.max(0.9, Math.min(2, 2.2 - Math.sqrt(follow.shown.size) * 0.22));
+        svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity.scale(k));
+      }
+    }
+    sim.alpha(.6).restart();
+    schedulePaint();
+  }
+  function drawAxis(items) {
+    gAxis.selectAll('line.tw-axis__line').data([0]).join('line').attr('class', 'tw-axis__line')
+      .attr('x1', tl.start).attr('x2', tl.end).attr('y1', 0).attr('y2', 0);
+    // a tick every 10 minutes (15 for long episodes)
+    const every = tl.dur > 7200 ? 900 : 600;
+    const ticks = tl.timed ? d3.range(0, tl.dur + 1, every) : [];
+    gAxis.selectAll('g.tw-tick').data(ticks).join((en) => { const g = en.append('g').attr('class', 'tw-tick'); g.append('line').attr('y1', -4).attr('y2', 4); g.append('text').attr('y', 16); return g; })
+      .attr('transform', (s) => `translate(${tl.x(s)},0)`)
+      .select('text').text((s) => fmtOffset(s));
+    gAxis.selectAll('line.tw-stem').data(items, (d) => d.id).join('line').attr('class', 'tw-stem')
+      .attr('x2', (d) => d.tx).attr('y2', 0).attr('x1', (d) => d.x).attr('y1', (d) => d.y);
+    movePlayhead();
+  }
+  function movePlayhead() {
+    if (!tl) return;
+    const show = tl.timed && follow.kind === 'archive';
+    const x = show ? tl.x(ArchivePlayer.state.position / 1000) : 0;
+    gAxis.selectAll('line.tw-playhead').data(show ? [0] : []).join('line').attr('class', 'tw-playhead')
+      .attr('y1', -190).attr('y2', 190).style('transform', `translateX(${x}px)`);
   }
   // The tracks heard so far, oldest first, and which one is playing
   function heardSoFar() {
@@ -780,14 +874,17 @@ const TrackWeb = (() => {
       n.popAt = Date.now();
       n.popDelay = Math.min(added, 20) * 60;     // several at once (seeking ahead): one after another
       if (!n.via) n.via = follow.ep.id;
-      addLink(n, follow.ep, { offset: t.offset ?? t.offset_estimate ?? null });
+      n.fOffset = t.offset ?? t.offset_estimate ?? null;
+      n.fIndex = follow.shown.size;
+      addLink(n, follow.ep, { offset: n.fOffset });
       added++;
     });
     // a small web starts close up and zooms out gently as it grows
-    if (added && !follow.userZoomed) {
+    if (added && !follow.userZoomed && !timelineOn()) {
       const k = Math.max(0.9, Math.min(2, 2.2 - Math.sqrt(follow.shown.size) * 0.22));
       svg.transition().duration(initial ? 0 : 900).call(zoom.transform, d3.zoomIdentity.scale(k));
     }
+    if (timelineOn()) { if (added) applyLayout(initial); else movePlayhead(); }
     const playingId = idx >= 0 && tracks[idx] ? trackId(tracks[idx]) : null;
     const changed = added || playingId !== follow.playingId;
     follow.playingId = playingId;

@@ -43,7 +43,7 @@ async function pool(items, size, fn) {
   }));
 }
 // NTS's catch-all slots (one-off guests, yearly dance specials): not shows in their own right
-const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests)$/;
+const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests|supporter-radio.*)$/;
 
 let firstEpisode = null;              // show -> date of its first episode (whole sitemap)
 async function debutsOf() {
@@ -102,13 +102,17 @@ async function build(period) {
     if (sh) names[s] = [sh.name || s, sh.media?.picture_small || '', sh.location_long || ''];
   });
 
+  // Supporter Radio specials: addresses change, the name doesn't
+  const special = (s) => /^supporter radio/i.test((names[s] || [])[0] || '');
+  const realBusiest = busiest.filter(([s]) => !special(s));
+  const realDebuts = debuts.filter((s) => !special(s));
   return {
     period, from, to: Math.min(to, now), generated: now, complete: to <= now,
     episodes: refs.length, shows: showEps.size, plays, uniqueTracks: tracks.size,
     showList,
     // [artist, title, episodes, [show indexes], [latest show index, episode, offset, date], first played]
     tracks: top.map((m) => [m.a, m.t, m.e, [...m.shows].map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first]),
-    busiest, debuts, names,
+    busiest: realBusiest, debuts: realDebuts, names,
     // every show that broadcast, with its number of episodes (for the year's totals)
     showEps: [...showEps].sort((a, b) => b[1] - a[1])
   };

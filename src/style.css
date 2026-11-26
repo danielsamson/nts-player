@@ -1348,4 +1348,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .year__celltitle { font-size: 12px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .year__shows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .year__show { display: flex; flex-direction: column; gap: 4px; text-align: left; font-size: 12px; line-height: 15px; font-weight: 700; text-transform: uppercase; }
-.year__show img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--grey-4); }
+.year__showpic { width: 100%; aspect-ratio: 1; background: var(--grey-4); overflow: hidden; }
+.year__showpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* big covers fit the window, so a card doesn't need scrolling */
+.year__card > .year__cover { width: min(100%, 42vh); align-self: center; }

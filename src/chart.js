@@ -6,7 +6,9 @@
 const Chart = (() => {
   const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const showName = (alias) => alias.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests)$/;
+  const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests|supporter-radio.*)$/;
+  // ...and NTS's Supporter Radio specials, whose addresses change but whose names don't
+  const catchAll = (alias, names) => CATCH_ALL.test(alias) || /^supporter radio/i.test((names?.[alias] || [])[0] || '');
   const mem = new Map();          // period -> result
   const loading = new Map();
 
@@ -104,15 +106,16 @@ const Chart = (() => {
       for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) { const k = `${s[i]}|${s[j]}`; pairs.set(k, (pairs.get(k) || 0) + 1); }
     }
     const topPair = [...pairs].sort((a, b) => b[1] - a[1])[0];
-    const busiest = [...showEps].filter(([s]) => !CATCH_ALL.test(s)).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    const busiest = [...showEps].filter(([s]) => !catchAll(s, names)).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([show, count]) => ({ show, count, name: (names[show] || [])[0] || showName(show), img: (names[show] || [])[1] || '' }));
     const peak = files.slice().sort((a, b) => b.episodes - a.episodes)[0];
     all.forEach((m) => { delete m.showSet; });
+    const realDebuts = debuts.filter((d) => !catchAll(d.show, names));
     return {
       year: y, months: files.length, complete: files.length === 12 && files.every((f) => f.complete),
       episodes, plays, shows: showEps.size, uniqueTracks: files.reduce((s, f) => s + f.uniqueTracks, 0),
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
-      debuts: debuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
+      debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: topPair[0].split('|')[0], b: topPair[0].split('|')[1], count: topPair[1], names } : null,
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null
     };

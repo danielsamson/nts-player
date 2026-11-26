@@ -6,6 +6,11 @@ const Year = (() => {
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const monthName = (m, style = 'long') => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: style, timeZone: 'UTC' });
   const fmt = (x) => Number(x).toLocaleString();
+  const showPic = (src, cls) => {
+    const wrap = el('div', cls);
+    if (src) { const im = el('img'); im.alt = ''; im.addEventListener('error', () => im.remove()); im.src = src; wrap.append(im); }
+    return wrap;
+  };
   const plural = (x, word) => `${fmt(x)} ${word}${x === 1 ? '' : 's'}`;
 
   function cover(t, size = 'high') {
@@ -75,14 +80,14 @@ const Year = (() => {
     // 8: busiest shows
     if (s.busiest.length) {
       const l = el('div', 'year__list');
-      s.busiest.forEach((b, i) => { const r = el('div', 'year__row'); const c = el('div', 'year__cover year__cover--small has-img'); const im = el('img'); im.alt = ''; if (b.img) im.src = b.img; c.append(im); const tx = el('div', 'year__rowtext'); tx.append(el('span', 'year__rowtitle', b.name), el('span', 'year__rowsub', plural(b.count, 'episode'))); r.append(el('span', 'year__rank', String(i + 1)), c, tx); r.addEventListener('click', () => { close(); Archive.showShow(b.show); }); l.append(r); });
+      s.busiest.forEach((b, i) => { const r = el('div', 'year__row'); const c = showPic(b.img, 'year__cover year__cover--small has-img'); const tx = el('div', 'year__rowtext'); tx.append(el('span', 'year__rowtitle', b.name), el('span', 'year__rowsub', plural(b.count, 'episode'))); r.append(el('span', 'year__rank', String(i + 1)), c, tx); r.addEventListener('click', () => { close(); Archive.showShow(b.show); }); l.append(r); });
       out.push(card('Busiest shows', 'Most episodes', l));
     }
     // 9: new shows
     if (s.debuts.length) {
       const g = el('div', 'year__shows');
-      s.debuts.slice(0, 12).forEach((d) => { const b = el('button', 'year__show'); const im = el('img'); im.alt = ''; if (d.img) im.src = d.img; b.append(im, el('span', null, d.name)); b.addEventListener('click', () => { close(); Archive.showShow(d.show); }); g.append(b); });
-      out.push(card('New on NTS', `${plural(s.debuts.length, 'new show')}`, g));
+      s.debuts.slice(0, 9).forEach((d) => { const b = el('button', 'year__show'); b.append(showPic(d.img, 'year__showpic'), el('span', null, d.name)); b.addEventListener('click', () => { close(); Archive.showShow(d.show); }); g.append(b); });
+      out.push(card('New on NTS', `${plural(s.debuts.length, 'new show')}`, g, s.debuts.length > 9 ? el('p', 'year__note', `And ${fmt(s.debuts.length - 9)} more.`) : null));
     }
     // 10: shared taste
     if (s.pair && s.pair.count >= 3) {

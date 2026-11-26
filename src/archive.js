@@ -292,13 +292,15 @@ const Archive = (() => {
   // Gives the episodes a track was played on and its tracklist entry there (with the
   // Deezer ID / ISRC for an exact cover, and its timestamp for "Play from"). Cached.
   const TrackInfo = (() => {
-    const KEY = 'trackInfo:v2';
+    const KEY = 'trackInfo:v3';
     let cache;
     try { cache = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { cache = {}; }
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {} };
     const inflight = new Map();
     const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-    const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1));
+    // little words don't count as an artist match ("The Haunting" isn't "The Invaders")
+    const STOP = new Set(['the', 'and', 'of', 'de', 'la', 'le', 'el', 'les', 'los', 'las', 'der', 'die', 'das', 'und', 'et', 'feat', 'ft', 'with', 'vs', 'his', 'her', 'their', 'orchestra', 'band', 'trio', 'quartet']);
+    const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1 && !STOP.has(w)));
 
     // Is a search result this track? Same title and an overlapping artist, or the same
     // with artist and title swapped (it happens in hand-typed tracklists)
@@ -315,7 +317,7 @@ const Archive = (() => {
       if (cache[key]) return Promise.resolve(cache[key]);
       if (inflight.has(key)) return inflight.get(key);
       const p = (async () => {
-        const res = await api(`/api/v2/search?q=${enc(`${t.artist} ${t.title}`.slice(0, 200))}&version=2&offset=0&limit=20&types[]=track`);
+        const res = await api(`/api/v2/search?q=${enc(`${t.artist} ${t.title}`.slice(0, 200))}&version=2&offset=0&limit=50&types[]=track`);
         const wantTitle = n(t.title);
         const wantArtist = words(t.artist);
         const plays = (res.results || [])
@@ -330,7 +332,7 @@ const Archive = (() => {
           if (e) match = { show: ep.show, episode: ep.episode, title: plays[0].title, date: plays[0].date,
             offset: e.offset ?? e.offset_estimate, isrc_id: e.isrc_id, deezer_track_id: e.deezer_track_id };
         }
-        const info = { plays: plays.slice(0, 8), match };
+        const info = { plays: plays.slice(0, 16), total: plays.length, match };
         cache[key] = info;
         save();
         return info;
@@ -339,7 +341,7 @@ const Archive = (() => {
       return p;
     }
     // How many NTS episodes played this track (from one track search; 50 means 50+)
-    const COUNTS = 'trackCount:v2';
+    const COUNTS = 'trackCount:v3';
     let counts;
     try { counts = JSON.parse(localStorage.getItem(COUNTS)) || {}; } catch { counts = {}; }
     const countQueue = [];
@@ -369,7 +371,7 @@ const Archive = (() => {
       return new Promise((resolve) => { countQueue.push({ t, key, resolve }); pumpCounts(); });
     }
 
-    return { find, count };
+    return { find, count, sameTrack };
   })();
 
   // ---- Track page: big cover, details, links, where it was played ----
@@ -1042,6 +1044,8 @@ const Archive = (() => {
   return {
     findTrack: (t) => TrackInfo.find(t),
     trackCount: (t) => TrackInfo.count(t),
+    // is a tracklist row ({ artist, title }) this track? (tolerates swapped tags)
+    sameTrack: (row, t) => TrackInfo.sameTrack({ title: row.title, artists: [{ name: row.artist }] }, t),
     // Play an episode from a position (seconds)
     async playFrom(show, episode, offsetSec = 0) {
       try {

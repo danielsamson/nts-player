@@ -465,14 +465,19 @@ const TrackWeb = (() => {
 
   // Episodes this track can be played from (with its position), the one we found it
   // through first; for a searched-for track, its latest episode
+  // Every episode in the web that played this track. The time comes from the episode's
+  // tracklist: known when we expanded that episode, otherwise looked up (lookupOffsets).
+  // offset null = still looking; NaN = the tracklist gives no time (plays from the start).
   function playOptions(t) {
     const opts = [];
     for (const l of links) {
       if (l.kind === 'show') continue;
       const other = l.source.id === t.id ? l.target : l.target.id === t.id ? l.source : null;
-      if (other?.type === 'episode' && l.offset != null) opts.push({ ep: other, offset: l.offset });
+      if (other?.type === 'episode') opts.push({ ep: other, offset: l.offset ?? null, link: l });
     }
-    opts.sort((a, b) => (b.ep.id === t.via) - (a.ep.id === t.via));
+    // the episode we found it through first, then ones with a known time
+    const rank = (o) => (o.ep.id === t.via ? 2 : 0) + (Number.isFinite(o.offset) ? 1 : 0);
+    opts.sort((a, b) => rank(b) - rank(a));
     if (!opts.length && t.viaMatch?.offset != null) {
       const m = t.viaMatch;
       opts.push({ ep: { show: m.show, episode: m.episode, title: m.title, date: m.date }, offset: m.offset });
@@ -480,6 +485,23 @@ const TrackWeb = (() => {
     return opts;
   }
   const playableEpisode = (t) => playOptions(t)[0] || null;
+
+  const tracklists = new Map();   // episode id -> Promise of its tracklist
+  const sameTrack = (x, t) => trackId(x) === t.id || trackId({ artist: x.title, title: x.artist }) === t.id;
+  async function lookupOffsets(t) {
+    const missing = playOptions(t).filter((o) => o.offset == null && o.link);
+    if (!missing.length) return false;
+    await Promise.all(missing.map(async (o) => {
+      const id = o.ep.id;
+      if (!tracklists.has(id)) tracklists.set(id, window.nts.api(`/api/v2/shows/${o.ep.show}/episodes/${o.ep.episode}/tracklist`).catch(() => null));
+      const tl = await tracklists.get(id);
+      const rows = tl?.results || [];
+      const hit = rows.find((x) => x.title && sameTrack(x, t)) || rows.find((x) => x.title && Archive.sameTrack(x, t));
+      const off = hit ? (hit.offset ?? hit.offset_estimate) : null;
+      o.link.offset = off != null ? off : NaN;
+    }));
+    return true;
+  }
 
   function paintInfo() {
     const box = host.querySelector('.trackweb__info');
@@ -504,18 +526,25 @@ const TrackWeb = (() => {
       if (p) {
         const play = el('button', 'episode-play trackweb__play');
         let choice = p;
-        const paintPlay = () => { play.textContent = `▶ Play from ${fmtOffset(choice.offset)}`; };
+        const paintPlay = () => {
+          play.disabled = choice.offset == null;
+          play.textContent = choice.offset == null ? '▶ Finding the time…'
+            : Number.isFinite(choice.offset) ? `▶ Play from ${fmtOffset(choice.offset)}` : '▶ Play episode';
+          play.title = Number.isFinite(choice.offset) ? '' : 'This episode’s tracklist has no times, so it plays from the start';
+        };
         paintPlay();
-        play.addEventListener('click', () => Archive.playFrom(choice.ep.show, choice.ep.episode, choice.offset));
+        play.addEventListener('click', () => Archive.playFrom(choice.ep.show, choice.ep.episode, Number.isFinite(choice.offset) ? choice.offset : 0));
+        // times we don't know yet: look them up, then redraw this panel
+        if (opts.some((o) => o.offset == null)) lookupOffsets(d).then((changed) => { if (changed && selected === d) paintInfo(); });
         actions.append(play);
         if (opts.length > 1) {
           const pick = el('select', 'trackweb__pick');
           pick.setAttribute('aria-label', 'Episode to play it from');
-          opts.forEach((o, i) => { const op = el('option', null, `in ${o.ep.title}${o.ep.date ? ' · ' + o.ep.date : ''}`); op.value = i; pick.append(op); });
+          opts.forEach((o, i) => { const op = el('option', null, `in ${o.ep.title}${o.ep.date ? ' · ' + o.ep.date : ''}${Number.isNaN(o.offset) ? ' (no time listed)' : ''}`); op.value = i; pick.append(op); });
           pick.addEventListener('change', () => { choice = opts[Number(pick.value)]; paintPlay(); });
           actions.append(pick);
         } else {
-          actions.append(el('span', 'trackweb__in', `in ${p.ep.title}${p.ep.date ? ' · ' + p.ep.date : ''}`));
+          actions.append(el('span', 'trackweb__in', `in ${p.ep.title}${p.ep.date ? ' · ' + p.ep.date : ''}${Number.isNaN(p.offset) ? ' · no time listed, plays from the start' : ''}`));
         }
       }
       if (!d.expanded) actions.append(btn(d.loading ? 'Finding episodes…' : 'Expand: other episodes', () => expand(d)));
@@ -524,7 +553,7 @@ const TrackWeb = (() => {
       if (p && supporter) {
         actions.append(btn('Save to My NTS', async (b) => {
           b.classList.add('mynts-btn--busy');
-          const res = await MyNTS.toggleTrack(p.ep.show, p.ep.episode, d, true, { show: p.ep.show, episode: p.ep.episode, title: p.ep.title, date: p.ep.date, offset: p.offset });
+          const res = await MyNTS.toggleTrack(p.ep.show, p.ep.episode, d, true, { show: p.ep.show, episode: p.ep.episode, title: p.ep.title, date: p.ep.date, offset: Number.isFinite(p.offset) ? p.offset : null });
           b.classList.remove('mynts-btn--busy');
           if (res && !res.error) { b.textContent = 'Saved'; b.classList.add('mynts-btn--on'); }
         }));

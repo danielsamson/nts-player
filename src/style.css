@@ -1151,3 +1151,18 @@ body.playing .channel .track__time { color: var(--grey-3); }
 /* Track labels only where they help: root, selected, expanded, hovered, or zoomed in */
 .tw-node--track:not(.is-root):not(.is-selected):not(.is-expanded):not(.is-popular):not(:hover) .tw-label { display: none; }
 .trackweb__svg.is-zoomed .tw-node--track .tw-label { display: block; }
+
+/* Track web: shows, shared tracks, followed shows */
+.tw-node--show .tw-shape { fill: var(--grey-4); }
+.tw-node--show .tw-ring { stroke: var(--white); stroke-width: 1.5; }
+.tw-life { fill: none; stroke: var(--grey-3); }
+.tw-star { font: 700 11px/1 sans-serif; fill: var(--white); paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
+.tw-link--show { stroke: var(--grey-3); stroke-dasharray: 3 3; }
+.tw-node--track.is-shared .tw-ring { stroke: var(--white); stroke-width: 1.5; }
+.tw-node--track.is-shared .tw-label { display: block !important; }
+.tw-node.is-followed .tw-ring, .tw-node.is-followed .tw-life { stroke: var(--live); }
+.trackweb__meta { font-size: 12px; line-height: 16px; color: var(--grey-2); margin: -6px 0 10px; }
+.trackweb__group { padding: 8px 10px 4px; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); border-bottom: 1px solid var(--grey-4); }
+.trackweb__top { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; }
+.trackweb__top-label { width: 100%; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); }
+.trackweb__info { max-height: 40%; overflow-y: auto; }

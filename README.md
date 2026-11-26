@@ -92,6 +92,12 @@ means "this episode played this track". Click a node to expand it: a track shows
 episodes that played it, an episode shows its tracklist. Pick a track to play it from that
 point in the episode, open its details, save it, or start a new web from it.
 
+Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
+or **Explore this show** on any episode, to bring in its episodes six at a time: tracks
+shared between them light up, and the show's panel lists the ones it played most. Shows
+carry their stand-in popularity: how many episodes, since when, how often, ★ if featured
+by NTS, and a red outline if you follow them.
+
 ### Wide view
 
 The thin strip is the default. The expand button in the header (or a wider window) adds

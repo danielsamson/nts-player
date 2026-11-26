@@ -40,12 +40,16 @@ schedule, history and lists.
 
 - **Most played on NTS** on Home: the tracks played by the most different shows in the
   last 30 days, worked out from every episode's tracklist (NTS doesn't publish a chart).
-  **See all** for the top 100 and earlier months. Click a track for its details or press
-  play to hear it in the latest episode that played it.
+  **See all** for the top 100 and earlier months. Each track has a small line of how many
+  shows played it each month over the past year, and its movement since last month
+  (▲, ▼ or NEW). Click a track for its details or press play to hear it in the latest
+  episode that played it.
 - **NTS in 2026:** the year on NTS in tracks, as full-window cards: the year in numbers,
   track of the year, the top 10, artist of the year, number one month by month,
-  breakouts, tracks played all year, the busiest and new shows, and the two shows with
-  the most tracks in common. Pick earlier years too.
+  how the top 10 moved month by month, each track's lifespan, breakouts, tracks played all
+  year, the busiest and new shows, and a network of shows that played the same tracks.
+  Switch to **Timeline** for the months side by side, each month's top 8 with lines
+  following a track from month to month; scroll back through earlier years.
 - **I'm feeling lucky** on Home plays a random episode from anywhere in the archive: any
   show, any year.
 - **Explore by mood and genre:** NTS's moods (Sedative, Lean Back, Music To Dance To…) and

@@ -177,7 +177,7 @@ async function mockAccount() {
       ipcMain.removeHandler('charts:get');
       ipcMain.handle('charts:get', (_e, name) => data[name] || null);
     });
-    await win.evaluate(() => Archive.home());
+    await win.evaluate(() => { Chart.reset(); Archive.home(); });
     await waitFor(() => document.querySelectorAll('.chart-row').length > 0, null, { timeout: 15000, what: 'the chart on Home' });
     const rows = await win.evaluate(() => [...document.querySelectorAll('.chart-row')].map((r) => r.querySelector('.track__title').textContent + ' / ' + r.querySelector('.chart-row__count').textContent));
     expect(rows[0] === 'Sweetie / 2 shows · 3 episodes' && rows[1].startsWith('See It Thru'), `unexpected chart: ${rows.join(' | ')}`);
@@ -188,8 +188,13 @@ async function mockAccount() {
     await win.keyboard.press('ArrowRight');
     const track = await win.evaluate(() => document.querySelector('.year__track')?.textContent);
     expect(track === 'Sweetie' || track === 'See It Thru', `track of the year: ${track}`);
+    // the timeline: a column per month
+    await win.click('.year__mode[data-mode="timeline"]');
+    await waitFor(() => document.querySelectorAll('.tl__col').length === 2, null, { timeout: 10000, what: 'the timeline' });
     await win.keyboard.press('Escape');
     expect(await win.evaluate(() => !document.querySelector('.year')), 'Esc closes the year');
+    // trends on the chart rows: a line of shows per month
+    await waitFor(() => document.querySelectorAll('.chart-row .spark').length > 0, null, { timeout: 10000, what: 'trend lines on the chart' });
   });
 
   await test('Schedule lists upcoming shows', async () => {

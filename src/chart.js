@@ -5,6 +5,9 @@
 
 const Chart = (() => {
   const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const key = (a, t) => `${n(a)}|${n(t)}`;
+  const ym = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  const shift = (m, k) => ym(new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1 + k, 1)));
   const showName = (alias) => alias.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests|supporter-radio.*)$/;
   // ...and NTS's Supporter Radio specials, whose addresses change but whose names don't
@@ -23,7 +26,10 @@ const Chart = (() => {
   async function load(period) {
     const data = await window.nts.chart(period).catch(() => null);
     if (!data) return null;
-    const res = { period, data, rows: rowsOf(data), episodes: data.episodes, generated: data.generated };
+    const res = { period, data, rows: rowsOf(data), episodes: data.episodes, generated: data.generated, map: new Map() };
+    // track -> { shows, rank } (rank among tracks played in 2+ episodes)
+    let rank = 0;
+    for (const t of data.tracks) res.map.set(key(t[0], t[1]), { shows: t[3].length, rank: t[2] >= 2 ? ++rank : null });
     mem.set(period, res);
     return res;
   }
@@ -43,6 +49,28 @@ const Chart = (() => {
   async function months() {
     const idx = await window.nts.chart('index').catch(() => null);
     return idx?.months || [];
+  }
+
+  // ---- trends ----
+  // The month a period is "in" (the last 30 days count as this month)
+  const monthOf = (period) => (period === 'recent' ? ym(new Date()) : period);
+  // For a period: the months before it (up to `count`, ending with it) and the month to
+  // compare chart movement against
+  async function trend(period, count = 12) {
+    const have = new Set(await months());
+    const end = monthOf(period);
+    const list = [];
+    for (let i = count - 1; i >= 0; i--) list.push(shift(end, -i));
+    const files = await Promise.all(list.map((m) => (have.has(m) ? get(m) : null)));
+    const prevMonth = period === 'recent' ? shift(end, -1) : shift(end, -1);
+    const prev = have.has(prevMonth) ? await get(prevMonth) : null;
+    return {
+      months: list,
+      // shows per month for a track (null where there's no data for that month)
+      series: (t) => files.map((f) => (f ? (f.map.get(key(t.artist, t.title))?.shows || 0) : null)),
+      // chart movement: rank last month, or null if it wasn't in the chart
+      prevRank: (t) => (prev ? prev.map.get(key(t.artist, t.title))?.rank ?? null : undefined)
+    };
   }
 
   // ---- a year: its months merged ----
@@ -66,7 +94,8 @@ const Chart = (() => {
       for (const [artist, title, e, idx, l, first] of f.tracks) {
         const k = `${n(artist)}|${n(title)}`;
         let m = tracks.get(k);
-        if (!m) { m = { artist, title, episodes: 0, showSet: new Set(), monthSet: new Set(), latest: null, first }; tracks.set(k, m); }
+        if (!m) { m = { artist, title, episodes: 0, showSet: new Set(), monthSet: new Set(), perMonth: {}, latest: null, first }; tracks.set(k, m); }
+        m.perMonth[f.period] = idx.length;
         m.episodes += e;
         idx.forEach((i) => m.showSet.add(f.showList[i]));
         m.monthSet.add(f.period);
@@ -109,6 +138,13 @@ const Chart = (() => {
     const busiest = [...showEps].filter(([s]) => !catchAll(s, names)).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([show, count]) => ({ show, count, name: (names[show] || [])[0] || showName(show), img: (names[show] || [])[1] || '' }));
     const peak = files.slice().sort((a, b) => b.episodes - a.episodes)[0];
+    // each month's ranks, for the bump chart and the timeline
+    const monthRanks = {};
+    const monthFiles = (await Promise.all(list.map((mm) => get(mm)))).filter(Boolean);
+    monthFiles.forEach((r) => { monthRanks[r.period] = r.map; });
+    // shows that shared tracks: the strongest links, for the network
+    const links = [...pairs].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 60)
+      .map(([k, c]) => ({ a: k.split('|')[0], b: k.split('|')[1], count: c }));
     all.forEach((m) => { delete m.showSet; });
     const realDebuts = debuts.filter((d) => !catchAll(d.show, names));
     return {
@@ -117,9 +153,32 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: topPair[0].split('|')[0], b: topPair[0].split('|')[1], count: topPair[1], names } : null,
-      peak: peak ? { month: peak.period, episodes: peak.episodes } : null
+      peak: peak ? { month: peak.period, episodes: peak.episodes } : null,
+      monthList: list, monthRanks, links, names,
+      monthTop: monthFiles.map((r) => ({ month: r.period, rows: r.rows.slice(0, 5) }))
     };
   }
 
-  return { get, peek, months, year, showName };
+  // A small line of shows per month (gaps where a month has no data)
+  function spark(series, { w = 64, h = 18 } = {}) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'spark'); svg.setAttribute('width', w); svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`); svg.setAttribute('aria-hidden', 'true');
+    const max = Math.max(1, ...series.filter((v) => v != null));
+    const x = (i) => (series.length < 2 ? w / 2 : 1 + (i * (w - 2)) / (series.length - 1));
+    const y = (v) => h - 2 - (v / max) * (h - 4);
+    let d = '', pen = false;
+    series.forEach((v, i) => { if (v == null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`; pen = true; });
+    const base = document.createElementNS(NS, 'line');
+    base.setAttribute('x1', 1); base.setAttribute('x2', w - 1); base.setAttribute('y1', h - 2); base.setAttribute('y2', h - 2); base.setAttribute('class', 'spark__base');
+    const path = document.createElementNS(NS, 'path'); path.setAttribute('d', d); path.setAttribute('class', 'spark__line');
+    svg.append(base, path);
+    const last = series.length - 1;
+    if (series[last] != null) { const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', x(last)); c.setAttribute('cy', y(series[last])); c.setAttribute('r', 1.8); c.setAttribute('class', 'spark__dot'); svg.append(c); }
+    return svg;
+  }
+
+  return { get, peek, months, year, trend, spark, showName, key, shift,
+    reset() { mem.clear(); loading.clear(); } };      // tests
 })();

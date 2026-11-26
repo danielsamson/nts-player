@@ -1307,7 +1307,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .chart-year:hover { background: var(--white); color: var(--black); }
 
 /* ---- NTS in <year>: full-window cards ---- */
-.year { position: fixed; inset: 0; z-index: 200; background: var(--black); display: grid; grid-template-columns: 56px 1fr 56px; grid-template-rows: auto 1fr; }
+.year { position: fixed; inset: 0; z-index: 200; background: var(--black); display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; grid-template-rows: auto minmax(0, 1fr); }
 .year__top { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: var(--rule); }
 .year__pick { height: var(--btn-m); padding: 0 8px; background: var(--black); color: var(--white); border: var(--rule); font: 700 12px/14px "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
 .year__count { flex: 1; text-align: center; font-size: 12px; color: var(--grey-2); }
@@ -1352,3 +1352,69 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .year__showpic img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* big covers fit the window, so a card doesn't need scrolling */
 .year__card > .year__cover { width: min(100%, 42vh); align-self: center; }
+
+/* Chart trends: shows per month, and movement since last month */
+.chart-row__trend { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; gap: 2px; flex-shrink: 0; margin-right: 8px; align-self: center; }
+.spark { display: block; overflow: visible; }
+.spark__base { stroke: var(--grey-4); stroke-width: 1; }
+.spark__line { fill: none; stroke: var(--grey-1); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+.spark__dot { fill: var(--white); }
+.chart-move { font-size: 10px; line-height: 12px; font-weight: 700; color: var(--grey-2); }
+.chart-move.is-up { color: var(--white); }
+.chart-move.is-new { color: var(--live); }
+
+/* NTS in <year>: trend lines, charts, timeline */
+.year__spark { margin-left: auto; flex-shrink: 0; }
+.year__svg { width: 100%; height: auto; display: block; overflow: visible; }
+.year__axis { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); text-transform: uppercase; }
+.year__grid { stroke: #1c1c1c; }
+.year__bump path { fill: none; stroke: var(--grey-3); stroke-width: 1.5; }
+.year__bump .year__bumpgap { stroke-dasharray: 2 4; stroke-width: 1; }
+.year__bumpdot { fill: var(--grey-3); }
+.year__bump.is-first path { stroke: var(--white); stroke-width: 2.5; }
+.year__bump.is-first .year__bumpgap { stroke-width: 1; }
+.year__bump.is-first .year__bumpdot { fill: var(--white); }
+.year__bumpmark circle { fill: var(--black); stroke: var(--grey-1); stroke-width: 1; }
+.year__bumpmark text { font: 700 8px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--white); }
+.year__bump.is-first .year__bumpmark circle { fill: var(--white); stroke: var(--white); }
+.year__bump.is-first .year__bumpmark text { fill: var(--black); }
+.year__key { columns: 2; column-gap: 16px; margin-top: 10px; list-style: none; font-size: 11px; line-height: 16px; color: var(--grey-1); }
+.year__key li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.has-hover .year__bump { opacity: .25; }
+.has-hover .year__bump.is-hover { opacity: 1; }
+.year__bump.is-hover path { stroke: var(--live); }
+.year__bump.is-hover .year__bumpdot { fill: var(--live); }
+.year__bump.is-hover .year__bumpmark circle { stroke: var(--live); }
+.year__lifelabel { font: 700 10px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-1); text-transform: uppercase; }
+.year__lifebar { stroke: var(--grey-3); stroke-width: 2; }
+.year__lifedot { fill: var(--white); }
+.year__netlink { stroke: var(--grey-3); opacity: .6; }
+.year__net.has-hover .year__netlink { opacity: .12; }
+.year__net.has-hover .year__netlink.is-on { opacity: 1; stroke: var(--white); }
+.year__netnode { cursor: pointer; }
+.year__netnode circle { fill: var(--white); stroke: var(--black); stroke-width: 1; }
+.year__netnode:hover circle { fill: var(--live); }
+.year__netnode text { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-1); text-transform: uppercase; paint-order: stroke; stroke: var(--black); stroke-width: 3px; pointer-events: none; }
+.year__modes { display: flex; border: var(--rule); }
+.year__mode { height: calc(var(--btn-m) - 2px); padding: 0 12px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--grey-1); }
+.year__mode + .year__mode { border-left: var(--rule); }
+.year__mode.active { background: var(--white); color: var(--black); }
+.year.is-timeline .year__prev, .year.is-timeline .year__next, .year.is-timeline .year__count { visibility: hidden; }
+.year.is-timeline .year__stage { place-items: stretch; padding: 0; overflow: hidden; }
+.tl { display: flex; flex-direction: column; min-height: 0; min-width: 0; height: 100%; }
+.tl__scroll { flex: 1; overflow-x: auto; overflow-y: auto; }
+.tl__inner { position: relative; display: flex; align-items: flex-start; gap: 28px; padding: 20px 24px; width: max-content; }
+.tl__lines { position: absolute; left: 0; top: 0; pointer-events: none; }
+.tl__line { fill: none; stroke: var(--grey-2); stroke-width: 1.5; }
+.tl__col { position: relative; z-index: 1; width: 132px; display: flex; flex-direction: column; gap: 10px; }
+.tl__month { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--live); border-bottom: var(--rule); padding-bottom: 6px; }
+.tl__item { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto auto auto; column-gap: 8px; text-align: left; align-items: start; }
+.tl__cover { grid-row: 1 / 4; width: 56px; height: 56px; aspect-ratio: auto; }
+.tl__item.is-linked .tl__cover { outline: 1px solid var(--white); }
+.tl__rank { font-size: 11px; font-weight: 700; color: var(--grey-2); }
+.tl__title { font-size: 11px; line-height: 13px; font-weight: 700; text-transform: uppercase; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tl__artist { font-size: 10px; line-height: 12px; color: var(--grey-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl__item:hover .tl__title { text-decoration: underline; }
+.tl__more { align-self: center; height: var(--btn-m); padding: 0 12px; border: var(--rule); font-size: 12px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+.tl__more:hover { background: var(--white); color: var(--black); }
+.tl__note { padding: 8px 24px 14px; }

@@ -770,7 +770,29 @@ const Archive = (() => {
   }
   function chartList(res, limit) {
     const ol = el('ol', 'tracks archive-tracks chart-list');
-    res.rows.slice(0, limit).forEach((r, i) => ol.append(chartRow(r, i)));
+    const rows = res.rows.slice(0, limit);
+    rows.forEach((r, i) => ol.append(chartRow(r, i)));
+    // trends: a line of shows per month over the past year, and movement since last month
+    Chart.trend(res.period).then((tr) => {
+      [...ol.children].forEach((li, i) => {
+        const r = rows[i];
+        const s = tr.series(r);
+        const box = el('span', 'chart-row__trend');
+        const sp = Chart.spark(s);
+        sp.setAttribute('aria-label', `Shows per month over the past year: ${s.map((v) => v ?? '–').join(', ')}`);
+        box.append(sp);
+        const prev = tr.prevRank(r);
+        if (prev !== undefined) {
+          const mv = el('span', 'chart-move');
+          if (prev == null) { mv.textContent = 'NEW'; mv.classList.add('is-new'); mv.title = 'Not in last month’s chart'; }
+          else if (prev > i + 1) { mv.textContent = prev - (i + 1) > 99 ? '▲99+' : `▲${prev - (i + 1)}`; mv.classList.add('is-up'); mv.title = `Up from ${prev} last month`; }
+          else if (prev < i + 1) { mv.textContent = i + 1 - prev > 99 ? '▼99+' : `▼${i + 1 - prev}`; mv.classList.add('is-down'); mv.title = `Down from ${prev} last month`; }
+          else { mv.textContent = '='; mv.title = 'Same place as last month'; }
+          box.append(mv);
+        }
+        li.querySelector('.track__actions').prepend(box);      // beside the play and copy buttons
+      });
+    }).catch(() => {});
     return ol;
   }
   const thisYear = new Date().getUTCFullYear();

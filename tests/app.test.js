@@ -179,19 +179,6 @@ async function mockAccount() {
     await win.click('#expandBtn');
   });
 
-  await test('World: the globe shows places and both channels', async () => {
-    await win.click('#expandBtn');
-    await waitFor(() => window.innerWidth >= 720, null, { what: 'wide view' });
-    await win.click('.stage__mode[data-mode="world"]');
-    await waitFor(() => { const c = document.querySelector('.world__svg'); return c && c.width > 0 && !document.getElementById('world').hidden; }, null, { timeout: 15000, what: 'the globe' });
-    await waitFor(() => document.querySelectorAll('.world__row').length === 2, null, { timeout: 30000, what: 'both channels in the panel' });
-    // scrub back a day: no longer live
-    await win.evaluate(() => { const s = document.querySelector('.world__scrub'); s.value = String(Date.now() - 86400000); s.dispatchEvent(new Event('input')); });
-    expect(await win.evaluate(() => !/Live now/.test(document.querySelector('.world__when').textContent)), 'scrubbing should leave live');
-    await win.click('.stage__mode[data-mode="now"]');
-    await win.click('#expandBtn');
-  });
-
   await test('Keyboard: Space pauses and plays', async () => {
     await win.evaluate(() => document.activeElement?.blur());
     const before = await win.evaluate(() => ArchivePlayer.state.playing);

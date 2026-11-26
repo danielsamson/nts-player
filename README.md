@@ -105,18 +105,6 @@ Every node is named when there's room. Where names would overlap, the less impor
 fade out (shows and episodes are always named), and a note says how many are hidden.
 Zoom in to make room for them, or rest on a node to see its name and connections.
 
-### World (prototype)
-
-In the wide view, switch the stage to **World**: a globe of where NTS shows broadcast
-from, with each place sized by how many shows come from there. NTS 1 and NTS 2 pulse red
-where they're broadcasting from now, with a trail of where they were before. Scrub the
-timeline through the schedule (the past week and the week ahead), or **Play the week**
-to watch the station move around the world. Click a place for its shows and its coming
-broadcasts. Drag to turn the globe, scroll to zoom.
-
-Places come from a snapshot of NTS's shows (`src/world-data.js`). NTS's public API only
-reaches about 1,300 of its roughly 1,700 shows. Refresh it with `npm run world-data`.
-
 ### Wide view
 
 The thin strip is the default. The expand button in the header (or a wider window) adds
@@ -252,7 +240,6 @@ allows them for signed apps, so Mac users download new versions from the release
 | Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
 | Apple Music links | iTunes Search, for the track you're listening to |
 | My NTS | NTS's own pages and buttons on `www.nts.live`, in your signed-in session |
-| World map | [world-atlas](https://github.com/topojson/world-atlas) land outlines (Natural Earth, public domain), bundled |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist
@@ -270,7 +257,6 @@ src/renderer.js        Live radio, now-playing bar, history, wide view
 src/archive.js         Archive: browse, search, show and episode pages
 src/archive-player.js  Plays archive episodes via SoundCloud's embed player
 src/trackweb.js        Track web
-src/world.js           World: the globe (world-places.js: place coordinates, world-data.js: show snapshot)
 src/style.css          Styling (design tokens at the top)
 src/fonts/             Roboto Condensed (SIL Open Font License)
 build/icon.png         App icon

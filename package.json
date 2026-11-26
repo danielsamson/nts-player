@@ -11,8 +11,7 @@
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
-    "test": "node tests/app.test.js",
-    "world-data": "node scripts/build-world-data.js"
+    "test": "node tests/app.test.js"
   },
   "devDependencies": {
     "d3": "^7.9.0",

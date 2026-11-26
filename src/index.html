@@ -81,6 +81,23 @@
   <!-- Wide view: the stage. Big album art and the full track details -->
   <aside class="stage" id="stage" aria-label="Now playing">
     <div class="stage__save" id="stageSave"></div>
+    <div class="stage__modes" role="tablist" aria-label="Stage">
+      <button class="stage__mode active" data-mode="now" role="tab">Now playing</button>
+      <button class="stage__mode" data-mode="web" role="tab">Track web</button>
+    </div>
+    <!-- Track web (prototype): explore through what DJs played -->
+    <div class="trackweb" id="trackweb" hidden>
+      <div class="trackweb__bar">
+        <div class="trackweb__search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a7 7 0 0 1 5.6 11.2l5.1 5.1-1.4 1.4-5.1-5.1A7 7 0 1 1 10 3zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
+          <input type="search" placeholder="Search for a track" autocomplete="off" spellcheck="false" aria-label="Search for a track">
+          <div class="trackweb__results" hidden></div>
+        </div>
+        <button class="mynts-btn trackweb__now">From what's playing</button>
+      </div>
+      <svg class="trackweb__svg" role="img" aria-label="Track web"></svg>
+      <div class="trackweb__info"></div>
+    </div>
     <div class="stage__body">
       <div class="stage__art" id="stageArt">
         <div class="stage__tilt" id="stageTilt">
@@ -195,5 +212,7 @@
   <script src="archive-player.js"></script>
   <script src="renderer.js"></script>
   <script src="archive.js"></script>
+  <script src="vendor/d3.min.js"></script>
+  <script src="trackweb.js"></script>
 </body>
 </html>

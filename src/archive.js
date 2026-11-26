@@ -347,9 +347,11 @@ const Archive = (() => {
     const actions = el('div', 'track-page__actions');
     const save = el('button', 'mynts-btn');
     save.hidden = true;
+    const web = el('button', 'mynts-btn', 'Open in Track web');
+    web.addEventListener('click', () => openTrackWeb({ artist: t.artist, title: t.title, isrc_id: current.origin?.isrc_id, deezer_track_id: current.origin?.deezer_track_id }));
     const copy = el('button', 'mynts-btn', 'Copy artist & title');
     copy.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
-    actions.append(save, copy);
+    actions.append(save, web, copy);
     const linksNav = el('nav', 'track-page__links');
     const linksLabel = el('span', 'stage__links-label', 'Find it on');
     const linksList = el('span', 'stage__links-list');
@@ -996,6 +998,15 @@ const Archive = (() => {
 
   return {
     findTrack: (t) => TrackInfo.find(t),
+    // Play an episode from a position (seconds)
+    async playFrom(show, episode, offsetSec = 0) {
+      try {
+        const { info } = await fetchEpisode(show, episode);
+        if (!info.url) { showSnack('This episode isn’t available to stream'); return; }
+        if (ArchivePlayer.isLoaded(show, episode)) { switchToArchive(); ArchivePlayer.seek(offsetSec * 1000); }
+        else playArchive(info, offsetSec * 1000);
+      } catch { showSnack('Couldn’t load the episode'); }
+    },
     tagButtons,
     resumeLast,
     home() { started = true; history.length = 0; current = { type: 'home' }; render(); },

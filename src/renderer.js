@@ -25,12 +25,15 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// NTS sometimes sends titles with HTML entities ("Burnin&#039;")
+const unescapeHtml = (x) => { const t = document.createElement('textarea'); t.innerHTML = x || ''; return t.value; };
+
 function showInfo(r) {
   const now = r?.now || {};
   const d = now.embeds?.details || {};
   const media = d.media || {};
   return {
-    title: now.broadcast_title || d.name || 'NTS Live',
+    title: unescapeHtml(now.broadcast_title || d.name || 'NTS Live'),
     location: d.location_long || '',
     description: d.description || '',
     img: media.background_large || media.picture_large || media.background_medium || media.picture_medium || '',
@@ -1267,6 +1270,24 @@ var NowSave = (() => {   // var: renderNowbar may ask before this line runs
   ArchivePlayer.onChange(() => update());
   return { update, toggle: () => btn.click() };
 })();
+
+// ---- Stage modes: Now playing / Track web ----
+function setStageMode(mode) {
+  document.body.classList.toggle('stage-web', mode === 'web');
+  document.querySelectorAll('.stage__mode').forEach((b) => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+    b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+  });
+  $('trackweb').hidden = mode !== 'web';
+  if (mode === 'web') TrackWeb.show();
+}
+document.querySelectorAll('.stage__mode').forEach((b) => b.addEventListener('click', () => setStageMode(b.dataset.mode)));
+// Open the track web on a track (switches to the wide view if needed)
+function openTrackWeb(t) {
+  if (!window.matchMedia('(min-width: 720px)').matches) window.nts.setWide(true);
+  setStageMode('web');
+  setTimeout(() => TrackWeb.start(t), 250);
+}
 
 // ---- Wide view: the stage ----
 // Big album art and full details for what's playing, with links to find the

@@ -144,6 +144,20 @@ async function mockAccount() {
     await win.click('#expandBtn');
   });
 
+  await test('Track web: search a track and expand the web', async () => {
+    await win.click('#expandBtn');
+    await waitFor(() => window.innerWidth >= 720, null, { what: 'wide view' });
+    await win.click('.stage__mode[data-mode="web"]');
+    await win.fill('.trackweb__search input', 'kokoroko sweetie');
+    await win.waitForSelector('.trackweb__result', { timeout: 30000 });
+    await win.locator('.trackweb__result').first().click();
+    await waitFor(() => document.querySelectorAll('.tw-node--episode').length > 0, null, { timeout: 40000, what: 'episodes in the web' });
+    await win.evaluate(() => document.querySelector('.tw-node--episode').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await waitFor(() => document.querySelectorAll('.tw-node--track').length > 5, null, { timeout: 40000, what: 'tracks from an episode' });
+    await win.click('.stage__mode[data-mode="now"]');
+    await win.click('#expandBtn');
+  });
+
   await test('Keyboard: Space pauses and plays', async () => {
     await win.evaluate(() => document.activeElement?.blur());
     const before = await win.evaluate(() => ArchivePlayer.state.playing);

@@ -1086,3 +1086,60 @@ input[type=range]:focus-visible { outline: 2px solid var(--live); outline-offset
 body.playing .channel .track__time { color: var(--grey-3); }
 
 .welcome__card:focus, .welcome__card:focus-visible { outline: none; }
+
+/* ======================================================================
+   Track web (prototype)
+   ====================================================================== */
+.stage__modes { display: none; }
+@media (min-width: 720px) {
+  .stage__modes { display: flex; position: absolute; top: 16px; left: 16px; z-index: 4; border: var(--rule); }
+  .stage__mode { height: var(--btn-m); padding: 0 12px; font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-1); }
+  .stage__mode + .stage__mode { border-left: var(--rule); }
+  .stage__mode.active { background: var(--white); color: var(--black); }
+  .stage__mode:not(.active):hover { background: var(--grey-4); color: var(--white); }
+  body.stage-web .stage__body, body.stage-web .stage__save { display: none; }
+}
+.trackweb { position: relative; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+.trackweb[hidden] { display: none; }
+.trackweb__bar { display: flex; gap: 8px; align-items: center; padding: 64px 16px 8px; }
+.trackweb__search { position: relative; flex: 1; max-width: 420px; display: flex; align-items: center; gap: 8px; height: var(--btn-m); padding: 0 10px; border: var(--rule); }
+.trackweb__search svg { width: 16px; height: 16px; fill: var(--grey-2); flex-shrink: 0; }
+.trackweb__search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--white); font: 700 13px/16px "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.trackweb__search input::placeholder { color: var(--grey-2); }
+.trackweb__results { position: absolute; top: calc(100% + 1px); left: -1px; right: -1px; z-index: 5; background: var(--black); border: var(--rule); max-height: 360px; overflow-y: auto; }
+.trackweb__result { display: flex; flex-direction: column; width: 100%; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--grey-4); }
+.trackweb__result:hover, .trackweb__result:focus-visible { background: var(--white); color: var(--black); }
+.trackweb__result-title { font-size: 13px; line-height: 16px; font-weight: 700; text-transform: uppercase; }
+.trackweb__result-artist { font-size: 12px; line-height: 15px; color: var(--grey-2); }
+.trackweb__results .loader, .trackweb__results .trackweb__hint { padding: 10px; }
+.trackweb__svg { width: 100%; height: 100%; display: block; cursor: grab; }
+.trackweb__svg:active { cursor: grabbing; }
+.trackweb__info { min-height: 84px; padding: 12px 16px 16px; border-top: var(--rule); }
+.trackweb__hint { font-size: 13px; line-height: 18px; color: var(--grey-2); }
+.trackweb__title { font-size: 18px; line-height: 22px; font-weight: 700; text-transform: uppercase; }
+.trackweb__sub { font-size: 13px; line-height: 18px; color: var(--grey-2); margin-bottom: 10px; }
+.trackweb__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.trackweb__actions .loader { padding: 0; }
+
+/* nodes and links */
+.tw-link { stroke: var(--grey-4); stroke-width: 1; transition: stroke .15s, opacity .15s; }
+.tw-link.is-lit { stroke: var(--white); }
+.tw-link.is-dim { opacity: .25; }
+.tw-node { cursor: pointer; transition: opacity .15s; }
+.tw-node.is-dim { opacity: .25; }
+.tw-node--track .tw-shape { fill: var(--grey-4); }
+.tw-node--track .tw-ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
+.tw-node--track.is-expanded .tw-ring { stroke: var(--white); }
+.tw-node--episode .tw-shape { fill: var(--black); stroke: var(--white); stroke-width: 1; }
+.tw-node--episode.is-expanded .tw-shape { fill: var(--white); }
+.tw-node.is-root .tw-ring, .tw-node.is-root .tw-shape { stroke: var(--live); stroke-width: 2; }
+.tw-node.is-selected .tw-ring, .tw-node.is-selected .tw-shape { stroke: var(--live); stroke-width: 3; }
+.tw-node.is-loading .tw-ring, .tw-node.is-loading .tw-shape { animation: twPulse .8s ease-in-out infinite; }
+@keyframes twPulse { 50% { stroke-opacity: .2; } }
+.tw-label { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
+.tw-node--episode .tw-label { fill: var(--grey-2); font-weight: 400; }
+@media (prefers-reduced-motion: reduce) { .tw-node.is-loading .tw-ring, .tw-node.is-loading .tw-shape { animation: none; } }
+
+/* Track labels only where they help: root, selected, expanded, hovered, or zoomed in */
+.tw-node--track:not(.is-root):not(.is-selected):not(.is-expanded):not(:hover) .tw-label { display: none; }
+.trackweb__svg.is-zoomed .tw-node--track .tw-label { display: block; }

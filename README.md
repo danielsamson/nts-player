@@ -83,6 +83,15 @@ opens next to the player so you can watch it, and each step is logged in the ter
   overlay and notifications.
 - **Click a track** to copy "Artist - Title".
 
+### Track web (prototype)
+
+In the wide view, switch the stage to **Track web** to explore NTS through what DJs
+played. Search for a track (or start from the one playing, or **Open in Track web** on any
+track page). Round nodes are tracks with their covers, square nodes are episodes; a line
+means "this episode played this track". Click a node to expand it: a track shows the
+episodes that played it, an episode shows its tracklist. Pick a track to play it from that
+point in the episode, open its details, save it, or start a new web from it.
+
 ### Wide view
 
 The thin strip is the default. The expand button in the header (or a wider window) adds

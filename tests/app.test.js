@@ -194,7 +194,8 @@ async function mockAccount() {
   });
 
   await app.evaluate(({ app }) => app.exit(0)).catch(() => {});
-  fs.rmSync(profile, { recursive: true, force: true });
+  // the app may still be writing its profile as it exits: retry, and never fail the run over it
+  try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 }); } catch {}
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

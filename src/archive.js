@@ -329,7 +329,39 @@ const Archive = (() => {
       inflight.set(key, p);
       return p;
     }
-    return { find };
+    // How many NTS episodes played this track (from one track search; 50 means 50+)
+    const COUNTS = 'trackCount:v1';
+    let counts;
+    try { counts = JSON.parse(localStorage.getItem(COUNTS)) || {}; } catch { counts = {}; }
+    const countQueue = [];
+    let counting = 0;
+    function pumpCounts() {
+      while (counting < 2 && countQueue.length) {
+        const job = countQueue.shift();
+        counting++;
+        (async () => {
+          const res = await api(`/api/v2/search?q=${enc(`${job.t.artist} ${job.t.title}`.slice(0, 200))}&version=2&offset=0&limit=50&types[]=track`);
+          const wantTitle = n(job.t.title);
+          const wantArtist = words(job.t.artist);
+          const eps = new Set((res.results || [])
+            .filter((x) => x.article_type === 'track' && n(x.title) === wantTitle &&
+              (!wantArtist.size || (x.artists || []).some((a) => [...words(a.name)].some((w) => wantArtist.has(w)))))
+            .map((x) => x.article?.path).filter(Boolean));
+          return eps.size;
+        })().then((c) => {
+          counts[job.key] = c;
+          try { localStorage.setItem(COUNTS, JSON.stringify(counts)); } catch {}
+          job.resolve(c);
+        }, () => job.resolve(null)).finally(() => { counting--; pumpCounts(); });
+      }
+    }
+    function count(t) {
+      const key = `${n(t.artist)}|${n(t.title)}`;
+      if (key in counts) return Promise.resolve(counts[key]);
+      return new Promise((resolve) => { countQueue.push({ t, key, resolve }); pumpCounts(); });
+    }
+
+    return { find, count };
   })();
 
   // ---- Track page: big cover, details, links, where it was played ----
@@ -998,6 +1030,7 @@ const Archive = (() => {
 
   return {
     findTrack: (t) => TrackInfo.find(t),
+    trackCount: (t) => TrackInfo.count(t),
     // Play an episode from a position (seconds)
     async playFrom(show, episode, offsetSec = 0) {
       try {

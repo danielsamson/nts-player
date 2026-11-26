@@ -22,8 +22,9 @@ const TrackWeb = (() => {
     const near = n.near && byId.get(n.near);
     n.x = near ? near.x + (Math.random() - .5) * 60 : (Math.random() - .5) * 40;
     n.y = near ? near.y + (Math.random() - .5) * 60 : (Math.random() - .5) * 40;
+    n.r = n.type === 'track' ? 16 : 12;
     nodes.push(n); byId.set(n.id, n);
-    if (n.type === 'track') loadCover(n);
+    if (n.type === 'track') { loadCover(n); loadCount(n); } else loadShowArt(n);
     return n;
   }
   function addLink(a, b, data = {}) {
@@ -34,8 +35,35 @@ const TrackWeb = (() => {
     links.push({ id, source: a.id, target: b.id, ...data });
   }
   async function loadCover(n) {
+    n.artLoading = true;
     const art = await Art.get({ artist: n.artist, title: n.title, isrc_id: n.isrc_id, deezer_track_id: n.deezer_track_id }).catch(() => null);
-    if (art?.small) { n.img = art.small; paintNodes(); }
+    n.artLoading = false;
+    if (art?.small) n.img = art.small;
+    paintNodes();
+  }
+  // Show artwork for an episode node (from the episode details; cached)
+  const showArt = new Map();
+  async function loadShowArt(n) {
+    n.artLoading = true;
+    const key = `${n.show}/${n.episode}`;
+    if (!showArt.has(key)) {
+      showArt.set(key, window.nts.api(`/api/v2/shows/${n.show}/episodes/${n.episode}`)
+        .then((ep) => { const m = ep.media || {}; return m.background_small || m.picture_small || m.background_thumb || m.picture_thumb || ''; })
+        .catch(() => ''));
+    }
+    n.img = await showArt.get(key);
+    n.artLoading = false;
+    paintNodes();
+  }
+  // The explore hint: how many episodes played this track; bigger node = more played
+  async function loadCount(n) {
+    const c = await Archive.trackCount({ artist: n.artist, title: n.title }).catch(() => null);
+    if (c == null || !byId.has(n.id)) return;
+    n.plays = c;
+    n.r = 13 + Math.min(13, Math.sqrt(Math.max(0, c - 1)) * 3.2);
+    paintNodes();
+    sim?.force('collide').radius((d) => d.r + 8);
+    sim?.alpha(.15).restart();
   }
 
   // Expand a track: the episodes that played it
@@ -88,7 +116,7 @@ const TrackWeb = (() => {
     sim = d3.forceSimulation()
       .force('link', d3.forceLink().id((d) => d.id).distance((l) => (l.source.type === 'episode' || l.target.type === 'episode' ? 70 : 60)).strength(.7))
       .force('charge', d3.forceManyBody().strength(-220))
-      .force('collide', d3.forceCollide((d) => (d.type === 'track' ? 24 : 18)))
+      .force('collide', d3.forceCollide((d) => d.r + 8))
       .force('x', d3.forceX(0).strength(.03))
       .force('y', d3.forceY(0).strength(.03))
       .on('tick', ticked);
@@ -117,14 +145,24 @@ const TrackWeb = (() => {
       .on('mouseleave', () => highlight(null));
     enter.each(function (d) {
       const g = d3.select(this);
+      const shape = g.append('g').attr('class', 'tw-body');
       if (d.type === 'track') {
-        g.append('circle').attr('class', 'tw-shape').attr('r', 18);
-        g.append('image').attr('x', -17).attr('y', -17).attr('width', 34).attr('height', 34).attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
-        g.append('circle').attr('class', 'tw-ring').attr('r', 18);
+        shape.append('circle').attr('class', 'tw-shape');
+        shape.append('image').attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
+        shape.append('circle').attr('class', 'tw-ring');
       } else {
-        g.append('rect').attr('class', 'tw-shape').attr('x', -9).attr('y', -9).attr('width', 18).attr('height', 18);
+        shape.append('rect').attr('class', 'tw-shape');
+        shape.append('image').attr('preserveAspectRatio', 'xMidYMid slice');
+        shape.append('rect').attr('class', 'tw-ring');
       }
-      g.append('text').attr('class', 'tw-label').attr('y', d.type === 'track' ? 32 : 22).attr('text-anchor', 'middle');
+      g.append('circle').attr('class', 'tw-select');           // thin ring when selected
+      g.append('circle').attr('class', 'tw-root').attr('r', 3.5); // small red dot: where you started
+      const badge = g.append('g').attr('class', 'tw-badge');
+      badge.append('rect').attr('height', 13).attr('rx', 0);
+      badge.append('text').attr('y', 9.5).attr('text-anchor', 'middle');
+      const label = g.append('text').attr('class', 'tw-label').attr('text-anchor', 'middle');
+      label.append('tspan').attr('class', 'tw-label__title').attr('x', 0);
+      label.append('tspan').attr('class', 'tw-label__sub').attr('x', 0).attr('dy', 11);
       g.append('title');
     });
     paintNodes();
@@ -134,19 +172,43 @@ const TrackWeb = (() => {
     paintInfo();
   }
 
+  const clip = (x, n) => (x && x.length > n ? x.slice(0, n - 1) + '…' : x || '');
   function paintNodes() {
     if (!gNodes) return;
     gNodes.selectAll('g.tw-node')
       .classed('is-root', (d) => d.id === rootId)
       .classed('is-selected', (d) => d === selected)
       .classed('is-expanded', (d) => d.expanded)
-      .classed('is-loading', (d) => d.loading)
+      .classed('is-loading', (d) => d.loading || (d.artLoading && !d.img))
+      .classed('has-img', (d) => !!d.img)
+      .classed('is-popular', (d) => d.plays >= 3)
       .each(function (d) {
         const g = d3.select(this);
-        if (d.type === 'track') g.select('image').attr('href', d.img || null);
-        const label = d.type === 'track' ? d.title : d.title;
-        g.select('text').text(label.length > 22 ? label.slice(0, 21) + '…' : label);
-        g.select('title').text(d.type === 'track' ? `${d.artist} – ${d.title}` : `${d.title}${d.date ? ' · ' + d.date : ''}`);
+        const r = d.r;
+        if (d.type === 'track') {
+          g.selectAll('.tw-shape, .tw-ring').attr('r', r);
+          g.select('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2).attr('href', d.img || null);
+        } else {
+          g.selectAll('rect.tw-shape, rect.tw-ring').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2);
+          g.select('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2).attr('href', d.img || null);
+        }
+        g.select('.tw-select').attr('r', (d.type === 'track' ? r : r * 1.42) + 4);
+        g.select('.tw-root').attr('cx', r * .78).attr('cy', -r * .78);
+        // play-count badge (tracks played in more than one episode)
+        const show = d.type === 'track' && d.plays > 1;
+        const txt = d.plays >= 50 ? '50+' : String(d.plays || '');
+        const w = 6 + txt.length * 6;
+        g.select('.tw-badge').style('display', show ? null : 'none')
+          .attr('transform', `translate(${-r * .78 - w / 2},${-r * .78 - 9})`);
+        g.select('.tw-badge rect').attr('width', w);
+        g.select('.tw-badge text').attr('x', w / 2).text(txt);
+        // label: title, then artist (tracks) or date (episodes)
+        const label = g.select('.tw-label').attr('y', r + 12);
+        label.select('.tw-label__title').text(clip(d.title, 24));
+        label.select('.tw-label__sub').text(clip(d.type === 'track' ? d.artist : d.date, 26));
+        g.select('title').text(d.type === 'track'
+          ? `${d.artist} – ${d.title}${d.plays ? `\nPlayed in ${d.plays >= 50 ? '50+' : d.plays} NTS episode${d.plays === 1 ? '' : 's'}` : ''}`
+          : `${d.title}${d.date ? ' · ' + d.date : ''}`);
       });
   }
 
@@ -187,10 +249,11 @@ const TrackWeb = (() => {
     const d = selected;
     const hint = el('p', 'trackweb__hint',
       !nodes.length ? 'Search for a track, or start from the one playing.'
-        : d ? '' : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to expand it.`);
+        : d ? '' : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to expand it. Bigger tracks, with a number, were played in more episodes.`);
     if (!d) { box.append(hint); return; }
     const title = el('p', 'trackweb__title', d.title);
-    const sub = el('p', 'trackweb__sub', d.type === 'track' ? d.artist : `Episode${d.date ? ' · ' + d.date : ''}`);
+    const playsText = d.plays ? ` · played in ${d.plays >= 50 ? '50+' : d.plays} NTS episode${d.plays === 1 ? '' : 's'}` : '';
+    const sub = el('p', 'trackweb__sub', d.type === 'track' ? `${d.artist}${playsText}` : `Episode${d.date ? ' · ' + d.date : ''}`);
     const actions = el('div', 'trackweb__actions');
     if (d.type === 'track') {
       const p = playableEpisode(d);

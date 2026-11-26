@@ -1123,23 +1123,31 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* nodes and links */
 .tw-link { stroke: var(--grey-4); stroke-width: 1; transition: stroke .15s, opacity .15s; }
-.tw-link.is-lit { stroke: var(--white); }
-.tw-link.is-dim { opacity: .25; }
+.tw-link.is-lit { stroke: var(--grey-1); }
+.tw-link.is-dim { opacity: .2; }
 .tw-node { cursor: pointer; transition: opacity .15s; }
-.tw-node.is-dim { opacity: .25; }
-.tw-node--track .tw-shape { fill: var(--grey-4); }
-.tw-node--track .tw-ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
-.tw-node--track.is-expanded .tw-ring { stroke: var(--white); }
-.tw-node--episode .tw-shape { fill: var(--black); stroke: var(--white); stroke-width: 1; }
-.tw-node--episode.is-expanded .tw-shape { fill: var(--white); }
-.tw-node.is-root .tw-ring, .tw-node.is-root .tw-shape { stroke: var(--live); stroke-width: 2; }
-.tw-node.is-selected .tw-ring, .tw-node.is-selected .tw-shape { stroke: var(--live); stroke-width: 3; }
-.tw-node.is-loading .tw-ring, .tw-node.is-loading .tw-shape { animation: twPulse .8s ease-in-out infinite; }
-@keyframes twPulse { 50% { stroke-opacity: .2; } }
-.tw-label { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
-.tw-node--episode .tw-label { fill: var(--grey-2); font-weight: 400; }
-@media (prefers-reduced-motion: reduce) { .tw-node.is-loading .tw-ring, .tw-node.is-loading .tw-shape { animation: none; } }
+.tw-node.is-dim { opacity: .2; }
+.tw-shape { fill: var(--grey-4); }
+.tw-ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
+.tw-node.is-expanded .tw-ring { stroke: var(--grey-1); }
+.tw-node--episode:not(.has-img) .tw-shape { fill: var(--black); stroke: var(--grey-1); stroke-width: 1; }
+/* loading (artwork or expanding): a gentle pulse */
+.tw-node.is-loading .tw-body { animation: twPulse 1.6s ease-in-out infinite; }
+@keyframes twPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+/* selected: thin white ring; where you started: small red dot */
+.tw-select { fill: none; stroke: var(--white); stroke-width: 1; opacity: 0; }
+.tw-node.is-selected .tw-select { opacity: 1; }
+.tw-root { fill: var(--live); stroke: var(--black); stroke-width: 1.5; display: none; }
+.tw-node.is-root .tw-root { display: block; }
+/* play-count badge */
+.tw-badge rect { fill: var(--white); }
+.tw-badge text { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--black); pointer-events: none; }
+/* labels */
+.tw-label { pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
+.tw-label__title { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); }
+.tw-label__sub { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); }
+@media (prefers-reduced-motion: reduce) { .tw-node.is-loading .tw-body { animation: none; opacity: .6; } }
 
 /* Track labels only where they help: root, selected, expanded, hovered, or zoomed in */
-.tw-node--track:not(.is-root):not(.is-selected):not(.is-expanded):not(:hover) .tw-label { display: none; }
+.tw-node--track:not(.is-root):not(.is-selected):not(.is-expanded):not(.is-popular):not(:hover) .tw-label { display: none; }
 .trackweb__svg.is-zoomed .tw-node--track .tw-label { display: block; }

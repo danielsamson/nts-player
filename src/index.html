@@ -84,8 +84,24 @@
     <div class="stage__modes" role="tablist" aria-label="Stage">
       <button class="stage__mode active" data-mode="now" role="tab">Now playing</button>
       <button class="stage__mode" data-mode="web" role="tab">Track web</button>
+      <button class="stage__mode" data-mode="world" role="tab">World</button>
     </div>
     <!-- Track web (prototype): explore through what DJs played -->
+    <!-- NTS world: where shows broadcast from, and the schedule moving around the globe -->
+    <div class="world" id="world" hidden>
+      <div class="world__bar">
+        <p class="world__when" aria-live="polite"></p>
+        <button class="mynts-btn world__now" hidden>Back to now</button>
+        <button class="mynts-btn world__play">▶ Play the week</button>
+      </div>
+      <svg class="world__svg" role="img" aria-label="Globe of where NTS shows broadcast from"></svg>
+      <div class="world__time">
+        <input class="world__scrub" type="range" aria-label="Time in the schedule">
+        <span class="world__nowmark" aria-hidden="true"></span>
+        <div class="world__days" aria-hidden="true"></div>
+      </div>
+      <div class="world__info"></div>
+    </div>
     <div class="trackweb" id="trackweb" hidden>
       <div class="trackweb__bar">
         <div class="trackweb__search">
@@ -216,5 +232,9 @@
   <script src="archive.js"></script>
   <script src="vendor/d3.min.js"></script>
   <script src="trackweb.js"></script>
+  <script src="vendor/land-110m.js"></script>
+  <script src="world-places.js"></script>
+  <script src="world-data.js"></script>
+  <script src="world.js"></script>
 </body>
 </html>

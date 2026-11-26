@@ -815,7 +815,7 @@ setInterval(() => {
 }, 5 * 60_000);
 
 async function refresh() {
-  try { live = await window.nts.getLive(); render(); Reminders.check(); if (typeof Archive !== 'undefined') Archive.refreshOnAir(); }
+  try { live = await window.nts.getLive(); render(); Reminders.check(); if (typeof Archive !== 'undefined') Archive.refreshOnAir(); if (typeof World !== 'undefined') World.refresh(); }
   catch (e) { if (!live) $('title').textContent = 'Could not reach NTS'; }
 }
 
@@ -1297,12 +1297,15 @@ var NowSave = (() => {   // var: renderNowbar may ask before this line runs
 // ---- Stage modes: Now playing / Track web ----
 function setStageMode(mode) {
   document.body.classList.toggle('stage-web', mode === 'web');
+  document.body.classList.toggle('stage-world', mode === 'world');
   document.querySelectorAll('.stage__mode').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
     b.setAttribute('aria-selected', String(b.dataset.mode === mode));
   });
   $('trackweb').hidden = mode !== 'web';
+  $('world').hidden = mode !== 'world';
   if (mode === 'web') TrackWeb.show();
+  if (mode === 'world') World.show(); else if (typeof World !== 'undefined') World.hide();
 }
 document.querySelectorAll('.stage__mode').forEach((b) => b.addEventListener('click', () => setStageMode(b.dataset.mode)));
 // Open the track web on a track (switches to the wide view if needed)

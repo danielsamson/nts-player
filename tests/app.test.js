@@ -98,6 +98,8 @@ async function mockAccount() {
     await win.locator('#archiveContent .archive-tracks .track__play').nth(3).click();
     await waitFor(() => ArchivePlayer.state.playing && ArchivePlayer.state.position > 560000, null, { timeout: 60000 });
     expect(await win.evaluate(() => !playing), 'live radio should have stopped');
+    // the bar names the track playing (the stage may be showing the track web)
+    await waitFor(() => /Sweetie/i.test(document.getElementById('next').textContent), null, { timeout: 15000, what: 'the current track in the bar' });
   });
 
   await test('Play from in a different episode lands at the right time', async () => {

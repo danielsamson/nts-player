@@ -233,6 +233,14 @@ function setNowArt(url) {
 }
 const fmtMs = (ms) => fmtOffset(Math.max(0, Math.floor((ms || 0) / 1000)));
 
+// The track playing in an archive episode, for the bar (the stage may be showing the track web)
+function nowTrackText(a) {
+  const pos = a.position / 1000;
+  let cur = null;
+  for (const t of a.episode?.tracks || []) { const o = t.offset ?? t.offset_estimate; if (o != null && o <= pos) cur = t; }
+  return cur ? `${cur.artist} – ${cur.title}` : (a.episode?.date || '');
+}
+
 function renderNowbar() {
   const a = ArchivePlayer.state;
   const archive = source === 'archive' && a.episode;
@@ -252,7 +260,8 @@ function renderNowbar() {
     $('nowLabel').textContent = a.episode.title;
     $('next').textContent = !navigator.onLine ? 'Offline · waiting for a connection'
       : a.error ? `${a.error}${localStorage.getItem('autoplay') !== '0' ? ' Skipping…' : ''}`
-      : (a.loading ? 'Loading…' : `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}${a.episode.date ? ' · ' + a.episode.date : ''}`);
+      : a.loading ? 'Loading…'
+      : [nowTrackText(a), `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}`].filter(Boolean).join(' · ');
     $('seekFill').style.width = a.duration ? `${Math.min(100, (a.position / a.duration) * 100)}%` : '0%';
     $('nowArt').hidden = !nowArtUrl;
     document.title = `NTS Archive · ${a.episode.title}`;

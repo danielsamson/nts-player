@@ -43,7 +43,8 @@ schedule, history and lists.
   clickable too.
 - **Browse and search** every NTS show and episode: recently added, search, and show
   pages with all their episodes.
-- **Play episodes** in the app with a seek bar, and previous / next track buttons.
+- **Play episodes** in the app with a seek bar, and previous / next track buttons. The
+  now-playing bar shows the track playing, so you always see it (even in the track web).
 - **Keep listening.** When an episode ends, the show's previous episode starts (then the
   newest in the archive). Switch it off with **Autoplay next episode** on any episode page.
 - **Tracklists that follow the mix.** The track playing is highlighted; click a track for

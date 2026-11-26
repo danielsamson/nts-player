@@ -1063,7 +1063,9 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     if (TrackNotify.enabled()) window.nts.notify({ title: `${t.artist} – ${t.title}`, body: `Live on NTS ${channel + 1}${show ? ' · ' + show : ''}`, art: art?.large || '' });
   }
   setInterval(poll, 20000);
-  return { get track() { return track; }, poll, showList, clear: () => set(null) };
+  return { get track() { return track; }, poll, showList, clear: () => set(null),
+    // every track heard in this broadcast on the current channel, newest first
+    log: () => readLog()[broadcastKey(channel)]?.tracks || [] };
 })();
 
 // ---- Shows you follow in My NTS ----

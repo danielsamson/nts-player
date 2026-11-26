@@ -179,6 +179,22 @@ async function mockAccount() {
     await win.click('#expandBtn');
   });
 
+  await test('Track web: follow along adds tracks as they play', async () => {
+    await win.evaluate(() => Archive.playFrom('motive', 'motive-30th-september-2026', 570));
+    await waitFor(() => ArchivePlayer.state.playing && ArchivePlayer.state.position > 560000, null, { timeout: 60000, what: 'the episode to play' });
+    await win.click('#expandBtn');
+    await waitFor(() => window.innerWidth >= 720, null, { what: 'wide view' });
+    await win.click('.stage__mode[data-mode="web"]');
+    await win.evaluate(() => { const b = document.querySelector('.trackweb__follow'); if (!/Following/.test(b.textContent)) b.click(); });
+    await waitFor(() => document.querySelectorAll('.tw-node--track').length >= 3 && document.querySelector('.tw-node.is-playing'), null, { timeout: 30000, what: 'the tracks heard so far, one playing' });
+    const before = await win.evaluate(() => document.querySelectorAll('.tw-node--track').length);
+    await win.click('#nextTrack');
+    await waitFor((n) => document.querySelectorAll('.tw-node--track').length > n, before, { timeout: 30000, what: 'the next track to pop in' });
+    await win.click('.trackweb__follow');
+    await win.click('.stage__mode[data-mode="now"]');
+    await win.click('#expandBtn');
+  });
+
   await test('Keyboard: Space pauses and plays', async () => {
     await win.evaluate(() => document.activeElement?.blur());
     const before = await win.evaluate(() => ArchivePlayer.state.playing);

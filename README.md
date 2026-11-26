@@ -95,6 +95,11 @@ means "this episode played this track". Click a node to select it; **Expand** (o
 a track shows the episodes that played it, an episode shows its tracklist. Pick a track to **play it from that
 point** in the episode you found it through (or choose another), open its details, save it, or start a new web from it.
 
+**Follow along:** with an episode (or live radio, for Supporters) playing, the track web
+puts the show in the middle and each track pops in around it as it plays, the current
+one pulsing red. It starts by itself when you open the track web while something plays;
+skip ahead and the tracks you skipped appear.
+
 Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
 or **Explore this show** on any episode, to bring in its episodes six at a time: tracks
 shared between them light up, and the show's panel lists the ones it played most. Shows

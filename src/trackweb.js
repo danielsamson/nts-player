@@ -199,6 +199,7 @@ const TrackWeb = (() => {
     gNodes = gZoom.append('g').attr('class', 'tw-nodes');
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
       gZoom.attr('transform', e.transform);
+      if (e.sourceEvent && follow) follow.userZoomed = true;      // you zoomed: stop zooming for you
       zoomed = e.transform.k > 1.3;
       // names stay close to the same size on screen, so zooming in makes room for more of them
       const fs = 9 / Math.pow(Math.max(1, e.transform.k), .8);
@@ -236,13 +237,14 @@ const TrackWeb = (() => {
       .call(d3.drag()
         .on('start', (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
         .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
-        .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; d.held = false; }))
+        .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.held = false; if (follow?.ep !== d) { d.fx = null; d.fy = null; } }))
       .on('click', (e, d) => { e.stopPropagation(); select(d); })
       .on('dblclick', (e, d) => { e.stopPropagation(); select(d); expand(d); })
       .on('mouseenter', (e, d) => hoverSoon(d))
       .on('mouseleave', () => hoverSoon(null));
     enter.each(function (d) {
       const g = d3.select(this);
+      if (d.type === 'track') g.append('circle').attr('class', 'tw-pulse');
       const shape = g.append('g').attr('class', 'tw-body');
       if (d.type === 'track') {
         shape.append('circle').attr('class', 'tw-shape');
@@ -383,12 +385,15 @@ const TrackWeb = (() => {
       .classed('has-img', (d) => !!d.img)
       .classed('is-popular', (d) => d.plays >= 3)
       .classed('is-shared', (d) => d.type === 'track' && d.inWeb >= 2)
+      .classed('is-playing', (d) => !!follow && d.id === follow.playingId)
+      .classed('is-new', (d) => !!d.popAt && Date.now() - d.popAt < 900)
+      .style('--pop-delay', (d) => (d.popDelay ? `${d.popDelay}ms` : null))
       .classed('is-followed', (d) => d.type !== 'track' && typeof Following !== 'undefined' && Following.has(d.show))
       .each(function (d) {
         const g = d3.select(this);
         const r = d.r;
         if (d.type === 'track') {
-          g.selectAll('.tw-shape, .tw-ring').attr('r', r);
+          g.selectAll('.tw-shape, .tw-ring, .tw-pulse').attr('r', r);
           g.select('.tw-hole').attr('r', Math.max(2, r * .32));
           g.select('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2).attr('href', d.img || null);
         } else {
@@ -509,8 +514,8 @@ const TrackWeb = (() => {
     box.scrollTop = 0;
     const d = selected;
     const hint = el('p', 'trackweb__hint',
-      !nodes.length ? 'Search for a track or a show, or start from the one playing.'
-        : d ? '' : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to select it, double-click to expand it. Bigger tracks, with a number, were played in more episodes.`);
+      !nodes.length ? 'Search for a track or a show, start from the one playing, or follow along.'
+        : d ? '' : follow ? `Following along: each track appears as it plays (${follow.shown.size} so far). Click one to select it, or expand it to see where else it was played.` : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to select it, double-click to expand it. Bigger tracks, with a number, were played in more episodes.`);
     if (!d) { box.append(hint); return; }
     const title = el('p', 'trackweb__title', d.title);
     if (d.type === 'show') return paintShowInfo(box, d);
@@ -620,6 +625,7 @@ const TrackWeb = (() => {
   }
   // origin (optional): the episode we know it's in { show, episode, title, date, offset }
   function start(t, origin) {
+    stopFollow();
     build(); center(); clear();
     const n = addNode({ id: trackId(t), type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id });
     rootId = n.id;
@@ -635,6 +641,7 @@ const TrackWeb = (() => {
   }
 
   function startShow(alias, name) {
+    stopFollow();
     build(); center(); clear();
     const s = addNode({ id: showId(alias), type: 'show', show: alias, title: name });
     rootId = s.id;
@@ -701,6 +708,96 @@ const TrackWeb = (() => {
     const t = currentTrack();
     if (t) start(t, currentOrigin(t)); else showSnack('Nothing with a track ID is playing right now');
   });
+  // ---------- follow along ----------
+  // The episode (or live show) you're hearing sits in the middle; each track pops in
+  // around it as it starts playing, and the one playing pulses.
+  let follow = null;     // { key, ep, shown: Set of track ids, playingId }
+  const followBtn = host.querySelector('.trackweb__follow');
+  followBtn.addEventListener('click', () => (follow ? stopFollow() : startFollow()));
+  function hearing() {
+    if (source === 'archive' && ArchivePlayer.state.episode) {
+      const ep = ArchivePlayer.state.episode;
+      return { key: `a|${ep.show}/${ep.episode}`, kind: 'archive', show: ep.show, episode: ep.episode, title: ep.title, date: ep.date };
+    }
+    if (source === 'live' && playing) {
+      const r = live?.results?.[channel];
+      const info = r ? showInfo(r) : null;
+      if (info?.show && info?.episode) return { key: `l|${channel}|${info.episode}`, kind: 'live', show: info.show, episode: info.episode, title: info.title, date: '' };
+    }
+    return null;
+  }
+  function startFollow(quiet) {
+    const h = hearing();
+    if (!h) { if (!quiet) showSnack('Play an episode or live radio to follow along'); return false; }
+    build(); center(); clear();
+    const ep = addNode({ id: epId(h.show, h.episode), type: 'episode', show: h.show, episode: h.episode, title: h.title, date: h.date });
+    ep.fx = 0; ep.fy = 0;          // the show stays in the middle; tracks gather around it
+    rootId = ep.id;
+    follow = { key: h.key, kind: h.kind, ep, shown: new Set(), playingId: null };
+    followBtn.classList.add('mynts-btn--on'); followBtn.textContent = 'Following'; followBtn.setAttribute('aria-pressed', 'true');
+    update();
+    followTick(true);
+    paintInfo();
+    return true;
+  }
+  function stopFollow() {
+    if (!follow) return;
+    if (follow.ep) { follow.ep.fx = null; follow.ep.fy = null; }
+    follow = null;
+    followBtn.classList.remove('mynts-btn--on'); followBtn.textContent = 'Follow along'; followBtn.setAttribute('aria-pressed', 'false');
+    schedulePaint();
+  }
+  // The tracks heard so far, oldest first, and which one is playing
+  function heardSoFar() {
+    if (follow.kind === 'archive') {
+      const a = ArchivePlayer.state;
+      const tracks = (a.episode?.tracks || []).filter((t) => t.title);
+      if (!tracks.some((t) => (t.offset ?? t.offset_estimate) != null)) return { tracks, playing: -1, untimed: true };
+      const pos = a.position / 1000;
+      let idx = -1;
+      tracks.forEach((t, i) => { const o = t.offset ?? t.offset_estimate; if (o != null && o <= pos) idx = i; });
+      return { tracks: tracks.slice(0, idx + 1), playing: idx };
+    }
+    const log = LiveNow.log().slice().reverse();
+    const cur = LiveNow.track;
+    const id = (t) => trackId(t);
+    if (cur && !log.some((t) => id(t) === id(cur))) log.push(cur);
+    return { tracks: log, playing: cur ? log.findIndex((t) => id(t) === id(cur)) : -1 };
+  }
+  function followTick(initial) {
+    if (!follow) return;
+    const h = hearing();
+    if (!h) return;
+    if (h.key !== follow.key) { startFollow(true); return; }      // the next episode started
+    const { tracks, playing: idx, untimed } = heardSoFar();
+    let added = 0;
+    tracks.forEach((t, i) => {
+      const id = trackId(t);
+      if (follow.shown.has(id)) return;
+      const n = addNode({ id, type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id, near: follow.ep.id });
+      if (!n) return;
+      follow.shown.add(id);
+      n.popAt = Date.now();
+      n.popDelay = Math.min(added, 20) * 60;     // several at once (seeking ahead): one after another
+      if (!n.via) n.via = follow.ep.id;
+      addLink(n, follow.ep, { offset: t.offset ?? t.offset_estimate ?? null });
+      added++;
+    });
+    // a small web starts close up and zooms out gently as it grows
+    if (added && !follow.userZoomed) {
+      const k = Math.max(0.9, Math.min(2, 2.2 - Math.sqrt(follow.shown.size) * 0.22));
+      svg.transition().duration(initial ? 0 : 900).call(zoom.transform, d3.zoomIdentity.scale(k));
+    }
+    const playingId = idx >= 0 && tracks[idx] ? trackId(tracks[idx]) : null;
+    const changed = added || playingId !== follow.playingId;
+    follow.playingId = playingId;
+    if (added) { update(); if (untimed && initial) showSnack('This tracklist has no times, so every track is shown'); }
+    if (changed) { schedulePaint(); if (!selected) paintInfo(); setTimeout(schedulePaint, 1000); }
+  }
+  let followTimer = null;
+  ArchivePlayer.onChange(() => { if (follow && !followTimer) followTimer = setTimeout(() => { followTimer = null; followTick(); }, 400); });
+  setInterval(() => { if (follow) followTick(); }, 5000);
+
   // The episode the current track is playing in
   function currentOrigin(t) {
     if (source === 'archive' && ArchivePlayer.state.episode) {
@@ -723,7 +820,7 @@ const TrackWeb = (() => {
     start,
     startShow,
     // open with the current track if the web is empty
-    show() { build(); center(); if (!nodes.length) { const t = currentTrack(); if (t) start(t, currentOrigin(t)); else paintInfo(); } },
+    show() { build(); center(); if (!nodes.length && !startFollow(true)) { const t = currentTrack(); if (t) start(t, currentOrigin(t)); else paintInfo(); } },
     get empty() { return !nodes.length; }
   };
 })();

@@ -1212,3 +1212,15 @@ body.playing .channel .track__time { color: var(--grey-3); }
 @keyframes luckyRoll { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .lucky.is-busy svg { animation: none; } }
 
+
+/* Track web, follow along: tracks pop in as they play; the playing one pulses */
+.tw-node.is-new .tw-body { animation: twPop .55s cubic-bezier(.2, 1.5, .4, 1) var(--pop-delay, 0ms) both; transform-box: fill-box; transform-origin: center; }
+@keyframes twPop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.tw-pulse { fill: none; stroke: var(--live); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; pointer-events: none; }
+.tw-node.is-playing .tw-pulse { animation: twPlaying 1.8s ease-out infinite; }
+.tw-node.is-playing .tw-ring { stroke: var(--live); stroke-width: 2; }
+@keyframes twPlaying { from { transform: scale(1); opacity: .9; } to { transform: scale(1.9); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .tw-node.is-new .tw-body { animation: none; }
+  .tw-node.is-playing .tw-pulse { animation: none; opacity: .8; transform: scale(1.25); }
+}

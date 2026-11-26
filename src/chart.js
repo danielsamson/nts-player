@@ -15,18 +15,37 @@ const Chart = (() => {
   const mem = new Map();          // period -> result
   const loading = new Map();
 
-  // One file's tracks as chart rows (most played first)
-  function rowsOf(data, limit = 100) {
+  // One file's tracks as chart rows (most played first). With a genre family ("housetechno"),
+  // only plays in episodes tagged with it count: ranked by the shows that played it under it.
+  function chartTracks(data, fam) {
+    if (!fam) return data.tracks.filter((t) => t[2] >= 2).map((t) => ({ t, shows: t[3].length, episodes: t[2] }));
+    const fi = (data.families || []).findIndex((f) => f[0] === fam);
+    if (fi < 0) return [];
+    return data.tracks.map((t) => { const g = (t[7] || []).find((x) => x[0] === fi); return g && g[2] >= 2 ? { t, shows: g[1], episodes: g[2] } : null; })
+      .filter(Boolean).sort((a, b) => b.shows - a.shows || b.episodes - a.episodes);
+  }
+  function rowsOf(data, limit = 100, fam = null) {
     const shows = data.showList;
-    return data.tracks.filter((t) => t[2] >= 2).slice(0, limit).map(([artist, title, episodes, idx, l]) => ({
-      artist, title, episodes, shows: idx.length,
+    return chartTracks(data, fam).slice(0, limit).map(({ t: [artist, title, , , l], shows: s, episodes }) => ({
+      artist, title, episodes, shows: s,
       latest: { show: shows[l[0]], episode: l[1], offset: l[2], d: l[3], title: (data.names?.[shows[l[0]]] || [])[0] || showName(shows[l[0]]) }
     }));
+  }
+  // track -> { shows, rank } for a file, overall or within a genre family (remembered)
+  function ranks(res, fam = null) {
+    if (!fam) return res.map;
+    res.famMaps ||= new Map();
+    if (!res.famMaps.has(fam)) res.famMaps.set(fam, new Map(chartTracks(res.data, fam).map((x, i) => [key(x.t[0], x.t[1]), { shows: x.shows, rank: i + 1 }])));
+    return res.famMaps.get(fam);
+  }
+  // The genre families a file has a chart for: [{ id, name, tracks }], most episodes first
+  function families(res, min = 10) {
+    return (res?.data.families || []).map(([id, name]) => ({ id, name, tracks: ranks(res, id).size })).filter((f) => f.tracks >= min);
   }
   async function load(period) {
     const data = await window.nts.chart(period).catch(() => null);
     if (!data) return null;
-    const res = { period, data, rows: rowsOf(data), episodes: data.episodes, generated: data.generated, map: new Map() };
+    const res = { period, data, rows: rowsOf(data), rowsFor: (fam, limit) => rowsOf(data, limit, fam), episodes: data.episodes, generated: data.generated, map: new Map() };
     // track -> { shows, rank } (rank among tracks played in 2+ episodes)
     let rank = 0;
     for (const t of data.tracks) res.map.set(key(t[0], t[1]), { shows: t[3].length, rank: t[2] >= 2 ? ++rank : null });
@@ -56,7 +75,7 @@ const Chart = (() => {
   const monthOf = (period) => (period === 'recent' ? ym(new Date()) : period);
   // For a period: the months before it (up to `count`, ending with it) and the month to
   // compare chart movement against
-  async function trend(period, count = 12) {
+  async function trend(period, count = 12, fam = null) {
     const have = new Set(await months());
     const end = monthOf(period);
     const list = [];
@@ -67,9 +86,9 @@ const Chart = (() => {
     return {
       months: list,
       // shows per month for a track (null where there's no data for that month)
-      series: (t) => files.map((f) => (f ? (f.map.get(key(t.artist, t.title))?.shows || 0) : null)),
+      series: (t) => files.map((f) => (f && (!fam || f.data.families) ? (ranks(f, fam).get(key(t.artist, t.title))?.shows || 0) : null)),
       // chart movement: rank last month, or null if it wasn't in the chart
-      prevRank: (t) => (prev ? prev.map.get(key(t.artist, t.title))?.rank ?? null : undefined)
+      prevRank: (t) => (prev && (!fam || prev.data.families) ? ranks(prev, fam).get(key(t.artist, t.title))?.rank ?? null : undefined)
     };
   }
 
@@ -328,6 +347,6 @@ const Chart = (() => {
     return out;
   }
 
-  return { get, peek, months, year, trend, spark, showName, key, shift,
+  return { get, peek, months, year, trend, spark, showName, key, shift, families,
     reset() { mem.clear(); loading.clear(); } };      // tests
 })();

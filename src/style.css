@@ -1305,6 +1305,9 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .chart-year { display: block; width: 100%; padding: 10px 12px; text-align: left; font-size: 12px; line-height: 14px; font-weight: 700; text-transform: uppercase; border-top: var(--rule); }
 .chart-head .chart-year { display: inline-block; width: auto; border: var(--rule); height: var(--btn-m); margin-left: 8px; padding: 0 12px; }
 .chart-year:hover { background: var(--white); color: var(--black); }
+.chart-genres { padding: 10px 12px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chart-genres[hidden] { display: none; }
+.chart-genre[aria-pressed="true"] { background: var(--white); color: var(--black); }
 
 /* ---- NTS in <year>: full-window cards ---- */
 .year { position: fixed; inset: 0; z-index: 200; background: var(--black); display: grid; grid-template-columns: 56px minmax(0, 1fr) 56px; grid-template-rows: auto minmax(0, 1fr); }

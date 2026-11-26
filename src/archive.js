@@ -60,7 +60,7 @@ const Archive = (() => {
     else if (current.type === 'genres') renderGenres();
     else if (current.type === 'explore') renderExplore(current);
     else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
-    else if (current.type === 'chart') renderChart(current.period);
+    else if (current.type === 'chart') renderChart(current.period, current.genre);
   }
 
   function backBar(label) {
@@ -768,12 +768,12 @@ const Archive = (() => {
       `${r.shows} show${r.shows === 1 ? '' : 's'}${r.episodes > r.shows ? ` · ${r.episodes} episodes` : ''}`));
     return li;
   }
-  function chartList(res, limit) {
+  function chartList(res, limit, genre = null) {
     const ol = el('ol', 'tracks archive-tracks chart-list');
-    const rows = res.rows.slice(0, limit);
+    const rows = genre ? res.rowsFor(genre, limit) : res.rows.slice(0, limit);
     rows.forEach((r, i) => ol.append(chartRow(r, i)));
     // trends: a line of shows per month over the past year, and movement since last month
-    Chart.trend(res.period).then((tr) => {
+    Chart.trend(res.period, 12, genre).then((tr) => {
       [...ol.children].forEach((li, i) => {
         const r = rows[i];
         const s = tr.series(r);
@@ -814,7 +814,9 @@ const Archive = (() => {
     Chart.get('recent').then((res) => { if (box.isConnected) fill(res); });
     return [head, box];
   }
-  async function renderChart(period = 'recent') {
+  // genre family names from NTS ("house / techno") as chip labels
+  const genreLabel = (name) => titleCase(name).replace(/\s*\/\s*/g, ' / ').replace(/\bRhythm & Blues\b/i, 'R&B');
+  async function renderChart(period = 'recent', genre = null) {
     const bar = backBar('Most played on NTS');
     const pick = el('select', 'chart-pick');
     pick.setAttribute('aria-label', 'Period');
@@ -823,21 +825,38 @@ const Archive = (() => {
     if (period !== 'recent') addOpt(period);
     pick.value = period;
     Chart.months().then((ms) => { ms.filter((m) => m !== period).forEach(addOpt); pick.value = period; });
-    pick.addEventListener('change', () => { current.period = pick.value; renderChart(pick.value); });
+    pick.addEventListener('change', () => { current.period = pick.value; renderChart(pick.value, current.genre); });
     const head = el('div', 'chart-head');
     head.append(pick, yearLink());
+    // genre chips: the same chart, counting only plays in episodes tagged with that genre
+    const chips = el('div', 'tags chart-genres');
+    chips.setAttribute('role', 'group');
+    chips.setAttribute('aria-label', 'Genre');
     const box = el('div', 'chart-box chart-box--page');
-    root.replaceChildren(bar, head, box);
+    root.replaceChildren(bar, head, chips, box);
     const fill = (res) => {
-      if (!res?.rows.length) { box.replaceChildren(el('p', 'archive__empty', 'No chart for this period yet.')); return; }
+      const fams = Chart.families(res);
+      const sel = fams.find((f) => f.id === genre) || null;
+      const chip = (label, id) => {
+        const b = el('button', 'tag chart-genre', label);
+        b.setAttribute('aria-pressed', String((sel?.id || null) === id));
+        b.addEventListener('click', () => { current.genre = id; renderChart(period, id); });
+        return b;
+      };
+      chips.replaceChildren(...(fams.length ? [chip('All', null), ...fams.map((f) => chip(genreLabel(f.name), f.id))] : []));
+      chips.hidden = !fams.length;
+      const rows = res && (sel ? res.rowsFor(sel.id, 100) : res.rows);
+      if (!rows?.length) { box.replaceChildren(el('p', 'archive__empty', 'No chart for this period yet.')); return; }
       box.replaceChildren(
-        el('p', 'chart-box__span', `${periodLabel(period)} · ${res.episodes} episodes. Ranked by how many different shows played each track.`),
-        chartList(res, 100));
+        el('p', 'chart-box__span', sel
+          ? `${periodLabel(period)} · ${genreLabel(sel.name)}. Ranked by how many different shows played each track in episodes tagged ${genreLabel(sel.name)}.`
+          : `${periodLabel(period)} · ${res.episodes} episodes. Ranked by how many different shows played each track.`),
+        chartList(res, 100, sel?.id || null));
     };
     const now = Chart.peek(period);
     if (now) fill(now); else box.replaceChildren(loader('Loading the chart'));
     const res = await Chart.get(period);
-    if (box.isConnected && current.type === 'chart' && (current.period || 'recent') === period) fill(res);
+    if (box.isConnected && current.type === 'chart' && (current.period || 'recent') === period && (current.genre || null) === genre) fill(res);
   }
 
   // ---- Feeling lucky: a random episode from anywhere in the archive ----

@@ -17,7 +17,7 @@ const sitemap = require('../sitemap');
 
 const API = 'https://www.nts.live/api/v2';
 const KEEP_TRACKS = 2000;            // per file, most played first (enough to merge into a year)
-const VERSION = 2;                   // bump when files gain data: older ones are rebuilt a year at a time
+const VERSION = 3;                   // bump when files gain data: older ones are rebuilt a year at a time
 const DAY = 864e5;
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -60,6 +60,15 @@ async function debutsOf() {
   return firstEpisode;
 }
 
+// NTS's top-level genre families ("housetechno" -> "house / techno"): an episode's genre ids
+// start with their family ("genres-housetechno-acid")
+let families = null;
+async function familyNames() {
+  if (!families) families = new Map(((await get(`${API}/genres`))?.results || []).map((g) => [g.id, g.name || g.id]));
+  return families;
+}
+const familyOf = (id) => String(id || '').replace(/^genres-/, '').split('-')[0];
+
 async function build(period) {
   const now = Date.now();
   let from, to;
@@ -71,6 +80,8 @@ async function build(period) {
   const showEps = new Map();
   const tracks = new Map();
   const genres = new Map();            // genre -> episodes tagged with it
+  const famEps = new Map();            // genre family -> episodes tagged with it
+  const famNames = await familyNames();
   const artists = new Map();           // artist -> { name, tracks: Set, shows: Set }
   let plays = 0, read = 0;
   await pool(refs, 3, async (r) => {
@@ -80,6 +91,8 @@ async function build(period) {
       get(`${API}/shows/${r.show}/episodes/${r.episode}`)
     ]);
     for (const g of new Set((ep?.genres || []).map((x) => String(x.value || '').trim()).filter(Boolean))) genres.set(g, (genres.get(g) || 0) + 1);
+    const fams = [...new Set((ep?.genres || []).map((x) => familyOf(x.id)).filter((f) => famNames.has(f) && f !== 'other'))];
+    fams.forEach((f) => famEps.set(f, (famEps.get(f) || 0) + 1));
     read++;
     if (read % 100 === 0) console.log(`  ${read} / ${refs.length}`);
     const seen = new Set();
@@ -91,8 +104,13 @@ async function build(period) {
       if (seen.has(k)) continue;                       // once per episode
       seen.add(k);
       let m = tracks.get(k);
-      if (!m) { m = { a: x.artist, t: x.title, e: 0, shows: new Set(), firstBy: new Map(), latest: null, first: r.d }; tracks.set(k, m); }
+      if (!m) { m = { a: x.artist, t: x.title, e: 0, shows: new Set(), firstBy: new Map(), latest: null, first: r.d, fams: new Map() }; tracks.set(k, m); }
       m.e++;
+      for (const f of fams) {
+        let g = m.fams.get(f);
+        if (!g) { g = { shows: new Set(), e: 0 }; m.fams.set(f, g); }
+        g.shows.add(r.show); g.e++;
+      }
       m.shows.add(r.show);
       if (!m.firstBy.has(r.show) || r.d < m.firstBy.get(r.show)) m.firstBy.set(r.show, r.d);
       for (const name of splitArtists(x.artist)) {
@@ -108,6 +126,8 @@ async function build(period) {
   });
 
   const top = [...tracks.values()].sort((a, b) => b.shows.size - a.shows.size || b.e - a.e || b.latest.d - a.latest.d).slice(0, KEEP_TRACKS);
+  const familyList = [...famEps].sort((a, b) => b[1] - a[1]).map(([f]) => f);
+  const fi = new Map(familyList.map((f, i) => [f, i]));
   const showList = [];
   const idx = new Map();
   const si = (s) => { if (!idx.has(s)) { idx.set(s, showList.length); showList.push(s); } return idx.get(s); };
@@ -132,8 +152,12 @@ async function build(period) {
     episodes: refs.length, shows: showEps.size, plays, uniqueTracks: tracks.size,
     showList,
     // [artist, title, episodes, [show indexes], [latest show index, episode, offset, date], first played,
-    //  [day each of those shows first played it (days since 1970)]]
-    tracks: top.map((m) => { const ss = [...m.shows]; return [m.a, m.t, m.e, ss.map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first, ss.map((s) => Math.floor(m.firstBy.get(s) / DAY))]; }),
+    //  [day each of those shows first played it (days since 1970)],
+    //  [[genre family index, shows, episodes] for each family it was played under]]
+    tracks: top.map((m) => { const ss = [...m.shows]; return [m.a, m.t, m.e, ss.map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first, ss.map((s) => Math.floor(m.firstBy.get(s) / DAY)),
+      [...m.fams].map(([f, g]) => [fi.get(f), g.shows.size, g.e])]; }),
+    // genre families, most episodes first: [id, name, episodes] (tracks point at these)
+    families: familyList.map((f) => [f, famNames.get(f), famEps.get(f)]),
     // genres by number of episodes tagged with them
     genres: [...genres].sort((a, b) => b[1] - a[1]).slice(0, 60),
     // artists with the most different tracks played (from every play): [name, tracks, [show indexes]]
@@ -198,9 +222,21 @@ async function releaseYear(artist, title) {
   } catch {}
   return found.length ? Math.min(...found) : 0;
 }
+const yearsFile = () => path.join(OUT, 'charts', 'years-v2.json');     // v2: looser search, retries, Deezer/iTunes fallback
+const keyOf = (t) => `${n(t[0])}|${n(t[1])}`;
+// A freshly built month gets every release year already looked up, so a rebuild never loses
+// them; it's only marked done (yearsV) if none of its top tracks are left to look up
+function cachedYears(d) {
+  let cache = {};
+  try { cache = JSON.parse(fs.readFileSync(yearsFile(), 'utf8')); } catch { return; }
+  const top = d.tracks.filter((t) => t[2] >= 2).slice(0, YEAR_TOP);
+  d.years = {};
+  top.forEach((t, i) => { if (cache[keyOf(t)]) d.years[i] = cache[keyOf(t)]; });
+  if (top.every((t) => keyOf(t) in cache)) d.yearsV = 2;
+}
 async function fillYears() {
   const dir = path.join(OUT, 'charts');
-  const cacheFile = path.join(dir, 'years-v2.json');     // v2: looser search, retries, Deezer/iTunes fallback
+  const cacheFile = yearsFile();
   let cache = {};
   try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch {}
   const todo = fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).sort().reverse()
@@ -213,7 +249,7 @@ async function fillYears() {
     for (const t of d.tracks) {
       if (t[2] < 2) continue;
       if (i >= YEAR_TOP) break;
-      const k = `${n(t[0])}|${n(t[1])}`;
+      const k = keyOf(t);
       if (!(k in cache)) {
         try { cache[k] = await releaseYear(t[0], t[1]); } catch (e) { console.log(`years: ${e.message}, stopping`); failed = true; break; }
       }
@@ -259,12 +295,13 @@ function periods() {
   return [...new Set(out)];
 }
 
-module.exports = { releaseYear };
+module.exports = { releaseYear, build };
 if (require.main === module) (async () => {
   fs.mkdirSync(path.join(OUT, 'charts'), { recursive: true });
   for (const p of periods()) {
     const res = await build(p);
     if (!res.episodes) { console.log(`${p}: no episodes, skipped`); continue; }
+    cachedYears(res);
     fs.writeFileSync(path.join(OUT, 'charts', `${p}.json`), JSON.stringify(res));
   }
   if (args.includes('years')) await fillYears().catch((e) => console.log(`years: ${e.message}`));

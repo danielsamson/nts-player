@@ -164,13 +164,16 @@ async function mockAccount() {
       const file = (period, complete, top) => ({
         period, complete, generated: Date.now(), episodes: 700, shows: 500, plays: 13000, uniqueTracks: 12000,
         showList: ['motive', 'tone', 'guests', 'raisa-k'],
-        tracks: top.map(([a, t, e, idx]) => [a, t, e, idx, [0, 'motive-30th-september-2026', 570, Date.now()], Date.UTC(2026, 0, 3)]),
+        tracks: top.map(([a, t, e, idx, fams]) => [a, t, e, idx, [0, 'motive-30th-september-2026', 570, Date.now()], Date.UTC(2026, 0, 3), [], fams || []]),
+        families: [['jazz', 'jazz', 300], ['housetechno', 'house / techno', 200]],
         busiest: [['guests', 50], ['motive', 9]], showEps: [['guests', 50], ['motive', 9], ['tone', 4], ['raisa-k', 4]],
         debuts: ['raisa-k'], names: { motive: ['Motive', '', 'London'], 'raisa-k': ['Raisa K', '', 'London'] }
       });
       const data = {
         index: { months: ['2026-02', '2026-01'] },
-        recent: file('recent', false, [['Kokoroko', 'Sweetie', 3, [0, 1]], ['Camille Munn', 'See It Thru', 2, [1, 3]], ['Solo', 'One Show Only', 3, [0]]]),
+        // genres: See It Thru tops jazz (3 shows there); Sweetie was only played in house / techno
+        recent: file('recent', false, [['Kokoroko', 'Sweetie', 3, [0, 1], [[1, 2, 3]]], ['Camille Munn', 'See It Thru', 2, [1, 3], [[0, 3, 3]]], ['Solo', 'One Show Only', 3, [0]],
+          ...Array.from({ length: 10 }, (_, i) => ['Filler', `Jazz ${i}`, 2, [0, 1], [[0, 2, 2]]])]),
         '2026-01': file('2026-01', true, [['Kokoroko', 'Sweetie', 3, [0, 1, 3]], ['Camille Munn', 'See It Thru', 2, [1, 3]]]),
         '2026-02': file('2026-02', true, [['Camille Munn', 'See It Thru', 4, [0, 1, 3]], ['Kokoroko', 'Sweetie', 2, [0, 1]]])
       };
@@ -198,6 +201,16 @@ async function mockAccount() {
     expect(await win.evaluate(() => !document.querySelector('.year')), 'Esc closes the year');
     // trends on the chart rows: a line of shows per month
     await waitFor(() => document.querySelectorAll('.chart-row .spark').length > 0, null, { timeout: 10000, what: 'trend lines on the chart' });
+    // the full chart, by genre: jazz has enough tracks for a chip, house / techno doesn't
+    await win.evaluate(() => [...document.querySelectorAll('.archive__see')].find((b) => b.parentElement.textContent.startsWith('Most played')).click());
+    await waitFor(() => document.querySelectorAll('.chart-genre').length > 0, null, { timeout: 10000, what: 'genre chips' });
+    const chips = await win.evaluate(() => [...document.querySelectorAll('.chart-genre')].map((b) => b.textContent));
+    expect(chips.join(',') === 'All,Jazz', `genre chips: ${chips.join(',')}`);
+    await win.evaluate(() => [...document.querySelectorAll('.chart-genre')].find((b) => b.textContent === 'Jazz').click());
+    await waitFor(() => document.querySelector('.chart-genre[aria-pressed="true"]')?.textContent === 'Jazz', null, { timeout: 5000, what: 'Jazz selected' });
+    const jazz = await win.evaluate(() => [...document.querySelectorAll('.chart-row .track__title')].map((t) => t.textContent));
+    expect(jazz[0] === 'See It Thru' && !jazz.includes('Sweetie') && jazz.length === 11, `jazz chart: ${jazz.join(' | ')}`);
+    expect(await win.evaluate(() => /3 shows/.test(document.querySelector('.chart-row .chart-row__count').textContent)), 'genre counts only plays under that genre');
   });
 
   await test('Schedule lists upcoming shows', async () => {

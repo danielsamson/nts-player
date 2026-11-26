@@ -1240,3 +1240,20 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-tick text { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); text-anchor: middle; }
 .tw-stem { stroke: var(--grey-4); stroke-width: 1; stroke-dasharray: 2 3; }
 .tw-playhead { stroke: var(--live); stroke-width: 1.5; transition: transform .45s linear; }
+
+/* Timeline: the same track in other episodes, lined up above */
+.tw-lane { animation: twLaneIn .5s ease-out var(--lane-delay, 0ms) both; }
+@keyframes twLaneIn { from { opacity: 0; } to { opacity: 1; } }
+.tw-lane__line { stroke: var(--grey-4); stroke-width: 1; }
+.tw-lane__title { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-2); }
+.tw-lane__align { stroke: var(--grey-2); stroke-width: 1; stroke-dasharray: 3 3; }
+.tw-lane__track { cursor: pointer; }
+.tw-lane__dot { fill: var(--grey-4); }
+.tw-lane__ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
+.tw-lane__track:hover .tw-lane__ring { stroke: var(--white); }
+.tw-lane__track.is-anchor .tw-lane__ring { stroke: var(--white); stroke-width: 2; }
+.tw-lane__label { font: 400 8px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-1); text-anchor: middle;
+  paint-order: stroke; stroke: var(--black); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; opacity: 0; transition: opacity .2s; }
+.tw-lane__track:hover .tw-lane__label, .tw-lane__track.is-anchor .tw-lane__label { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .tw-lane { animation: none; } }
+.trackweb__lanes-note { margin-top: 10px; font-size: 12px; line-height: 16px; color: var(--grey-2); }

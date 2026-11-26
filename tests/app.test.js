@@ -193,7 +193,11 @@ async function mockAccount() {
     // the timeline view: tracks along the episode, with a playhead
     await win.click('.trackweb__layout-btn[data-layout="timeline"]');
     await waitFor(() => document.querySelector('.trackweb__svg.is-timeline') && document.querySelector('.tw-playhead') && document.querySelectorAll('.tw-stem').length > 2, null, { timeout: 10000, what: 'the timeline' });
+    // click a track: other episodes that played it line up above (when NTS has their times)
+    await win.evaluate(() => [...document.querySelectorAll('.tw-node--track')].find((n) => /Sweetie/.test(n.textContent))?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await waitFor(() => document.querySelector('.trackweb__lanes-note') && !/Finding|Lining up/.test(document.querySelector('.trackweb__lanes-note').textContent), null, { timeout: 40000, what: 'other episodes lined up' });
     await win.click('.trackweb__layout-btn[data-layout="web"]');
+    expect(await win.evaluate(() => !document.querySelector('.tw-lane')), 'lanes should go with the timeline');
     await win.click('.trackweb__follow');
     await win.click('.stage__mode[data-mode="now"]');
     await win.click('#expandBtn');

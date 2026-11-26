@@ -471,7 +471,7 @@ const TrackWeb = (() => {
     else if (d.type === 'episode') expandEpisode(d);
     else addShowEpisodes(d);
   }
-  function select(d) { selected = d; laneSel = null; paintNodes(); paintInfo(); sim?.force('collide')?.radius(spaceFor); cullLabels(); if (timelineOn()) compareTrack(d); }
+  function select(d) { selected = d; paintNodes(); paintInfo(); sim?.force('collide')?.radius(spaceFor); cullLabels(); if (timelineOn()) compareTrack(d); }
 
   // Episodes this track can be played from (with its position), the one we found it
   // through first; for a searched-for track, its latest episode
@@ -517,7 +517,6 @@ const TrackWeb = (() => {
     const box = host.querySelector('.trackweb__info');
     box.replaceChildren();
     box.scrollTop = 0;
-    if (laneSel) return paintLaneTrack(box);
     const d = selected;
     const hint = el('p', 'trackweb__hint',
       !nodes.length ? 'Search for a track or a show, start from the one playing, or follow along.'
@@ -820,6 +819,8 @@ const TrackWeb = (() => {
     sim.alpha(.6).restart();
     schedulePaint();
   }
+  // a small play triangle, centred in a circle of radius r
+  const playPath = (r) => { const s = r * 0.42; return `M${-s * 0.75},${-s} L${s * 1.05},0 L${-s * 0.75},${s} Z`; };
   // alternate above and below the axis, two rows each (by place in the tracklist)
   const rowY = (i) => (i % 2 ? 1 : -1) * (i % 4 >= 2 ? 150 : 85);
   // Tracks still to come in the episode: grey circles where they'll pop in. Click one to skip there.
@@ -833,13 +834,14 @@ const TrackWeb = (() => {
     const en = sel.enter().append('g').attr('class', 'tw-ahead')
       .on('click', (e, u) => { e.stopPropagation(); Archive.playFrom(follow.ep.show, follow.ep.episode, u.off); });
     en.append('line').attr('class', 'tw-ahead__stem');
-    en.append('circle').attr('r', 7);
+    en.append('circle').attr('r', 8);
+    en.append('path').attr('class', 'tw-play-icon').attr('d', playPath(8));
     en.append('title');
     en.merge(sel)
       .attr('transform', (u) => `translate(${tl.x(u.off)},${rowY(u.i)})`)
       .each(function (u) {
         d3.select(this).select('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', -rowY(u.i));
-        d3.select(this).select('title').text(`Coming up at ${fmtOffset(u.off)}: ${u.t.artist} – ${u.t.title}. Click to skip to it`);
+        d3.select(this).select('title').text(`Coming up at ${fmtOffset(u.off)}: ${u.t.artist} – ${u.t.title}. Play from here`);
       });
   }
   function drawAxis(items) {
@@ -862,10 +864,9 @@ const TrackWeb = (() => {
   const MAX_LANES = 4;
   let compare = null;      // { track, lanes, status }
   let compareToken = 0;
-  let laneSel = null;      // a track picked in one of those lanes: { row, lane }
   function clearLanes() {
     compareToken++;
-    compare = null; laneSel = null;
+    compare = null;
     gLanes?.selectAll('*').remove();
   }
   const rowOffset = (r) => r.offset ?? r.offset_estimate;
@@ -899,7 +900,7 @@ const TrackWeb = (() => {
     const untimed = lanes.filter((l) => !l).length;
     compare.lanes = ok;
     compare.status = ok.length
-      ? `Also in ${ok.length} other episode${ok.length === 1 ? '' : 's'}, lined up above at this track${untimed ? ` (${untimed} more had no times to line up)` : ''}. Click a track up there to play it.`
+      ? `Also in ${ok.length} other episode${ok.length === 1 ? '' : 's'}, lined up above at this track${untimed ? ` (${untimed} more had no times to line up)` : ''}. Press play on any track up there to jump into that episode.`
       : `Played in ${eps.length} other episode${eps.length === 1 ? '' : 's'}, but ${eps.length === 1 ? 'its tracklist has' : 'their tracklists have'} no times to line up.`;
     drawLanes(d);
     paintInfo();
@@ -925,13 +926,15 @@ const TrackWeb = (() => {
         const anchor = row === lane.hit;
         const r = anchor ? 12 : 8;
         const t = g.append('g').attr('class', `tw-lane__track${anchor ? ' is-anchor' : ''}`).attr('transform', `translate(${x(rowOffset(row))},0)`)
-          .on('click', (e) => { e.stopPropagation(); laneSel = { row, lane }; paintInfo(); });
+          .on('click', (e) => { e.stopPropagation(); Archive.playFrom(lane.ep.show, lane.ep.episode, rowOffset(row)); });
         t.append('circle').attr('class', 'tw-lane__dot').attr('r', r);
         const img = t.append('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2)
           .attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
         t.append('circle').attr('class', 'tw-lane__ring').attr('r', r);
+        t.append('circle').attr('class', 'tw-lane__shade').attr('r', r);       // darkens the cover on hover
+        t.append('path').attr('class', 'tw-play-icon').attr('d', playPath(r));
         t.append('text').attr('class', 'tw-lane__label').attr('y', r + 11).text(clip(`${row.title}`, 22));
-        t.append('title').text(`${row.artist} – ${row.title} · ${fmtOffset(rowOffset(row))}`);
+        t.append('title').text(`${row.artist} – ${row.title} · ${fmtOffset(rowOffset(row))}. Play from here in ${lane.ep.title}`);
         Art.get({ artist: row.artist, title: row.title, isrc_id: row.isrc_id, deezer_track_id: row.deezer_track_id })
           .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
       });
@@ -947,17 +950,7 @@ const TrackWeb = (() => {
     const k = Math.max(0.25, Math.min(1.6, Math.min(r.width / (x1 - x0 + 140), r.height / (y1 - y0 + 40))));
     svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity.scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
   }
-  function paintLaneTrack(box) {
-    const { row, lane } = laneSel;
-    const off = rowOffset(row);
-    const actions = el('div', 'trackweb__actions');
-    const play = el('button', 'episode-play trackweb__play', `▶ Play from ${fmtOffset(off)}`);
-    play.addEventListener('click', () => Archive.playFrom(lane.ep.show, lane.ep.episode, off));
-    actions.append(play,
-      btn('Start a web here', () => start({ artist: row.artist, title: row.title }, { ...lane.ep, offset: off })),
-      btn('Back', () => { laneSel = null; paintInfo(); }));
-    box.append(el('p', 'trackweb__title', row.title), el('p', 'trackweb__sub', `${row.artist} · in ${lane.ep.title}${lane.ep.date ? ' · ' + lane.ep.date : ''} at ${fmtOffset(off)}`), actions);
-  }
+
 
   function movePlayhead() {
     if (!tl) return;

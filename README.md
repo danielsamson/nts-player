@@ -100,10 +100,11 @@ puts the show in the middle and each track pops in around it as it plays, the cu
 one pulsing red. It starts by itself when you open the track web while something plays;
 skip ahead and the tracks you skipped appear. Switch between **Web** and **Timeline**: the
 timeline lays the tracks out along the episode's running time, with a playhead; tracks
-still to come show as grey circles (click one to skip to it). Click a
+still to come show as grey circles with a play button (click to skip to it). Click a
 track in the timeline and up to four other episodes that played it appear above, each
 lined up so that track sits right above it: see what other DJs played around it, and
-click any of their tracks to play it from there.
+press play on any of their tracks to jump into that episode (it becomes the timeline you
+follow).
 
 Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
 or **Explore this show** on any episode, to bring in its episodes six at a time: tracks

@@ -42,6 +42,7 @@ const ArchivePlayer = (() => {
     trySeek();
   }
   let primed = null;   // { episode, startMs }: shown as paused, loaded when you press play
+  let loadedAt = 0;
 
   const emit = () => listeners.forEach((fn) => fn(state));
 
@@ -64,7 +65,12 @@ const ArchivePlayer = (() => {
       emit();
     });
     widget.bind(E.PAUSE, () => { state.playing = false; emit(); });
-    widget.bind(E.FINISH, () => { state.playing = false; state.position = state.duration; state.finished = true; emit(); });
+    widget.bind(E.FINISH, () => {
+      // While switching episodes, a seek past the end of the old audio can make SoundCloud
+      // report "finished" for it: ignore that, or autoplay would skip the episode just picked.
+      if (Date.now() - loadedAt < 4000 || seekTarget != null || pendingSeek != null) return;
+      state.playing = false; state.position = state.duration; state.finished = true; emit();
+    });
     widget.bind(E.PLAY_PROGRESS, (e) => {
       if (seekTarget != null) {
         if (Math.abs(e.currentPosition - seekTarget) < 4000) { seekTarget = null; guardUntil = Math.min(guardUntil, Date.now() + 10000); }   // seems to have landed
@@ -97,6 +103,7 @@ const ArchivePlayer = (() => {
   // Load an episode and start playing, optionally from a position in ms
   function load(episode, startMs = 0) {
     primed = null;
+    loadedAt = Date.now();
     seekTarget = null;
     guardTarget = null;
     state.finished = false;

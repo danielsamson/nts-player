@@ -112,6 +112,17 @@ async function mockAccount() {
     await waitFor(() => ArchivePlayer.state.episode?.episode === 'motive-30th-september-2026' && ArchivePlayer.state.position > 560000, null, { timeout: 60000, what: 'back to the first episode' });
   });
 
+  await test('Play from late in a longer episode doesn\'t skip to another one', async () => {
+    // 1:45:32 into a 1:54 episode, from a 59-minute one: the switch used to look like the end
+    await win.evaluate(() => Archive.playFrom('selassie-tbc', 'selassie-tbc-24th-july-2026', 6332));
+    await waitFor(() => ArchivePlayer.state.episode?.episode === 'selassie-tbc-24th-july-2026' && ArchivePlayer.state.playing, null, { timeout: 60000, what: 'the long episode to play' });
+    await new Promise((r) => setTimeout(r, 8000));
+    const s = await win.evaluate(() => ({ ep: ArchivePlayer.state.episode.episode, pos: ArchivePlayer.state.position / 1000 }));
+    expect(s.ep === 'selassie-tbc-24th-july-2026' && s.pos > 6300, `expected the same episode near 6332s, got ${s.ep} at ${Math.round(s.pos)}s`);
+    await win.evaluate(() => Archive.playFrom('motive', 'motive-30th-september-2026', 570));
+    await waitFor(() => ArchivePlayer.state.episode?.episode === 'motive-30th-september-2026' && ArchivePlayer.state.position > 560000, null, { timeout: 60000, what: 'back to the first episode' });
+  });
+
   await test('Save the current track to My NTS from the bar', async () => {
     await waitFor(() => !document.getElementById('nowSave').hidden, null, { timeout: 30000 });
     await win.click('#nowSave');

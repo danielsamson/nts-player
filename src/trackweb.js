@@ -795,7 +795,14 @@ const TrackWeb = (() => {
       const timed = items.length > 0 && items.every((n) => Number.isFinite(n.fOffset));
       const durSec = follow.kind === 'archive' && ArchivePlayer.state.duration ? ArchivePlayer.state.duration / 1000
         : Math.max(600, ...items.map((n) => (n.fOffset || 0) + 300));
-      const W = Math.max(900, (durSec / 60) * 16);          // 16 px a minute
+      // 16 px a minute, stretched for busy episodes so neighbouring tracks have room
+      const offs = (follow.kind === 'archive' ? (ArchivePlayer.state.episode?.tracks || []) : [])
+        .map((t) => t.offset ?? t.offset_estimate).filter(Number.isFinite).sort((a, b) => a - b);
+      const gaps = offs.slice(1).map((o, i) => o - offs[i]).filter((g) => g > 5).sort((a, b) => a - b);
+      const typicalGap = gaps.length ? gaps[Math.floor(gaps.length * 0.25)] : 240;
+      rows = typicalGap < 150 ? 6 : 4;                        // busy: three rows each side
+      const pps = Math.max(16 / 60, 26 * (6 / rows) / typicalGap / 1.5);
+      const W = Math.min(14000, Math.max(900, durSec * pps));
       const x = timed ? (sec) => (sec / durSec) * W - W / 2 : null;
       items.forEach((n, i) => {
         n.tx = timed ? x(n.fOffset) : i * 95 - ((items.length - 1) * 95) / 2;
@@ -808,9 +815,12 @@ const TrackWeb = (() => {
       sim.force('x', d3.forceX((d) => d.tx ?? 0).strength((d) => (d.tx != null ? .4 : 0)));
       sim.force('y', d3.forceY((d) => d.ty ?? 0).strength((d) => (d.ty != null ? .4 : 0)));
       sim.force('link').strength(0);
-      sim.force('charge').strength(-30);
+      sim.force('charge').strength(0);
+      sim.force('collide').radius(0);
+      sim.force('x').strength((d) => (d.tx != null ? .9 : 0));
+      sim.force('y').strength((d) => (d.ty != null ? .9 : 0));
       drawAxis(items);
-      refitTimeline(compare?.lanes.length ? -235 - (Math.min(compare.lanes.length, FIT_LANES) - 1) * 85 - 40 : undefined);
+      refitTimeline(compare?.lanes.length ? laneTop() - (Math.min(compare.lanes.length, FIT_LANES) - 1) * 85 - 40 : undefined);
     } else {
       tl = null;
       clearLanes();
@@ -819,6 +829,7 @@ const TrackWeb = (() => {
       sim.force('y', d3.forceY(0).strength(.03));
       sim.force('link').strength((l) => (l.kind === 'show' ? .3 : .5));
       sim.force('charge').strength(-340);
+      sim.force('collide').radius(spaceFor);
       if (follow) { follow.ep.fx = 0; follow.ep.fy = 0; }
       gAxis.selectAll('*').remove();
       if (follow && refit && !follow.userZoomed) {
@@ -832,7 +843,12 @@ const TrackWeb = (() => {
   // a small play triangle, centred in a circle of radius r
   const playPath = (r) => { const s = r * 0.42; return `M${-s * 0.75},${-s} L${s * 1.05},0 L${-s * 0.75},${s} Z`; };
   // alternate above and below the axis, two rows each (by place in the tracklist)
-  const rowY = (i) => (i % 2 ? 1 : -1) * (i % 4 >= 2 ? 150 : 85);
+  let rows = 4;
+  const laneTop = () => (rows === 6 ? -300 : -235);     // other episodes' lanes start above the top row
+  const rowY = (i) => {
+    const side = i % 2 ? 1 : -1, level = Math.floor(i / 2) % (rows / 2);
+    return side * (85 + level * (rows === 6 ? 62 : 65));
+  };
   // Tracks still to come in the episode: grey circles where they'll pop in. Click one to skip there.
   function drawUpcoming() {
     const a = ArchivePlayer.state;
@@ -942,7 +958,7 @@ const TrackWeb = (() => {
     if (!compare?.lanes.length || !tl) return;
     const pps = tl.timed ? tl.x(1) - tl.x(0) : 16 / 60;       // the main timeline's pixels per second
     const ax = d.tx ?? d.x;                                   // where the track sits on the main timeline
-    const TOP = -235, GAP = 85;
+    const TOP = laneTop(), GAP = 85;
     const lastY = TOP - (compare.lanes.length - 1) * GAP;
     gLanes.append('line').attr('class', 'tw-lane__align').attr('x1', ax).attr('x2', ax).attr('y1', -20).attr('y2', lastY - 26);
     // tracks that turn up in more than one of these sets (yours included), and where
@@ -1031,10 +1047,16 @@ const TrackWeb = (() => {
     if (!tl || follow?.userZoomed) return;
     const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
     const x0 = tl.start - 80, x1 = tl.end;        // your episode's width; other episodes may run off the sides
-    const y0 = Math.min(-200, topY ?? -200), y1 = 200;
-    const k = Math.max(0.25, Math.min(1.6, Math.min(r.width / (x1 - x0 + 140), r.height / (y1 - y0 + 40))));
-    svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity.scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+    const edge = rows === 6 ? 260 : 200;
+    const y0 = Math.min(-edge, topY ?? -edge), y1 = edge;
+    let k = Math.max(0.25, Math.min(1.6, Math.min(r.width / (x1 - x0 + 140), r.height / (y1 - y0 + 40))));
+    let cx = (x0 + x1) / 2;
+    tl.panning = k < 0.6;
+    if (tl.panning) { k = Math.min(0.75, r.height / (y1 - y0 + 40)); cx = playheadX() + r.width * 0.15 / k; }   // a little ahead of the playhead
+    tl.k = k; tl.cy = (y0 + y1) / 2;
+    svg.transition().duration(700).call(zoom.transform, d3.zoomIdentity.scale(k).translate(-cx, -tl.cy));
   }
+  const playheadX = () => (tl?.timed && follow?.kind === 'archive' ? tl.x(ArchivePlayer.state.position / 1000) : 0);
 
 
   function movePlayhead() {
@@ -1042,7 +1064,18 @@ const TrackWeb = (() => {
     const show = tl.timed && follow.kind === 'archive';
     const x = show ? tl.x(ArchivePlayer.state.position / 1000) : 0;
     gAxis.selectAll('line.tw-playhead').data(show ? [0] : []).join('line').attr('class', 'tw-playhead')
-      .attr('y1', -190).attr('y2', 190).style('transform', `translateX(${x}px)`);
+      .attr('y1', -260).attr('y2', 260).style('transform', `translateX(${x}px)`);
+    // zoomed in on a long, busy episode: keep the playhead in view
+    if (show && tl.panning && !follow.userZoomed && !svg.node().__panning) {
+      const t = d3.zoomTransform(svg.node());
+      const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
+      const sx = t.applyX(x) + r.width / 2;      // the svg's viewBox is centred
+      if (sx < r.width * 0.15 || sx > r.width * 0.7) {
+        svg.node().__panning = true;
+        svg.transition().duration(900).call(zoom.transform, d3.zoomIdentity.scale(tl.k).translate(-(x + r.width * 0.15 / tl.k), -tl.cy))
+          .on('end interrupt', () => { svg.node().__panning = false; });
+      }
+    }
   }
   // The tracks heard so far, oldest first, and which one is playing
   function heardSoFar() {

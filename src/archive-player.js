@@ -22,11 +22,24 @@ const ArchivePlayer = (() => {
   let seekTarget = null;
   let seekTries = 0;
   let seekLastTry = 0;
+  let seekStarted = 0;
   function trySeek() {
     if (seekTarget == null || !widget) return;
     seekTries++;
     seekLastTry = Date.now();
     widget.seekTo(seekTarget);
+  }
+  // Keep asking for the position until SoundCloud's player confirms it. On a slower
+  // connection it can ignore seeks for a while after the audio starts; give up only
+  // after 45 s.
+  // After it seems to land, keep watching for 10 s: while switching episodes the player
+  // briefly reports the requested position before the audio starts (from 0).
+  let guardTarget = null;
+  let guardUntil = 0;
+  function startSeek(ms) {
+    seekTarget = ms; seekTries = 0; seekStarted = Date.now();
+    guardTarget = ms; guardUntil = Date.now() + 45000;
+    trySeek();
   }
   let primed = null;   // { episode, startMs }: shown as paused, loaded when you press play
 
@@ -47,21 +60,30 @@ const ArchivePlayer = (() => {
     widget.bind(E.PLAY, () => {
       state.playing = true; state.loading = false; state.error = null;
       widget.getDuration((d) => { state.duration = d || state.duration; emit(); });
-      if (pendingSeek != null) { seekTarget = pendingSeek; seekTries = 0; pendingSeek = null; trySeek(); }
+      if (pendingSeek != null) { startSeek(pendingSeek); pendingSeek = null; }
       emit();
     });
     widget.bind(E.PAUSE, () => { state.playing = false; emit(); });
     widget.bind(E.FINISH, () => { state.playing = false; state.position = state.duration; state.finished = true; emit(); });
     widget.bind(E.PLAY_PROGRESS, (e) => {
       if (seekTarget != null) {
-        if (Math.abs(e.currentPosition - seekTarget) < 4000 || seekTries >= 12) seekTarget = null;   // landed (or give up)
+        if (Math.abs(e.currentPosition - seekTarget) < 4000) { seekTarget = null; guardUntil = Math.min(guardUntil, Date.now() + 10000); }   // seems to have landed
+        else if (Date.now() - seekStarted > 45000) { seekTarget = null; guardTarget = null; }                                                // give up
         else {
-          if (Date.now() - seekLastTry > 600) trySeek();
+          if (Date.now() - seekLastTry > 800) trySeek();
           state.position = seekTarget;      // show where we're going, not 0:00
           emit();
           return;
         }
       }
+      // fell back to the start after "landing": ask again
+      if (guardTarget != null && Date.now() < guardUntil && e.currentPosition < guardTarget - 8000) {
+        seekTarget = guardTarget; seekLastTry = 0;
+        state.position = guardTarget;
+        emit();
+        return;
+      }
+      if (Date.now() >= guardUntil) guardTarget = null;
       state.position = e.currentPosition;
       emit();
     });
@@ -76,6 +98,7 @@ const ArchivePlayer = (() => {
   function load(episode, startMs = 0) {
     primed = null;
     seekTarget = null;
+    guardTarget = null;
     state.finished = false;
     state.episode = episode;
     state.playing = false;
@@ -128,7 +151,7 @@ const ArchivePlayer = (() => {
       if (primed) { primed.startMs = ms; state.position = ms; emit(); return; }
       if (!widget) return;
       state.position = ms;
-      widget.seekTo(ms);
+      startSeek(ms);
       if (!state.playing) widget.play();
       emit();
     },

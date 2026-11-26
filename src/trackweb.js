@@ -54,7 +54,7 @@ const TrackWeb = (() => {
     if (near) {
       near.kids = (near.kids || 0) + 1;
       const a = near.kids * 2.4;                       // golden-angle spiral around the parent
-      const dist = 55 + Math.sqrt(near.kids) * 6;
+      const dist = 80 + Math.sqrt(near.kids) * 12;     // room to breathe
       n.x = near.x + Math.cos(a) * dist; n.y = near.y + Math.sin(a) * dist;
     } else { n.x = 0; n.y = 0; }
     n.r = n.type === 'track' ? 16 : n.type === 'show' ? 20 : 12;
@@ -203,9 +203,9 @@ const TrackWeb = (() => {
     svg.call(zoom).on('dblclick.zoom', null);
     svg.on('click', (e) => { if (e.target === svg.node()) select(null); });
     sim = d3.forceSimulation()
-      .force('link', d3.forceLink().id((d) => d.id).distance((l) => (l.kind === 'show' ? 90 : 70)).strength((l) => (l.kind === 'show' ? .4 : .7)))
-      .force('charge', d3.forceManyBody().strength(-220))
-      .force('collide', d3.forceCollide((d) => d.r + 8))
+      .force('link', d3.forceLink().id((d) => d.id).distance((l) => (l.kind === 'show' ? 120 : 90)).strength((l) => (l.kind === 'show' ? .3 : .5)))
+      .force('charge', d3.forceManyBody().strength(-300))
+      .force('collide', d3.forceCollide((d) => d.r + 12).strength(1).iterations(2))
       .force('x', d3.forceX(0).strength(.03))
       .force('y', d3.forceY(0).strength(.03))
       .velocityDecay(.6)           // more damping: drift, don't jump
@@ -270,7 +270,7 @@ const TrackWeb = (() => {
       clearTimeout(holdTimer);
       holdTimer = setTimeout(() => {
         nodes.forEach((n) => { if (n.held) { n.fx = null; n.fy = null; n.held = false; } });
-        sim.alpha(Math.max(sim.alpha(), .08)).restart();
+        sim.alpha(Math.max(sim.alpha(), .35)).restart();   // let everything sort out its spacing
       }, 1400);
     }
     sim.nodes(nodes);
@@ -302,7 +302,7 @@ const TrackWeb = (() => {
         d.r = 12 + Math.min(10, d.shared * 1.5);
       }
     });
-    sim?.force('collide')?.radius((d) => d.r + 8);
+    sim?.force('collide')?.radius((d) => d.r + 12);
     gNodes.selectAll('g.tw-node')
       .classed('is-root', (d) => d.id === rootId)
       .classed('is-selected', (d) => d === selected)

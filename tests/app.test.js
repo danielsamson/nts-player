@@ -100,6 +100,16 @@ async function mockAccount() {
     expect(await win.evaluate(() => !playing), 'live radio should have stopped');
   });
 
+  await test('Play from in a different episode lands at the right time', async () => {
+    await win.evaluate(() => Archive.playFrom('motive', 'motive-2nd-september-2026', 900));
+    await waitFor(() => ArchivePlayer.state.episode?.episode === 'motive-2nd-september-2026' && ArchivePlayer.state.playing, null, { timeout: 60000, what: 'the other episode to play' });
+    await new Promise((r) => setTimeout(r, 8000));      // past the moment it used to fall back to 0:00
+    const pos = await win.evaluate(() => ArchivePlayer.state.position / 1000);
+    expect(pos > 890 && pos < 960, `expected ~900s, got ${Math.round(pos)}s`);
+    await win.evaluate(() => Archive.playFrom('motive', 'motive-30th-september-2026', 570));
+    await waitFor(() => ArchivePlayer.state.episode?.episode === 'motive-30th-september-2026' && ArchivePlayer.state.position > 560000, null, { timeout: 60000, what: 'back to the first episode' });
+  });
+
   await test('Save the current track to My NTS from the bar', async () => {
     await waitFor(() => !document.getElementById('nowSave').hidden, null, { timeout: 30000 });
     await win.click('#nowSave');

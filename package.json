@@ -92,7 +92,8 @@
         "owner": "danielsamson",
         "repo": "nts-player"
       }
-    ]
+    ],
+    "afterPack": "build/adhoc-sign.js"
   },
   "homepage": "https://github.com/danielsamson/nts-player",
   "author": "Daniel Samson",

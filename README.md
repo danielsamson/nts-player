@@ -212,7 +212,14 @@ like `v1.0.0`.
 The builds aren't code-signed, so the first launch needs a click past a warning:
 
 - **Windows:** SmartScreen, click **More info**, then **Run anyway**.
-- **macOS:** right-click the app, choose **Open**, then **Open** again.
+- **macOS:** open the app once; macOS says it can't check it. Go to **System Settings >
+  Privacy & Security**, scroll down and click **Open Anyway** (older macOS: right-click the
+  app, choose **Open**, then **Open** again). If macOS says the app **is damaged**
+  (older builds), run `xattr -cr "/Applications/NTS Player.app"` in Terminal, then open it.
+
+  The Mac builds have an ad-hoc signature, not an Apple Developer ID, so macOS can't verify
+  who made them. Removing this step entirely needs a paid Apple Developer account and
+  notarization.
 - **Linux (AppImage):** make it executable first: `chmod +x NTS-Player-*.AppImage`.
 
 ### Releasing a new version

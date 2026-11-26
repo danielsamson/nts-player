@@ -21,7 +21,8 @@ const Chart = (() => {
     if (!fam) return data.tracks.filter((t) => t[2] >= 2).map((t) => ({ t, shows: t[3].length, episodes: t[2] }));
     const fi = (data.families || []).findIndex((f) => f[0] === fam);
     if (fi < 0) return [];
-    return data.tracks.map((t) => { const g = (t[7] || []).find((x) => x[0] === fi); return g && g[2] >= 2 ? { t, shows: g[1], episodes: g[2] } : null; })
+    // a family's shows: a list of show indexes (older files: just the number)
+    return data.tracks.map((t) => { const g = (t[7] || []).find((x) => x[0] === fi); return g && g[2] >= 2 ? { t, shows: Array.isArray(g[1]) ? g[1].length : g[1], episodes: g[2] } : null; })
       .filter(Boolean).sort((a, b) => b.shows - a.shows || b.episodes - a.episodes);
   }
   function rowsOf(data, limit = 100, fam = null) {
@@ -42,8 +43,50 @@ const Chart = (() => {
   function families(res, min = 10) {
     return (res?.data.families || []).map(([id, name]) => ({ id, name, tracks: ranks(res, id).size })).filter((f) => f.tracks >= min);
   }
+  const isYear = (p) => /^\d{4}$/.test(p);
+  // A year's chart: its months' files merged into one, in the same shape (a show counts once
+  // however many months it played the track in)
+  async function mergedYear(y) {
+    const list = (await months()).filter((m) => m.startsWith(`${y}-`)).sort();
+    const files = (await Promise.all(list.map((m) => get(m)))).filter(Boolean).map((r) => r.data);
+    if (!files.length) return null;
+    const showList = [], si = new Map();
+    const sIdx = (alias) => { if (!si.has(alias)) { si.set(alias, showList.length); showList.push(alias); } return si.get(alias); };
+    const famEps = new Map(), famName = new Map();
+    const withFams = files.every((f) => f.families);
+    const tracks = new Map();
+    for (const f of files) {
+      (f.families || []).forEach(([id, name, e]) => { famEps.set(id, (famEps.get(id) || 0) + e); famName.set(id, name); });
+      for (const t of f.tracks) {
+        const k = key(t[0], t[1]);
+        let m = tracks.get(k);
+        if (!m) { m = { a: t[0], t: t[1], e: 0, shows: new Set(), latest: null, first: t[5], fams: new Map() }; tracks.set(k, m); }
+        m.e += t[2];
+        t[3].forEach((i) => m.shows.add(sIdx(f.showList[i])));
+        if (!m.latest || t[4][3] > m.latest[3]) m.latest = [sIdx(f.showList[t[4][0]]), t[4][1], t[4][2], t[4][3]];
+        m.first = Math.min(m.first, t[5]);
+        for (const [fi, ss, e] of t[7] || []) {
+          if (!Array.isArray(ss)) continue;                 // older files: no show lists to merge
+          const id = f.families[fi][0];
+          let g = m.fams.get(id);
+          if (!g) { g = { shows: new Set(), e: 0 }; m.fams.set(id, g); }
+          ss.forEach((i) => g.shows.add(sIdx(f.showList[i])));
+          g.e += e;
+        }
+      }
+    }
+    const families = withFams ? [...famEps].sort((a, b) => b[1] - a[1]).map(([id, e]) => [id, famName.get(id), e]) : undefined;
+    const fi = new Map((families || []).map(([id], i) => [id, i]));
+    return {
+      period: String(y), showList, families,
+      episodes: files.reduce((a, f) => a + f.episodes, 0),
+      names: Object.assign({}, ...files.map((f) => f.names || {})),
+      tracks: [...tracks.values()].sort((a, b) => b.shows.size - a.shows.size || b.e - a.e)
+        .map((m) => [m.a, m.t, m.e, [...m.shows], m.latest, m.first, [], [...m.fams].map(([id, g]) => [fi.get(id), [...g.shows], g.e])])
+    };
+  }
   async function load(period) {
-    const data = await window.nts.chart(period).catch(() => null);
+    const data = isYear(period) ? await mergedYear(period) : await window.nts.chart(period).catch(() => null);
     if (!data) return null;
     const res = { period, data, rows: rowsOf(data), rowsFor: (fam, limit) => rowsOf(data, limit, fam), episodes: data.episodes, generated: data.generated, map: new Map() };
     // track -> { shows, rank } (rank among tracks played in 2+ episodes)
@@ -72,17 +115,24 @@ const Chart = (() => {
 
   // ---- trends ----
   // The month a period is "in" (the last 30 days count as this month)
-  const monthOf = (period) => (period === 'recent' ? ym(new Date()) : period);
+  // (a year: its last month so far)
+  const monthOf = (period) => {
+    if (period === 'recent') return ym(new Date());
+    if (isYear(period)) { const now = ym(new Date()); return now.startsWith(period) ? now : `${period}-12`; }
+    return period;
+  };
   // For a period: the months before it (up to `count`, ending with it) and the month to
   // compare chart movement against
   async function trend(period, count = 12, fam = null) {
     const have = new Set(await months());
     const end = monthOf(period);
+    if (isYear(period)) count = Number(end.slice(5));     // a year's sparkline: just its months
     const list = [];
     for (let i = count - 1; i >= 0; i--) list.push(shift(end, -i));
     const files = await Promise.all(list.map((m) => (have.has(m) ? get(m) : null)));
     const prevMonth = period === 'recent' ? shift(end, -1) : shift(end, -1);
-    const prev = have.has(prevMonth) ? await get(prevMonth) : null;
+    // (no movement for a year: there's no year before to compare with yet)
+    const prev = !isYear(period) && have.has(prevMonth) ? await get(prevMonth) : null;
     return {
       months: list,
       // shows per month for a track (null where there's no data for that month)

@@ -17,7 +17,7 @@ const sitemap = require('../sitemap');
 
 const API = 'https://www.nts.live/api/v2';
 const KEEP_TRACKS = 2000;            // per file, most played first (enough to merge into a year)
-const VERSION = 3;                   // bump when files gain data: older ones are rebuilt a year at a time
+const VERSION = 4;                   // bump when files gain data: older ones are rebuilt a year at a time
 const DAY = 864e5;
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -153,9 +153,9 @@ async function build(period) {
     showList,
     // [artist, title, episodes, [show indexes], [latest show index, episode, offset, date], first played,
     //  [day each of those shows first played it (days since 1970)],
-    //  [[genre family index, shows, episodes] for each family it was played under]]
+    //  [[genre family index, [show indexes], episodes] for each family it was played under]]
     tracks: top.map((m) => { const ss = [...m.shows]; return [m.a, m.t, m.e, ss.map(si), [si(m.latest.s), m.latest.ep, m.latest.o, m.latest.d], m.first, ss.map((s) => Math.floor(m.firstBy.get(s) / DAY)),
-      [...m.fams].map(([f, g]) => [fi.get(f), g.shows.size, g.e])]; }),
+      [...m.fams].map(([f, g]) => [fi.get(f), [...g.shows].map(si), g.e])]; }),
     // genre families, most episodes first: [id, name, episodes] (tracks point at these)
     families: familyList.map((f) => [f, famNames.get(f), famEps.get(f)]),
     // genres by number of episodes tagged with them

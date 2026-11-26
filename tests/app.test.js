@@ -211,6 +211,13 @@ async function mockAccount() {
     const jazz = await win.evaluate(() => [...document.querySelectorAll('.chart-row .track__title')].map((t) => t.textContent));
     expect(jazz[0] === 'See It Thru' && !jazz.includes('Sweetie') && jazz.length === 11, `jazz chart: ${jazz.join(' | ')}`);
     expect(await win.evaluate(() => /3 shows/.test(document.querySelector('.chart-row .chart-row__count').textContent)), 'genre counts only plays under that genre');
+    // a whole year in the same dropdown: its months merged, each show counted once
+    // (See It Thru: shows 1, 3 in January and 0, 1, 3 in February = 3 shows, 6 episodes)
+    await win.waitForFunction(() => [...document.querySelectorAll('.chart-pick option')].some((o) => o.value === '2026'), null, { timeout: 10000 });
+    await win.selectOption('.chart-pick', '2026');
+    await waitFor(() => /2026 so far|All of 2026/.test(document.querySelector('.chart-box__span')?.textContent || ''), null, { timeout: 10000, what: 'the year chart' });
+    const year = await win.evaluate(() => [...document.querySelectorAll('.chart-row')].map((r) => r.querySelector('.track__title').textContent + ' / ' + r.querySelector('.chart-row__count').textContent));
+    expect(year[0] === 'See It Thru / 3 shows · 6 episodes' && year[1] === 'Sweetie / 3 shows · 5 episodes', `year chart: ${year.join(' | ')}`);
   });
 
   await test('Schedule lists upcoming shows', async () => {

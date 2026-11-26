@@ -754,7 +754,7 @@ const Archive = (() => {
 
   // ---- Most played on NTS: a chart from tracklists (Chart, chart.js) ----
   const monthLabel = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' });
-  const periodLabel = (p) => (p === 'recent' ? 'Last 30 days' : monthLabel(p));
+  const periodLabel = (p) => (p === 'recent' ? 'Last 30 days' : /^\d{4}$/.test(p) ? (+p === new Date().getUTCFullYear() ? `${p} so far` : `All of ${p}`) : monthLabel(p));
   function chartRow(r, i) {
     const t = { artist: r.artist, title: r.title, time: String(i + 1) };
     const li = trackRow(t, {
@@ -824,7 +824,18 @@ const Archive = (() => {
     addOpt('recent');
     if (period !== 'recent') addOpt(period);
     pick.value = period;
-    Chart.months().then((ms) => { ms.filter((m) => m !== period).forEach(addOpt); pick.value = period; });
+    // years first (each year with data), then its months
+    Chart.months().then((ms) => {
+      pick.replaceChildren();
+      addOpt('recent');
+      const years = [...new Set(ms.map((m) => m.slice(0, 4)))];
+      const yg = el('optgroup'); yg.label = 'Years';
+      const mg = el('optgroup'); mg.label = 'Months';
+      years.forEach((y) => { const o = el('option', null, periodLabel(y)); o.value = y; yg.append(o); });
+      ms.forEach((m) => { const o = el('option', null, monthLabel(m)); o.value = m; mg.append(o); });
+      pick.append(yg, mg);
+      pick.value = period;
+    });
     pick.addEventListener('change', () => { current.period = pick.value; renderChart(pick.value, current.genre); });
     const head = el('div', 'chart-head');
     head.append(pick, yearLink());
@@ -850,7 +861,7 @@ const Archive = (() => {
       box.replaceChildren(
         el('p', 'chart-box__span', sel
           ? `${periodLabel(period)} · ${genreLabel(sel.name)}. Ranked by how many different shows played each track in episodes tagged ${genreLabel(sel.name)}.`
-          : `${periodLabel(period)} · ${res.episodes} episodes. Ranked by how many different shows played each track.`),
+          : `${periodLabel(period)} · ${res.episodes.toLocaleString()} episodes. Ranked by how many different shows played each track.`),
         chartList(res, 100, sel?.id || null));
     };
     const now = Chart.peek(period);

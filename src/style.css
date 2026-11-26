@@ -1260,13 +1260,10 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* Timeline: tracks still to come */
 .tw-ahead { cursor: pointer; }
-.tw-ahead circle { fill: var(--black); stroke: var(--grey-3); stroke-width: 1; transition: stroke .2s, fill .2s; }
-.tw-ahead:hover circle { stroke: var(--white); fill: var(--grey-4); }
 .tw-ahead__stem { stroke: #262626; stroke-width: 1; stroke-dasharray: 2 3; }
 
 /* Play buttons in timeline circles */
 .tw-play-icon { fill: var(--grey-2); pointer-events: none; transition: fill .15s, opacity .15s; }
-.tw-ahead:hover .tw-play-icon { fill: var(--white); }
 .tw-lane__shade { fill: rgba(0, 0, 0, .55); opacity: 0; transition: opacity .15s; pointer-events: none; }
 .tw-lane__track .tw-play-icon { fill: var(--white); opacity: 0; }
 .tw-lane__track:hover .tw-lane__shade, .tw-lane__track:hover .tw-play-icon { opacity: 1; }
@@ -1285,3 +1282,15 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-lanes.has-focus .tw-shared-mark.is-focus { opacity: 1; }
 .trackweb__shared { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
 .trackweb__shared .tag.tag--on { background: var(--white); color: var(--black); border-color: var(--white); }
+
+/* Timeline: coming up (faded covers, name and play on hover); played tracks play on click */
+.tw-ahead__dot { fill: var(--grey-4); }
+.tw-ahead image { opacity: .45; transition: opacity .15s; }
+.tw-ahead__ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
+.tw-ahead .tw-play-icon { fill: var(--white); opacity: 0; }
+.tw-ahead:hover image { opacity: 1; }
+.tw-ahead:hover .tw-ahead__ring { stroke: var(--white); }
+.tw-ahead:hover .tw-lane__shade, .tw-ahead:hover .tw-play-icon, .tw-ahead:hover .tw-lane__label { opacity: 1; }
+.tw-shade { fill: rgba(0, 0, 0, .5); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.tw-node__play { fill: var(--white); opacity: 0; }
+.trackweb__svg.is-timeline .tw-node--track:hover .tw-shade, .trackweb__svg.is-timeline .tw-node--track:hover .tw-node__play { opacity: 1; }

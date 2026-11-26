@@ -241,7 +241,11 @@ const TrackWeb = (() => {
         .on('start', (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
         .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
         .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.held = false; if (follow?.ep !== d) { d.fx = null; d.fy = null; } }))
-      .on('click', (e, d) => { e.stopPropagation(); select(d); })
+      .on('click', (e, d) => {
+        e.stopPropagation();
+        select(d);
+        if (timelineOn() && d.type === 'track' && follow.kind === 'archive' && Number.isFinite(d.fOffset)) Archive.playFrom(follow.ep.show, follow.ep.episode, d.fOffset);
+      })
       .on('dblclick', (e, d) => { e.stopPropagation(); select(d); expand(d); })
       .on('mouseenter', (e, d) => hoverSoon(d))
       .on('mouseleave', () => hoverSoon(null));
@@ -254,6 +258,8 @@ const TrackWeb = (() => {
         shape.append('image').attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
         shape.append('circle').attr('class', 'tw-hole');
         shape.append('circle').attr('class', 'tw-ring');
+        shape.append('circle').attr('class', 'tw-shade');            // timeline: play icon on hover
+        shape.append('path').attr('class', 'tw-play-icon tw-node__play');
       } else {
         shape.append('rect').attr('class', 'tw-shape');
         shape.append('image').attr('preserveAspectRatio', 'xMidYMid slice');
@@ -397,7 +403,8 @@ const TrackWeb = (() => {
         const g = d3.select(this);
         const r = d.r;
         if (d.type === 'track') {
-          g.selectAll('.tw-shape, .tw-ring, .tw-pulse').attr('r', r);
+          g.selectAll('.tw-shape, .tw-ring, .tw-pulse, .tw-shade').attr('r', r);
+          g.select('.tw-node__play').attr('d', playPath(r));
           g.select('.tw-hole').attr('r', Math.max(2, r * .32));
           g.select('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2).attr('href', d.img || null);
         } else {
@@ -520,7 +527,8 @@ const TrackWeb = (() => {
     const d = selected;
     const hint = el('p', 'trackweb__hint',
       !nodes.length ? 'Search for a track or a show, start from the one playing, or follow along.'
-        : d ? '' : follow ? `Following along: each track appears as it plays (${follow.shown.size} so far). Click one to select it, or expand it to see where else it was played.` : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to select it, double-click to expand it. Bigger tracks, with a number, were played in more episodes.`);
+        : d ? '' : follow ? (timelineOn() ? `Following along (${follow.shown.size} tracks so far). Click any track, played or coming up, to play from it; played ones also line up the other episodes that played them.`
+          : `Following along: each track appears as it plays (${follow.shown.size} so far). Click one to select it, or expand it to see where else it was played.`) : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to select it, double-click to expand it. Bigger tracks, with a number, were played in more episodes.`);
     if (!d) { box.append(hint); return; }
     const title = el('p', 'trackweb__title', d.title);
     if (d.type === 'show') return paintShowInfo(box, d);
@@ -859,15 +867,27 @@ const TrackWeb = (() => {
     sel.exit().remove();
     const en = sel.enter().append('g').attr('class', 'tw-ahead')
       .on('click', (e, u) => { e.stopPropagation(); Archive.playFrom(follow.ep.show, follow.ep.episode, u.off); });
+    const R = 11;
     en.append('line').attr('class', 'tw-ahead__stem');
-    en.append('circle').attr('r', 8);
-    en.append('path').attr('class', 'tw-play-icon').attr('d', playPath(8));
+    en.append('circle').attr('class', 'tw-ahead__dot').attr('r', R);
+    en.append('image').attr('x', -R).attr('y', -R).attr('width', R * 2).attr('height', R * 2)
+      .attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
+    en.append('circle').attr('class', 'tw-ahead__ring').attr('r', R);
+    en.append('circle').attr('class', 'tw-lane__shade').attr('r', R);
+    en.append('path').attr('class', 'tw-play-icon').attr('d', playPath(R));
+    en.append('text').attr('class', 'tw-lane__label').attr('y', R + 11);
     en.append('title');
+    en.each(function (u) {
+      const img = d3.select(this).select('image');
+      Art.get({ artist: u.t.artist, title: u.t.title, isrc_id: u.t.isrc_id, deezer_track_id: u.t.deezer_track_id })
+        .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
+    });
     en.merge(sel)
       .attr('transform', (u) => `translate(${tl.x(u.off)},${rowY(u.i)})`)
       .each(function (u) {
         d3.select(this).select('line').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', -rowY(u.i));
         d3.select(this).select('title').text(`Coming up at ${fmtOffset(u.off)}: ${u.t.artist} – ${u.t.title}. Play from here`);
+        d3.select(this).select('text').text(clip(u.t.title, 22));
       });
   }
   function drawAxis(items) {

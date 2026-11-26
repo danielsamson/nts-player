@@ -100,8 +100,8 @@ puts the show in the middle and each track pops in around it as it plays, the cu
 one pulsing red. It starts by itself when you open the track web while something plays;
 skip ahead and the tracks you skipped appear. Switch between **Web** and **Timeline**: the
 timeline lays the tracks out along the episode's running time, with a playhead; tracks
-still to come show as grey circles with a play button (click to skip to it). Click a
-track in the timeline and every other episode that played it appears above (up to 50), each
+still to come show faded. Click any track, played or still to come, to play from it. A
+played track also brings up every other episode that played it appears above (up to 50), each
 lined up so that track sits right above it: see what other DJs played around it, and
 press play on any of their tracks to jump into that episode (it becomes the timeline you
 follow). Episodes whose tracklist has no times are shown too, dashed, with their tracks

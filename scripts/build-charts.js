@@ -149,23 +149,61 @@ async function build(period) {
 // One request a second, as MusicBrainz asks; results cached in charts/years.json so a track
 // is only looked up once. A few months per run; gives up quietly if MusicBrainz is unreachable.
 const YEARS_PER_RUN = Number(process.env.YEARS_MONTHS) || 3, YEAR_TOP = 100;
+// The earliest year any source gives (a later one is usually a reissue). MusicBrainz first
+// (it records a recording's first release); Deezer and iTunes Search if it has nothing.
+const UA = { 'User-Agent': 'nts-player-charts/1.0', Accept: 'application/json' };
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1 && !['the', 'and', 'feat', 'ft'].includes(w)));
+const plain = (x) => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+(feat|ft)\.?\s.*$/i, '').replace(/["“”]/g, '').trim();
+// is a result this track? same title (ignoring brackets, feat.) and an overlapping artist
+function same(artist, title, rArtist, rTitle) {
+  if (n(plain(rTitle)) !== n(plain(title))) return false;
+  const a = words(artist), b = words(rArtist);
+  return !a.size || [...a].some((w) => b.has(w));
+}
+async function getJson(url, tries = 5) {
+  for (let i = 0; i < tries; i++) {
+    const r = await fetch(url, { headers: UA });
+    if (r.status === 503 || r.status === 429) { await sleep(2000 * 2 ** i); continue; }   // busy: wait longer each time
+    if (!r.ok) throw new Error(`${new URL(url).host} ${r.status}`);
+    return r.json();
+  }
+  throw new Error(`${new URL(url).host} stayed busy`);
+}
+const yearOf = (d) => { const y = parseInt(d, 10); return y > 1900 && y <= new Date().getUTCFullYear() + 1 ? y : null; };
 async function releaseYear(artist, title) {
-  const clean = (x) => String(x).replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/"/g, '').trim();
-  const q = `recording:"${clean(title)}" AND artist:"${clean(splitArtists(artist)[0] || artist)}"`;
-  const r = await fetch(`https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(q)}&fmt=json&limit=5`, { headers: { 'User-Agent': 'nts-player-charts/1.0', Accept: 'application/json' } });
-  if (r.status === 503) { await new Promise((res) => setTimeout(res, 3000)); return undefined; }   // busy: try another time
-  if (!r.ok) throw new Error(`MusicBrainz ${r.status}`);
-  const recs = ((await r.json()).recordings || []).filter((x) => x.score >= 90 && x['first-release-date']);
-  const years = recs.map((x) => parseInt(x['first-release-date'], 10)).filter((y) => y > 1900);
-  return years.length ? Math.min(...years) : 0;
+  const t = plain(title), a = plain(splitArtists(artist)[0] || artist).replace(/^the\s+/i, '');
+  const found = [];
+  // MusicBrainz: search the words, then check each result ourselves
+  const q = `recording:(${t.replace(/[^\p{L}\p{N}\s']/gu, ' ')}) AND artist:(${a.replace(/[^\p{L}\p{N}\s']/gu, ' ')})`;
+  const mb = await getJson(`https://musicbrainz.org/ws/2/recording?query=${encodeURIComponent(q)}&fmt=json&limit=15`);
+  await sleep(1100);
+  for (const r of mb.recordings || []) {
+    const ra = (r['artist-credit'] || []).map((c) => c.name).join(' ');
+    if (same(artist, title, ra, r.title)) { const y = yearOf(r['first-release-date']); if (y) found.push(y); }
+  }
+  if (found.length) return Math.min(...found);
+  // Deezer: the album's release date
+  try {
+    const dz = await getJson(`https://api.deezer.com/search?q=${encodeURIComponent(`${a} ${t}`)}&limit=5`, 2);
+    const hit = (dz.data || []).find((x) => same(artist, title, x.artist?.name, x.title));
+    if (hit) { const al = await getJson(`https://api.deezer.com/album/${hit.album.id}`, 2); const y = yearOf(al.release_date); if (y) found.push(y); }
+  } catch {}
+  // iTunes Search
+  try {
+    const it = await getJson(`https://itunes.apple.com/search?term=${encodeURIComponent(`${a} ${t}`)}&entity=song&limit=10`, 2);
+    (it.results || []).filter((x) => same(artist, title, x.artistName, x.trackName)).forEach((x) => { const y = yearOf(x.releaseDate); if (y) found.push(y); });
+    await sleep(3000);                      // iTunes allows about 20 searches a minute
+  } catch {}
+  return found.length ? Math.min(...found) : 0;
 }
 async function fillYears() {
   const dir = path.join(OUT, 'charts');
-  const cacheFile = path.join(dir, 'years.json');
+  const cacheFile = path.join(dir, 'years-v2.json');     // v2: looser search, retries, Deezer/iTunes fallback
   let cache = {};
   try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch {}
   const todo = fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).sort().reverse()
-    .filter((f) => { try { const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); return d.v >= VERSION && !d.years; } catch { return false; } })
+    .filter((f) => { try { const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); return d.v >= VERSION && d.yearsV !== 2; } catch { return false; } })
     .slice(0, YEARS_PER_RUN);
   for (const f of todo) {
     const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
@@ -176,10 +214,7 @@ async function fillYears() {
       if (i >= YEAR_TOP) break;
       const k = `${n(t[0])}|${n(t[1])}`;
       if (!(k in cache)) {
-        let y;
-        try { y = await releaseYear(t[0], t[1]); } catch (e) { console.log(`years: ${e.message}, stopping`); failed = true; break; }
-        await new Promise((res) => setTimeout(res, 1100));
-        if (y !== undefined) cache[k] = y;
+        try { cache[k] = await releaseYear(t[0], t[1]); } catch (e) { console.log(`years: ${e.message}, stopping`); failed = true; break; }
       }
       if (cache[k]) years[i] = cache[k];
       i++;
@@ -187,6 +222,7 @@ async function fillYears() {
     fs.writeFileSync(cacheFile, JSON.stringify(cache));
     if (failed) return;
     d.years = years;                    // chart row index -> first release year
+    d.yearsV = 2;
     fs.writeFileSync(path.join(dir, f), JSON.stringify(d));
     console.log(`years: ${f} (${Object.keys(years).length} of ${i})`);
   }
@@ -222,7 +258,8 @@ function periods() {
   return [...new Set(out)];
 }
 
-(async () => {
+module.exports = { releaseYear };
+if (require.main === module) (async () => {
   fs.mkdirSync(path.join(OUT, 'charts'), { recursive: true });
   for (const p of periods()) {
     const res = await build(p);

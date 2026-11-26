@@ -2,26 +2,27 @@
 // Dots are places, sized by how many shows come from there. Scrub the timeline through
 // the schedule (last week and the week ahead): NTS 1 and NTS 2 move around the globe,
 // trailing where they broadcast from before. At "now" they pulse red.
+// Drawn on a canvas, one frame at a time, so turning and playing stay smooth.
 // Data: WORLD_SHOWS (snapshot of shows and places, scripts/build-world-data.js),
 // WorldPlaces (place coordinates), WORLD_LAND (map), and the live NTS schedule.
 
 const World = (() => {
   const host = $('world');
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-  const STEP = 15 * 60000;            // the timeline moves in 15-minute steps
-  let built = false, active = false;
-  let svg, gSphere, gGrat, gLand, gTrails, gDots, gLabels, gLive, proj, geoPath;
-  let rot = [0, -25], target = null, zoomK = 1, lastUser = 0;
+  const STEP = 15 * 60000;              // the timeline moves in 15-minute steps
+  const PLAY_SPEED = 3600000 / 0.22;    // playing: an hour of schedule every 0.22 s
+  const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let built = false, active = false, dirty = true;
+  let canvas, ctx, proj, geoPath, W = 0, H = 0, dpr = 1;
+  let rot = [0, -25], vel = [0, 0], target = null, zoomK = 1, zoomTo = 1, lastUser = 0, dragging = false, moved = false;
+  let hovered = null;
+  let t = Date.now(), followNow = true, playing = false;
+  let selected = null;
   const places = new Map();           // key -> { key, label, lat, lon, shows: [{ alias, name }] }
   const placeOfShow = new Map();      // alias -> place
   let nowhereShows = [];
   let sched = [];                     // { ch, start, end, title, alias, episode, place }
-  let t = Date.now(), followNow = true, playTimer = null;
-  let selected = null;
 
-  const fmtWhen = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const fmtTimeOnly = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  const isNow = () => followNow || Math.abs(t - Date.now()) < STEP;
 
   // ---------- data ----------
   function indexShows() {
@@ -80,136 +81,279 @@ const World = (() => {
     return out;
   }
 
-  // ---------- drawing ----------
+
+  const isNow = () => followNow || Math.abs(t - Date.now()) < STEP;
+  const fmtWhen = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const fmtTimeOnly = (ms) => new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  // ---------- setup ----------
   function build() {
     if (built) return;
     built = true;
     indexShows();
-    svg = d3.select(host.querySelector('.world__svg'));
-    proj = d3.geoOrthographic().clipAngle(90).precision(0.5);
-    geoPath = d3.geoPath(proj);
-    gSphere = svg.append('path').attr('class', 'world__sphere');
-    gGrat = svg.append('path').attr('class', 'world__grat').datum(d3.geoGraticule10());
-    gLand = svg.append('path').attr('class', 'world__land').datum(WORLD_LAND);
-    gTrails = svg.append('g');
-    gDots = svg.append('g');
-    gLabels = svg.append('g').attr('class', 'world__labels');
-    gLive = svg.append('g');
+    canvas = host.querySelector('.world__svg');
+    ctx = canvas.getContext('2d');
+    proj = d3.geoOrthographic().clipAngle(90).precision(0.6);
+    geoPath = d3.geoPath(proj, ctx);
+    new ResizeObserver(() => resize()).observe(canvas);
+    resize();
 
-    svg.call(d3.drag()
-      .on('start', () => { lastUser = Date.now(); target = null; svg.classed('is-dragging', true); })
-      .on('drag', (e) => {
-        lastUser = Date.now();
-        const k = 0.28 / zoomK;
-        rot = [rot[0] + e.dx * k, Math.max(-75, Math.min(75, rot[1] - e.dy * k))];
-        draw();
-      })
-      .on('end', () => svg.classed('is-dragging', false)));
-    svg.on('wheel', (e) => {
+    // drag to turn (keeps drifting a little when let go), click a place, scroll to zoom
+    let last = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      dragging = true; moved = false; target = null; vel = [0, 0]; lastUser = Date.now();
+      last = { x: e.clientX, y: e.clientY, at: performance.now() };
+      canvas.classList.add('is-dragging');
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!dragging) { hoverAt(e); return; }
+      const dx = e.clientX - last.x, dy = e.clientY - last.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+      const k = 0.25 / zoomK;
+      rot = [rot[0] + dx * k, clampLat(rot[1] - dy * k)];
+      const dt = Math.max(1, performance.now() - last.at);
+      vel = [dx * k / dt * 16, -dy * k / dt * 16];
+      last = { x: e.clientX, y: e.clientY, at: performance.now() };
+      lastUser = Date.now(); dirty = true;
+    });
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false; canvas.classList.remove('is-dragging'); lastUser = Date.now();
+      if (!moved) { vel = [0, 0]; const p = hitTest(e); if (p) select(p); else if (selected) { selected = null; dirty = true; paintInfo(); } }
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('pointerleave', () => { if (hovered) { hovered = null; canvas.title = ''; canvas.style.cursor = ''; dirty = true; } });
+    canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       lastUser = Date.now();
-      zoomK = Math.max(1, Math.min(6, zoomK * Math.pow(1.0015, -e.deltaY)));
-      draw();
+      zoomTo = Math.max(1, Math.min(6, zoomTo * Math.pow(1.0018, -e.deltaY)));
     }, { passive: false });
-    svg.on('click', (e) => { if (e.target === svg.node() || e.target.classList.contains('world__sphere') || e.target.classList.contains('world__land')) { selected = null; draw(); paintInfo(); } });
 
     const scrub = host.querySelector('.world__scrub');
-    scrub.addEventListener('input', () => { const v = Number(scrub.value); followNow = false; t = v; stopPlay(); focusOnChannels(); draw(); paintInfo(); });
-    host.querySelector('.world__now').addEventListener('click', () => { stopPlay(); followNow = true; t = Date.now(); focusOnChannels(); draw(); paintInfo(); });
-    host.querySelector('.world__play').addEventListener('click', () => (playTimer ? stopPlay() : startPlay()));
-    new ResizeObserver(() => active && draw()).observe(host.querySelector('.world__svg'));
+    scrub.addEventListener('input', () => { const v = Number(scrub.value); stopPlay(); followNow = false; t = v; timeChanged(); });
+    host.querySelector('.world__now').addEventListener('click', () => { stopPlay(); followNow = true; t = Date.now(); timeChanged(); });
+    host.querySelector('.world__play').addEventListener('click', () => (playing ? stopPlay() : startPlay()));
+  }
+  const clampLat = (v) => Math.max(-75, Math.min(75, v));
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    dirty = true;
   }
 
-  const visible = (p) => d3.geoDistance([p.lon, p.lat], [-rot[0], -rot[1]]) < Math.PI / 2 - 0.03;
-
-  function draw() {
-    if (!built) return;
-    const box = host.querySelector('.world__svg').getBoundingClientRect();
-    if (!box.width || !box.height) return;
-    const base = Math.min(box.width, box.height) / 2 - 12;
-    proj.translate([box.width / 2, box.height / 2]).scale(base * zoomK).rotate(rot);
-    gSphere.datum({ type: 'Sphere' }).attr('d', geoPath);
-    gGrat.attr('d', geoPath);
-    gLand.attr('d', geoPath);
-
-    // trails: where each channel was before, as great-circle arcs that fade with age
-    const trails = [1, 2].flatMap((ch) => {
-      const pts = trail(t, ch);
-      return pts.slice(1).map((p, i) => ({ ch, i, a: pts[i], b: p }));
-    });
-    gTrails.selectAll('path').data(trails).join('path')
-      .attr('class', (d) => `world__trail world__trail--${d.ch}`)
-      .attr('opacity', (d) => Math.max(0.12, 0.8 - d.i * 0.15))
-      .attr('d', (d) => geoPath({ type: 'LineString', coordinates: [[d.a.lon, d.a.lat], [d.b.lon, d.b.lat]] }));
-
-    // places
-    const list = [...places.values()].filter((p) => p.shows.length || p === selected);
-    const r = (p) => 1.8 + Math.sqrt(p.shows.length) * 0.9 * Math.min(1.6, Math.sqrt(zoomK));
-    gDots.selectAll('circle').data(list, (p) => p.key).join((enter) => enter.append('circle').attr('class', 'world__dot')
-      .on('click', (e, p) => { e.stopPropagation(); select(p); })
-      .call((c) => c.append('title')))
-      .classed('is-selected', (p) => p === selected)
-      .attr('r', r)
-      .attr('display', (p) => (visible(p) ? null : 'none'))
-      .attr('cx', (p) => proj([p.lon, p.lat])[0]).attr('cy', (p) => proj([p.lon, p.lat])[1])
-      .select('title').text((p) => `${p.label} · ${p.shows.length} show${p.shows.length === 1 ? '' : 's'}`);
-
-    // live / scrubbed position of each channel
-    const now = [1, 2].map((ch) => at(t, ch)).filter((b) => b?.place);
-    const liveMarks = gLive.selectAll('g.world__ch').data(now, (b) => b.ch).join((enter) => {
-      const g = enter.append('g').attr('class', (b) => `world__ch world__ch--${b.ch}`)
-        .on('click', (e, b) => { e.stopPropagation(); select(b.place); });
-      g.append('circle').attr('class', 'world__pulse').attr('r', 10);
-      g.append('circle').attr('class', 'world__mark').attr('r', 5.5);
-      g.append('text').attr('class', 'world__num').attr('dy', '0.35em').text((b) => b.ch);
-      return g;
-    });
-    // both channels in one place: nudge them apart
-    const same = now.length === 2 && now[0].place === now[1].place;
-    liveMarks.classed('is-now', isNow())
-      .attr('display', (b) => (visible(b.place) ? null : 'none'))
-      .attr('transform', (b) => { const [x, y] = proj([b.place.lon, b.place.lat]); return `translate(${x + (same ? (b.ch === 1 ? -8 : 8) : 0)},${y})`; });
-
-    // labels: the channels' places, the selected one, then the biggest, without overlaps
-    const want = [...new Set([...now.map((b) => b.place), selected, ...list.slice().sort((a, b) => b.shows.length - a.shows.length).slice(0, 40)])]
-      .filter((p) => p && visible(p));
-    const kept = [];
-    const labels = [];
-    for (const p of want) {
-      const [x, y] = proj([p.lon, p.lat]);
-      const w = p.label.length * 6 + 6, h = 13;
-      const bx = { x: x + 8, y: y - h / 2, w, h };
-      if (kept.some((k) => bx.x < k.x + k.w && k.x < bx.x + bx.w && bx.y < k.y + k.h && k.y < bx.y + bx.h)) continue;
-      kept.push(bx);
-      labels.push({ p, x: x + 9, y });
-      if (labels.length >= 16 + Math.round(zoomK * 6)) break;
+  // ---------- hit testing ----------
+  const center = () => [-rot[0], -rot[1]];
+  const facing = (p) => d3.geoDistance([p.lon, p.lat], center());
+  const dotR = (p) => 1.8 + Math.sqrt(p.shows.length) * 0.9 * Math.min(1.6, Math.sqrt(zoomK));
+  function hitTest(e) {
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bestD = Infinity;
+    const cands = [...places.values()].filter((p) => p.shows.length || p === selected);
+    for (const m of markers.values()) if (m.place) cands.push(m.place);
+    for (const p of cands) {
+      if (facing(p) > Math.PI / 2 - 0.05) continue;
+      const [px, py] = proj([p.lon, p.lat]);
+      const d = Math.hypot(px - x, py - y);
+      if (d < Math.max(8, dotR(p) + 4) && d < bestD) { best = p; bestD = d; }
     }
-    gLabels.selectAll('text').data(labels, (d) => d.p.key).join('text')
-      .attr('class', (d) => `world__label${now.some((b) => b.place === d.p) ? ' is-on-air' : ''}`)
-      .attr('x', (d) => d.x).attr('y', (d) => d.y).attr('dy', '0.35em').text((d) => d.p.label);
-
-    paintTime();
+    return best;
+  }
+  function hoverAt(e) {
+    const p = hitTest(e);
+    if (p === hovered) return;
+    hovered = p;
+    canvas.style.cursor = p ? 'pointer' : '';
+    canvas.title = p ? `${p.label} · ${p.shows.length} show${p.shows.length === 1 ? '' : 's'}` : '';
+    dirty = true;
   }
 
-  // ---------- motion ----------
-  // One animation loop: eases toward a target place, or turns slowly when left alone
-  let timer = null;
-  function loop() {
-    if (timer) return;
-    timer = d3.timer(() => {
-      if (!active) { timer.stop(); timer = null; return; }
-      const idle = Date.now() - lastUser > 8000;
-      if (target && Date.now() - lastUser > 1500) {
-        const dx = ((target[0] - rot[0] + 540) % 360) - 180, dy = target[1] - rot[1];
-        if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) target = null;
-        else { rot = [rot[0] + dx * 0.07, rot[1] + dy * 0.07]; draw(); }
-      } else if (idle && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        rot = [rot[0] + 0.04, rot[1]];
-        draw();
+  // ---------- channels: markers glide from place to place ----------
+  const markers = new Map();     // ch -> { place, from: [lon, lat], to: [lon, lat], at }
+  let chanKey = '';
+  function syncChannels() {
+    const now = [1, 2].map((ch) => at(t, ch));
+    for (const b of now) {
+      if (!b) continue;
+      const m = markers.get(b.ch);
+      const to = b.place ? [b.place.lon, b.place.lat] : null;
+      if (!m) { markers.set(b.ch, { place: b.place, from: to, to, at: 0 }); continue; }
+      if (m.place !== b.place) {
+        const from = markerPos(m) || to;
+        markers.set(b.ch, { place: b.place, from, to, at: performance.now() });
       }
-    });
+    }
+    // a different show on air: refresh the panel and face the channels
+    const key = now.map((b) => `${b?.ch}|${b?.title}|${b?.place?.key}`).join('/') + isNow();
+    if (key !== chanKey) { chanKey = key; if (!selected) paintInfo(); if (Date.now() - lastUser > 2500) focusOnChannels(); }
   }
-  function focusOn(p) { if (p) target = [-p.lon, Math.max(-60, Math.min(60, -p.lat * 0.8))]; }
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  function markerPos(m) {
+    if (!m?.to) return null;
+    if (!m.from || reduceMotion()) return m.to;
+    const k = Math.min(1, (performance.now() - m.at) / 900);
+    return k >= 1 ? m.to : d3.geoInterpolate(m.from, m.to)(ease(k));
+  }
+
+  // ---------- the frame loop ----------
+  let raf = 0, prev = 0, lastPanel = 0;
+  const shownLabels = new Map();     // place key -> opacity (labels fade in and out)
+  function frame(ts) {
+    raf = 0;
+    if (!active) return;
+    const dt = Math.min(64, prev ? ts - prev : 16);
+    prev = ts;
+    let moving = false;
+
+    if (playing) {
+      t += (dt / 1000) * PLAY_SPEED;
+      const max = sched.length ? sched[sched.length - 1].end : t;
+      if (t >= max) { t = max; stopPlay(); }
+      if (ts - lastPanel > 120) { lastPanel = ts; paintTime(); }
+      syncChannels();
+      moving = true;
+    } else if (followNow && ts - lastPanel > 30000) { lastPanel = ts; t = Date.now(); paintTime(); syncChannels(); }
+
+    // drift after a drag, ease toward a place, or turn slowly when left alone
+    if (!dragging && (Math.abs(vel[0]) > 0.005 || Math.abs(vel[1]) > 0.005)) {
+      rot = [rot[0] + vel[0] * dt / 16, clampLat(rot[1] + vel[1] * dt / 16)];
+      const decay = Math.pow(0.92, dt / 16);
+      vel = [vel[0] * decay, vel[1] * decay];
+      moving = true;
+    } else if (target && !dragging) {
+      const k = 1 - Math.pow(1 - 0.06, dt / 16);
+      const dx = ((target[0] - rot[0] + 540) % 360) - 180, dy = target[1] - rot[1];
+      if (Math.abs(dx) < 0.03 && Math.abs(dy) < 0.03) target = null;
+      else { rot = [rot[0] + dx * k, rot[1] + dy * k]; moving = true; }
+    } else if (!dragging && Date.now() - lastUser > 8000 && !reduceMotion()) {
+      rot = [rot[0] + 0.004 * dt, rot[1]];
+      moving = true;
+    }
+    if (Math.abs(zoomTo - zoomK) > 0.001) { zoomK += (zoomTo - zoomK) * (1 - Math.pow(0.8, dt / 16)); moving = true; }
+    for (const m of markers.values()) if (m.at && performance.now() - m.at < 950) moving = true;
+    const pulsing = isNow() && markers.size && !reduceMotion();
+
+    if (moving || pulsing || dirty || labelsFading) render(ts, dt);
+    dirty = false;
+    raf = requestAnimationFrame(frame);
+  }
+  function kick() { if (!raf && active) { prev = 0; raf = requestAnimationFrame(frame); } }
+
+  // ---------- drawing ----------
+  let labelsFading = false;
+  function render(ts, dt) {
+    if (!W || !H) return;
+    const R = (Math.min(W, H) / 2 - 14) * zoomK;
+    proj.translate([W / 2, H / 2]).scale(R).rotate(rot);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // the sphere, lit softly from the top left
+    const g = ctx.createRadialGradient(W / 2 - R * 0.35, H / 2 - R * 0.35, R * 0.1, W / 2, H / 2, R);
+    g.addColorStop(0, '#161616'); g.addColorStop(1, '#060606');
+    ctx.beginPath(); geoPath({ type: 'Sphere' }); ctx.fillStyle = g; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = '#333'; ctx.stroke();
+    ctx.beginPath(); geoPath(graticule); ctx.lineWidth = 0.6; ctx.strokeStyle = '#1b1b1b'; ctx.stroke();
+    ctx.beginPath(); geoPath(WORLD_LAND); ctx.fillStyle = '#272727'; ctx.fill(); ctx.lineWidth = 0.5; ctx.strokeStyle = '#3a3a3a'; ctx.stroke();
+
+    // trails: where each channel broadcast from before, fading with age
+    ctx.setLineDash([3, 3]);
+    for (const ch of [1, 2]) {
+      const pts = trail(t, ch);
+      const head = markerPos(markers.get(ch));
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = i === 0 && head ? head : [pts[i].lon, pts[i].lat];
+        ctx.beginPath(); geoPath({ type: 'LineString', coordinates: [a, [pts[i + 1].lon, pts[i + 1].lat]] });
+        ctx.globalAlpha = Math.max(0.12, 0.75 - i * 0.14);
+        ctx.strokeStyle = ch === 1 ? '#fff' : '#999'; ctx.lineWidth = 1.4; ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // places: fade out toward the edge of the globe instead of popping
+    const limb = (p) => Math.max(0, Math.min(1, (Math.PI / 2 - facing(p)) / 0.3));
+    const list = [...places.values()].filter((p) => p.shows.length || p === selected);
+    for (const p of list) {
+      const a = limb(p);
+      if (a <= 0) continue;
+      const [x, y] = proj([p.lon, p.lat]);
+      const on = p === selected || p === hovered;
+      ctx.beginPath(); ctx.arc(x, y, dotR(p), 0, Math.PI * 2);
+      ctx.globalAlpha = a * (on ? 1 : 0.6); ctx.fillStyle = on ? '#fff' : '#ccc'; ctx.fill();
+      ctx.lineWidth = on ? 1.5 : 0.8; ctx.strokeStyle = on ? '#fff' : '#000'; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // labels: the channels' places, selected/hovered, then the biggest. Ones already showing
+    // keep their spot (no flicker); they fade in and out.
+    const chPlaces = [...markers.values()].map((m) => m.place).filter(Boolean);
+    ctx.font = '700 10px "NTS Condensed", "Arial Narrow", Arial, sans-serif';
+    const ranked = [...new Set([...chPlaces, selected, hovered,
+      ...[...shownLabels.keys()].map((k) => places.get(k)).filter((p) => p && shownLabels.get(p.key) > 0.5),
+      ...list.slice().sort((a, b) => b.shows.length - a.shows.length).slice(0, 50)])].filter((p) => p && limb(p) > 0.15);
+    const kept = [], want = new Set();
+    const maxLabels = 14 + Math.round(zoomK * 6);
+    for (const p of ranked) {
+      const [x, y] = proj([p.lon, p.lat]);
+      const text = p.label.toUpperCase();
+      const w = ctx.measureText(text).width + 6;
+      const bx = { x: x + dotR(p) + 3, y: y - 7, w, h: 14, p, text };
+      if (kept.some((k) => bx.x < k.x + k.w && k.x < bx.x + bx.w && bx.y < k.y + k.h && k.y < bx.y + bx.h)) continue;
+      kept.push(bx); want.add(p.key);
+      if (kept.length >= maxLabels) break;
+    }
+    labelsFading = false;
+    const step = (dt || 16) / 220;
+    for (const p of list.concat(chPlaces)) {
+      const cur = shownLabels.get(p.key) || 0;
+      const next = want.has(p.key) ? Math.min(1, cur + step) : Math.max(0, cur - step);
+      if (next !== cur) labelsFading = true;
+      if (next > 0) shownLabels.set(p.key, next); else shownLabels.delete(p.key);
+    }
+    ctx.lineJoin = 'round'; ctx.textBaseline = 'middle';
+    for (const [k, o] of shownLabels) {
+      const p = places.get(k);
+      if (!p) continue;
+      const a = o * limb(p);
+      if (a <= 0.01) continue;
+      const [x, y] = proj([p.lon, p.lat]);
+      const text = p.label.toUpperCase();
+      ctx.globalAlpha = a;
+      ctx.lineWidth = 3; ctx.strokeStyle = '#000'; ctx.strokeText(text, x + dotR(p) + 4, y);
+      ctx.fillStyle = chPlaces.includes(p) || p === selected ? '#fff' : '#ccc'; ctx.fillText(text, x + dotR(p) + 4, y);
+    }
+    ctx.globalAlpha = 1;
+
+    // the channels
+    const live = isNow();
+    const pos = [1, 2].map((ch) => ({ ch, m: markers.get(ch), at: markerPos(markers.get(ch)) })).filter((x) => x.at);
+    const same = pos.length === 2 && d3.geoDistance(pos[0].at, pos[1].at) < 0.002;
+    for (const { ch, at: ll } of pos) {
+      if (d3.geoDistance(ll, center()) > Math.PI / 2 - 0.02) continue;
+      let [x, y] = proj(ll);
+      if (same) x += ch === 1 ? -8 : 8;
+      if (live && !reduceMotion()) {
+        const ph = (((ts || 0) + (ch === 2 ? 1000 : 0)) % 2000) / 2000;
+        ctx.beginPath(); ctx.arc(x, y, 6 + ph * 16, 0, Math.PI * 2);
+        ctx.globalAlpha = (1 - ph) * 0.9; ctx.strokeStyle = '#f00'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = live ? '#f00' : '#fff'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
+      ctx.font = '700 8px "NTS Condensed", "Arial Narrow", Arial, sans-serif';
+      ctx.textAlign = 'center'; ctx.fillStyle = live ? '#fff' : '#000'; ctx.fillText(String(ch), x, y + 0.5);
+      ctx.textAlign = 'start';
+    }
+  }
+  const graticule = d3.geoGraticule10();
+
+  // ---------- motion targets ----------
+  function focusOn(p) { if (p) { target = [-p.lon, clampLat(-p.lat * 0.8)]; kick(); } }
   function focusOnChannels() {
     const ps = [1, 2].map((ch) => at(t, ch)?.place).filter(Boolean);
     if (!ps.length) return;
@@ -220,6 +364,7 @@ const World = (() => {
   }
 
   // ---------- timeline ----------
+  function timeChanged() { syncChannels(); paintTime(); dirty = true; kick(); }
   function paintTime() {
     const scrub = host.querySelector('.world__scrub');
     if (sched.length) {
@@ -229,13 +374,12 @@ const World = (() => {
       if (followNow) t = Date.now();
       scrub.value = t;
       scrub.style.setProperty('--fill', `${((t - scrub.min) / (scrub.max - scrub.min)) * 100}%`);
-      // where "now" sits on the timeline
       const pct = ((Date.now() - scrub.min) / (scrub.max - scrub.min)) * 100;
       host.querySelector('.world__nowmark').style.left = `calc(16px + (100% - 32px) * ${Math.max(0, Math.min(100, pct)) / 100})`;
     }
     host.querySelector('.world__when').textContent = isNow() ? 'Live now' : fmtWhen(t);
     host.querySelector('.world__now').hidden = isNow();
-    host.querySelector('.world__play').textContent = playTimer ? 'Pause' : '▶ Play the week';
+    host.querySelector('.world__play').textContent = playing ? 'Pause' : '▶ Play the week';
   }
   function paintDays() {
     const box = host.querySelector('.world__days');
@@ -256,17 +400,13 @@ const World = (() => {
     followNow = false;
     const max = sched[sched.length - 1].end;
     if (t >= max - STEP) t = sched[0].start;
-    playTimer = setInterval(() => {
-      t += STEP * 2;
-      if (t >= max) { stopPlay(); return; }
-      focusOnChannels(); draw(); paintInfo();
-    }, 140);
-    paintTime();
+    playing = true;
+    paintTime(); kick();
   }
-  function stopPlay() { clearInterval(playTimer); playTimer = null; paintTime(); }
+  function stopPlay() { if (!playing) return; playing = false; paintTime(); if (!selected) paintInfo(); }
 
   // ---------- panel ----------
-  function select(p) { selected = p; focusOn(p); draw(); paintInfo(); }
+  function select(p) { selected = p; focusOn(p); dirty = true; paintInfo(); }
   function chRow(b) {
     const row = el('div', 'world__row');
     const num = el('span', 'world__chnum', String(b.ch));
@@ -283,26 +423,43 @@ const World = (() => {
     box.replaceChildren();
     if (selected) {
       const p = selected;
-      box.append(el('p', 'world__title', p.label));
-      const upcoming = sched.filter((b) => b.place === p && b.end > Date.now()).slice(0, 6);
-      box.append(el('p', 'world__sub', `${p.shows.length} show${p.shows.length === 1 ? '' : 's'} from here${upcoming.length ? ` · ${upcoming.length >= 6 ? '6+' : upcoming.length} broadcast${upcoming.length === 1 ? '' : 's'} coming up` : ''}`));
+      const head = el('div', 'world__head');
+      const close = el('button', 'world__close', '×');
+      close.setAttribute('aria-label', 'Close');
+      close.addEventListener('click', () => { selected = null; dirty = true; kick(); paintInfo(); });
+      head.append(el('p', 'world__title', p.label), close);
+      box.append(head, el('p', 'world__sub', `${p.shows.length} show${p.shows.length === 1 ? '' : 's'} based here, all time`));
+      const upcoming = sched.filter((b) => b.place === p && b.end > Date.now()).slice(0, 3);
       if (upcoming.length) {
+        box.append(el('p', 'world__label-sm', 'Coming up from here'));
         const list = el('div', 'world__upcoming');
         upcoming.forEach((b) => {
           const r = el('button', 'world__up');
           r.append(el('span', 'world__uptime', `${new Date(b.start).toLocaleDateString(undefined, { weekday: 'short' })} ${fmtTimeOnly(b.start)} · NTS ${b.ch}`), el('span', 'world__uptitle', b.title));
-          r.addEventListener('click', () => { followNow = false; t = b.start; stopPlay(); draw(); paintInfo(); });
+          r.addEventListener('click', () => { stopPlay(); followNow = false; t = b.start; timeChanged(); });
           list.append(r);
         });
         box.append(list);
       }
-      const shows = el('div', 'world__shows');
-      p.shows.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((s) => {
-        const b = el('button', 'tag', s.name);
-        b.addEventListener('click', () => Archive.showShow(s.alias));
-        shows.append(b);
-      });
-      box.append(shows);
+      // shows on the schedule this week first, then the rest alphabetically; 10 to start
+      const onAir = new Set(sched.filter((b) => b.place === p).map((b) => b.alias));
+      const shows = p.shows.slice().sort((a, b) => (onAir.has(b.alias) - onAir.has(a.alias)) || a.name.localeCompare(b.name));
+      box.append(el('p', 'world__label-sm', 'Shows'));
+      const list = el('div', 'world__shows');
+      const paint = (n) => {
+        list.replaceChildren(...shows.slice(0, n).map((s) => {
+          const b = el('button', 'world__show', s.name);
+          b.addEventListener('click', () => Archive.showShow(s.alias));
+          return b;
+        }));
+        if (shows.length > n) {
+          const more = el('button', 'world__more', `All ${shows.length} shows`);
+          more.addEventListener('click', () => paint(shows.length));
+          list.append(more);
+        }
+      };
+      paint(10);
+      box.append(list);
       return;
     }
     const chans = [1, 2].map((ch) => at(t, ch) || { ch, title: '' });
@@ -313,22 +470,19 @@ const World = (() => {
       + `Most: ${top.map((p) => `${p.label} ${p.shows.length}`).join(' · ')}. Click a place for its shows. Drag to turn, scroll to zoom.`));
   }
 
-  // Keep "now" moving while the view is open
-  setInterval(() => { if (active && followNow && !playTimer) { draw(); paintInfo(); } }, 30000);
-
   return {
     async show() {
       active = true;
       build();
-      draw(); paintInfo(); loop();
+      resize(); paintInfo(); kick();
       if (!sched.length) {
         host.querySelector('.world__when').textContent = 'Loading the schedule…';
         await loadSchedule().catch(() => {});
-        paintDays(); focusOnChannels(); draw(); paintInfo();
-      }
+        paintDays(); timeChanged(); focusOnChannels(); paintInfo();
+      } else timeChanged();
     },
     hide() { active = false; stopPlay(); },
     // live info changed (new show on air)
-    refresh() { if (active) { if (followNow) focusOnChannels(); draw(); paintInfo(); } }
+    refresh() { if (active) { syncChannels(); dirty = true; } }
   };
 })();

@@ -94,7 +94,13 @@
         <button class="mynts-btn world__now" hidden>Back to now</button>
         <button class="mynts-btn world__play">▶ Play the week</button>
       </div>
-      <svg class="world__svg" role="img" aria-label="Globe of where NTS shows broadcast from"></svg>
+      <canvas class="world__svg" role="img" aria-label="Globe of where NTS shows broadcast from"></canvas>
+      <!-- What the globe shows -->
+      <ul class="world__key">
+        <li><span class="world__key-dot"></span>Size: NTS shows based there, all time</li>
+        <li><span class="world__key-line"></span>A channel’s recent path (NTS 1 white, NTS 2 grey)</li>
+        <li><span class="world__key-live"></span>Where NTS 1 and 2 are on air now</li>
+      </ul>
       <div class="world__time">
         <input class="world__scrub" type="range" aria-label="Time in the schedule">
         <span class="world__nowmark" aria-hidden="true"></span>

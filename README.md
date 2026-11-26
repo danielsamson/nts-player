@@ -40,9 +40,12 @@ schedule, history and lists.
 
 - **Most played on NTS** on Home: the tracks played by the most different shows in the
   last 30 days, worked out from every episode's tracklist (NTS doesn't publish a chart).
-  **See all** for the top 100, and pick any month back to 2015. Click a track for its
-  details or press play to hear it in the latest episode that played it. The episodes in
-  a period come from nts.live's sitemap; past months are worked out once and kept.
+  **See all** for the top 100 and earlier months. Click a track for its details or press
+  play to hear it in the latest episode that played it.
+- **NTS in 2026:** the year on NTS in tracks, as full-window cards: the year in numbers,
+  track of the year, the top 10, artist of the year, number one month by month,
+  breakouts, tracks played all year, the busiest and new shows, and the two shows with
+  the most tracks in common. Pick earlier years too.
 - **I'm feeling lucky** on Home plays a random episode from anywhere in the archive: any
   show, any year.
 - **Explore by mood and genre:** NTS's moods (Sedative, Lean Back, Music To Dance To…) and
@@ -207,6 +210,12 @@ Runs the real app and checks the main journeys (Home, live, archive, saving, exp
 schedule, search, keyboard), with a stand-in NTS account and a throwaway profile. On Linux
 without a display: `xvfb-run -a npm test`. The tests run on GitHub before every build.
 
+The **Charts** workflow works out "Most played on NTS" once a day, so the app doesn't
+read hundreds of tracklists itself: the last 30 days, the current month, and older years
+one at a time until they're all there. It publishes small JSON files to the `data`
+branch. To rebuild specific months, run it from the Actions tab (e.g. `2019-01..2019-12`),
+or locally: `npm run charts -- --out data 2026-10`.
+
 A separate **NTS site check** runs daily and opens an issue if nts.live has changed in a
 way that affects the app (live track IDs, My NTS).
 
@@ -267,7 +276,7 @@ allows them for signed apps, so Mac users download new versions from the release
 | Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
 | Apple Music links | iTunes Search, for the track you're listening to |
 | My NTS | NTS's own pages and buttons on `www.nts.live`, in your signed-in session |
-| Most played | Episode dates from `www.nts.live/sitemap.xml.gz`, tracklists from the NTS API |
+| Most played, NTS in <year> | Worked out once a day on GitHub (episode dates from nts.live's sitemap, tracklists from the NTS API) and published to this repo's `data` branch; the app downloads those files |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist
@@ -284,7 +293,9 @@ src/index.html         Layout
 src/renderer.js        Live radio, now-playing bar, history, wide view
 src/archive.js         Archive: browse, search, show and episode pages
 src/archive-player.js  Plays archive episodes via SoundCloud's embed player
-src/chart.js           Most played on NTS: a chart from tracklists (sitemap.js: episodes by date)
+src/chart.js           Most played on NTS: shows the published charts, merges a year
+src/year.js            NTS in <year>: the year's cards
+scripts/build-charts.js  Works out the charts (run daily by the Charts workflow)
 src/trackweb.js        Track web
 src/style.css          Styling (design tokens at the top)
 src/fonts/             Roboto Condensed (SIL Open Font License)

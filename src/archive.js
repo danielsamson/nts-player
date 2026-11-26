@@ -773,24 +773,22 @@ const Archive = (() => {
     res.rows.slice(0, limit).forEach((r, i) => ol.append(chartRow(r, i)));
     return ol;
   }
-  // While tracklists are being read: how far along
-  function chartLoading(box, period) {
-    const l = loader('Finding the episodes');
-    const off = Chart.onProgress((p, prog) => {
-      if (!l.isConnected) { off(); return; }
-      if (p === period && prog) l.querySelector('.loader__text').textContent = `Reading ${prog.total} tracklists… ${prog.done} of ${prog.total}`;
-    });
-    box.replaceChildren(l);
+  const thisYear = new Date().getUTCFullYear();
+  function yearLink() {
+    const b = el('button', 'chart-year', `NTS in ${thisYear} ›`);
+    b.title = `The year on NTS in tracks: track of the year, top artists, number ones, busiest and new shows`;
+    b.addEventListener('click', () => Year.open(thisYear));
+    return b;
   }
   function chartSection() {
     const box = el('div', 'chart-box');
     const head = sectionTitle('Most played on NTS', 'See all', () => go({ type: 'chart', period: 'recent' }));
     const fill = (res) => {
-      if (!res?.rows.length) { box.replaceChildren(el('p', 'archive__empty', 'Couldn’t work out the chart right now.')); return; }
-      box.replaceChildren(el('p', 'chart-box__span', `Last 30 days · ${res.episodes} episodes`), chartList(res, 5));
+      if (!res?.rows.length) { box.replaceChildren(el('p', 'archive__empty', 'The chart isn’t available right now.')); return; }
+      box.replaceChildren(el('p', 'chart-box__span', `Last 30 days · ${res.episodes} episodes`), chartList(res, 5), yearLink());
     };
     const now = Chart.peek('recent');
-    if (now) fill(now); else chartLoading(box, 'recent');
+    if (now) fill(now); else box.replaceChildren(loader('Loading the chart'));
     Chart.get('recent').then((res) => { if (box.isConnected) fill(res); });
     return [head, box];
   }
@@ -798,21 +796,24 @@ const Archive = (() => {
     const bar = backBar('Most played on NTS');
     const pick = el('select', 'chart-pick');
     pick.setAttribute('aria-label', 'Period');
-    ['recent', ...Chart.months()].forEach((p) => { const o = el('option', null, periodLabel(p)); o.value = p; pick.append(o); });
+    const addOpt = (p) => { const o = el('option', null, periodLabel(p)); o.value = p; pick.append(o); };
+    addOpt('recent');
+    if (period !== 'recent') addOpt(period);
     pick.value = period;
+    Chart.months().then((ms) => { ms.filter((m) => m !== period).forEach(addOpt); pick.value = period; });
     pick.addEventListener('change', () => { current.period = pick.value; renderChart(pick.value); });
     const head = el('div', 'chart-head');
-    head.append(pick);
+    head.append(pick, yearLink());
     const box = el('div', 'chart-box chart-box--page');
     root.replaceChildren(bar, head, box);
     const fill = (res) => {
-      if (!res?.rows.length) { box.replaceChildren(el('p', 'archive__empty', 'Couldn’t work out the chart for this period.')); return; }
+      if (!res?.rows.length) { box.replaceChildren(el('p', 'archive__empty', 'No chart for this period yet.')); return; }
       box.replaceChildren(
         el('p', 'chart-box__span', `${periodLabel(period)} · ${res.episodes} episodes. Ranked by how many different shows played each track.`),
         chartList(res, 100));
     };
     const now = Chart.peek(period);
-    if (now) fill(now); else chartLoading(box, period);
+    if (now) fill(now); else box.replaceChildren(loader('Loading the chart'));
     const res = await Chart.get(period);
     if (box.isConnected && current.type === 'chart' && (current.period || 'recent') === period) fill(res);
   }

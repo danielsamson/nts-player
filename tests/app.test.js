@@ -158,28 +158,38 @@ async function mockAccount() {
     await win.waitForSelector('#archiveContent .detail', { timeout: 30000 });
   });
 
-  await test('Most played on NTS: ranks tracks by how many shows played them', async () => {
-    // a small made-up set of recent tracklists (the real one reads ~700 episodes)
-    await win.evaluate(() => {
-      const now = Date.now();
-      const ep = (s, e, tr) => ({ d: now - 86400000, s, e, tr });
-      localStorage.setItem('chart:v2', JSON.stringify({ at: now, eps: {
-        'a/1': ep('a', 'a-1', [['Kokoroko', 'Sweetie', 10], ['ID', 'ID', 20], ['Theme', 'Show A Theme', 30]]),
-        'a/2': ep('a', 'a-2', [['Theme', 'Show A Theme', 30], ['Kokoroko', 'Sweetie', 40]]),
-        'a/3': ep('a', 'a-3', [['Theme', 'Show A Theme', 30]]),
-        'b/1': ep('b', 'b-1', [['Kokoroko', 'Sweetie', 50], ['Camille Munn', 'See It Thru', 60]]),
-        'c/1': ep('c', 'c-1', [['Camille Munn', 'See It Thru', 70]])
-      } }));
-      Chart.reload();
-      Archive.home();
+  await test('Most played on NTS: the chart and the year', async () => {
+    // stand-in chart files instead of the published ones (scripts/build-charts.js makes the real ones)
+    await app.evaluate(({ ipcMain }) => {
+      const file = (period, complete, top) => ({
+        period, complete, generated: Date.now(), episodes: 700, shows: 500, plays: 13000, uniqueTracks: 12000,
+        showList: ['motive', 'tone', 'guests', 'raisa-k'],
+        tracks: top.map(([a, t, e, idx]) => [a, t, e, idx, [0, 'motive-30th-september-2026', 570, Date.now()], Date.UTC(2026, 0, 3)]),
+        busiest: [['guests', 50], ['motive', 9]], showEps: [['guests', 50], ['motive', 9], ['tone', 4], ['raisa-k', 4]],
+        debuts: ['raisa-k'], names: { motive: ['Motive', '', 'London'], 'raisa-k': ['Raisa K', '', 'London'] }
+      });
+      const data = {
+        index: { months: ['2026-02', '2026-01'] },
+        recent: file('recent', false, [['Kokoroko', 'Sweetie', 3, [0, 1]], ['Camille Munn', 'See It Thru', 2, [1, 3]], ['Solo', 'One Show Only', 3, [0]]]),
+        '2026-01': file('2026-01', true, [['Kokoroko', 'Sweetie', 3, [0, 1, 3]], ['Camille Munn', 'See It Thru', 2, [1, 3]]]),
+        '2026-02': file('2026-02', true, [['Camille Munn', 'See It Thru', 4, [0, 1, 3]], ['Kokoroko', 'Sweetie', 2, [0, 1]]])
+      };
+      ipcMain.removeHandler('charts:get');
+      ipcMain.handle('charts:get', (_e, name) => data[name] || null);
     });
+    await win.evaluate(() => Archive.home());
     await waitFor(() => document.querySelectorAll('.chart-row').length > 0, null, { timeout: 15000, what: 'the chart on Home' });
     const rows = await win.evaluate(() => [...document.querySelectorAll('.chart-row')].map((r) => r.querySelector('.track__title').textContent + ' / ' + r.querySelector('.chart-row__count').textContent));
-    // Sweetie: 2 shows beats the theme tune (1 show, 3 episodes); the placeholder "ID" is left out
-    expect(rows[0].startsWith('Sweetie') && rows[1].startsWith('See It Thru') && !rows.some((r) => /^ID/.test(r)), `unexpected chart: ${rows.join(' | ')}`);
-    // the full chart has a month picker
-    await win.evaluate(() => document.querySelector('.chart-box').previousElementSibling.querySelector('.archive__see').click());
-    await waitFor(() => document.querySelector('.chart-pick')?.options.length > 12, null, { timeout: 10000, what: 'the month picker' });
+    expect(rows[0] === 'Sweetie / 2 shows · 3 episodes' && rows[1].startsWith('See It Thru'), `unexpected chart: ${rows.join(' | ')}`);
+    // the year: See It Thru was played by 3 shows across both months, Sweetie by 3 too but fewer episodes
+    await win.click('.chart-year');
+    await waitFor(() => document.querySelector('.year__card'), null, { timeout: 10000, what: 'the year cards' });
+    expect(await win.evaluate(() => /NTS in 2026/.test(document.querySelector('.year__kicker').textContent)), 'year intro card');
+    await win.keyboard.press('ArrowRight');
+    const track = await win.evaluate(() => document.querySelector('.year__track')?.textContent);
+    expect(track === 'Sweetie' || track === 'See It Thru', `track of the year: ${track}`);
+    await win.keyboard.press('Escape');
+    expect(await win.evaluate(() => !document.querySelector('.year')), 'Esc closes the year');
   });
 
   await test('Schedule lists upcoming shows', async () => {

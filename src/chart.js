@@ -1,130 +1,122 @@
-// Most played on NTS: a chart worked out from tracklists (NTS doesn't publish one).
-// The episodes broadcast in a period come from nts.live's sitemap (main process); the app
-// reads their tracklists, counts each track once per episode, and ranks tracks by how
-// many different shows played them (so a show's theme tune doesn't top it).
-// Periods: 'recent' (the last 30 days, refreshed in the background) or a month 'YYYY-MM'.
-// Past months don't change, so each is worked out once and kept.
+// Most played on NTS: charts worked out once a day by the Charts workflow
+// (scripts/build-charts.js) and published to the repo's data branch. The app only
+// downloads the small files (main.js caches them) and ranks/merges what's in them.
+// Periods: 'recent' (the last 30 days) or a month 'YYYY-MM'. A year merges its months.
 
 const Chart = (() => {
-  const RECENT = 'chart:v2';            // the last 30 days: tracklists, kept to update cheaply
-  const MONTH = (m) => `chart:month:${m}`;
-  const DAYS = 30;
-  const REFRESH = 6 * 3600e3;
   const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-  // placeholder entries in tracklists, not real tracks
-  const JUNK = new Set(['id', 'unknown', 'untitled', 'tba', 'tbc', 'track id', 'unreleased', 'n a', 'na', 'various', 'various artists', 'unknown artist']);
-  const read = (k, dflt) => { try { return JSON.parse(localStorage.getItem(k)) || dflt; } catch { return dflt; } };
-  const write = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
   const showName = (alias) => alias.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const CATCH_ALL = /^(guests|dancing-\d{4}|nts-guests)$/;
+  const mem = new Map();          // period -> result
+  const loading = new Map();
 
-  let recent = read(RECENT, { eps: {}, at: 0 });
-  const listeners = new Set();
-  const progress = {};                    // period -> { done, total }
-  const emit = (period) => listeners.forEach((fn) => fn(period, progress[period] || null));
-
-  // Read the tracklists of some episodes (four at a time), reporting progress
-  async function readTracklists(period, refs, into) {
-    progress[period] = { done: 0, total: refs.length };
-    emit(period);
-    let next = 0;
-    await Promise.all(Array.from({ length: 4 }, async () => {
-      while (next < refs.length) {
-        const r = refs[next++];
-        const tl = await window.nts.api(`/api/v2/shows/${r.show}/episodes/${r.episode}/tracklist`).catch(() => null);
-        if (tl) into[`${r.show}/${r.episode}`] = { d: r.d, s: r.show, e: r.episode, tr: (tl.results || []).filter((x) => x.title).map((x) => [x.artist || '', x.title, x.offset ?? x.offset_estimate ?? null]) };
-        progress[period].done++;
-        if (progress[period].done % 10 === 0) emit(period);
-      }
+  // One file's tracks as chart rows (most played first)
+  function rowsOf(data, limit = 100) {
+    const shows = data.showList;
+    return data.tracks.filter((t) => t[2] >= 2).slice(0, limit).map(([artist, title, episodes, idx, l]) => ({
+      artist, title, episodes, shows: idx.length,
+      latest: { show: shows[l[0]], episode: l[1], offset: l[2], d: l[3], title: (data.names?.[shows[l[0]]] || [])[0] || showName(shows[l[0]]) }
     }));
-    delete progress[period];
-    emit(period);
   }
-
-  // Rank the tracks in a set of episodes
-  function rank(eps, limit = 100) {
-    const map = new Map();
-    for (const ep of eps) {
-      const seen = new Set();
-      for (const [artist, title, offset] of ep.tr) {
-        const a = n(artist), t = n(title);
-        if (!a || !t || JUNK.has(a) || JUNK.has(t)) continue;
-        const k = `${a}|${t}`;
-        if (seen.has(k)) continue;                 // once per episode
-        seen.add(k);
-        let m = map.get(k);
-        if (!m) { m = { artist, title, episodes: 0, showSet: new Set(), latest: null }; map.set(k, m); }
-        m.episodes++;
-        m.showSet.add(ep.s);
-        if (!m.latest || ep.d > m.latest.d) m.latest = { d: ep.d, show: ep.s, episode: ep.e, title: showName(ep.s), offset };
-      }
-    }
-    return [...map.values()].map(({ showSet, ...m }) => ({ ...m, shows: showSet.size }))
-      .filter((m) => m.episodes >= 2)
-      .sort((a, b) => b.shows - a.shows || b.episodes - a.episodes || b.latest.d - a.latest.d)
-      .slice(0, limit);
-  }
-
-  // ---- the last 30 days ----
-  async function refreshRecent() {
-    const to = Date.now() + 864e5, from = Date.now() - DAYS * 864e5;
-    const refs = await window.nts.episodesBetween(from, to);
-    const keep = new Set(refs.map((r) => `${r.show}/${r.episode}`));
-    for (const k of Object.keys(recent.eps)) if (!keep.has(k)) delete recent.eps[k];
-    await readTracklists('recent', refs.filter((r) => !recent.eps[`${r.show}/${r.episode}`]), recent.eps);
-    recent.at = Date.now();
-    write(RECENT, recent);
-  }
-  const recentResult = () => {
-    const eps = Object.values(recent.eps);
-    return eps.length ? { rows: rank(eps), episodes: eps.length, days: DAYS } : null;
-  };
-
-  // ---- a month ----
-  async function buildMonth(m) {
-    const [y, mo] = m.split('-').map(Number);
-    const from = Date.UTC(y, mo - 1, 1), to = Date.UTC(y, mo, 1);
-    const refs = await window.nts.episodesBetween(from, to);
-    const eps = {};
-    // reuse tracklists we already have from the last 30 days
-    refs.forEach((r) => { const k = `${r.show}/${r.episode}`; if (recent.eps[k]) eps[k] = recent.eps[k]; });
-    await readTracklists(m, refs.filter((r) => !eps[`${r.show}/${r.episode}`]), eps);
-    const list = Object.values(eps);
-    const res = { rows: rank(list), episodes: list.length, at: Date.now(), complete: to < Date.now() };
-    write(MONTH(m), res);
+  async function load(period) {
+    const data = await window.nts.chart(period).catch(() => null);
+    if (!data) return null;
+    const res = { period, data, rows: rowsOf(data), episodes: data.episodes, generated: data.generated };
+    mem.set(period, res);
     return res;
   }
-
-  const building = {};
-  // The chart for a period: cached if fresh, otherwise worked out (progress via onProgress)
   function get(period) {
-    if (building[period]) return building[period];
-    const cached = peek(period);
-    const fresh = period === 'recent' ? cached && Date.now() - recent.at < REFRESH
-      : cached && (cached.complete || Date.now() - cached.at < REFRESH);
-    if (fresh) return Promise.resolve(cached);
-    building[period] = (period === 'recent' ? refreshRecent().then(recentResult) : buildMonth(period))
-      .catch(() => peek(period)).finally(() => { delete building[period]; });
-    return building[period];
-  }
-  // What we have for a period right now (or null)
-  function peek(period) { return period === 'recent' ? recentResult() : read(MONTH(period), null); }
-
-  // Months you can pick: newest first, back to 2015
-  function months() {
-    const out = [];
-    const now = new Date();
-    for (let i = 0; ; i++) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-      if (d.getUTCFullYear() < 2015) break;
-      out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+    // remember a download for a minute (several parts of the page ask at once); never a failure
+    if (!loading.has(period)) {
+      loading.set(period, load(period).then((r) => {
+        if (r) setTimeout(() => loading.delete(period), 60000); else loading.delete(period);
+        return r;
+      }));
     }
-    return out;
+    return loading.get(period);
+  }
+  const peek = (period) => mem.get(period) || null;
+
+  // Months with data, newest first
+  async function months() {
+    const idx = await window.nts.chart('index').catch(() => null);
+    return idx?.months || [];
   }
 
-  return {
-    get, peek, months,
-    progress: (period) => progress[period] || null,
-    onProgress: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
-    reload() { recent = read(RECENT, { eps: {}, at: 0 }); }      // tests
-  };
+  // ---- a year: its months merged ----
+  async function year(y) {
+    const list = (await months()).filter((m) => m.startsWith(`${y}-`)).sort();
+    const files = (await Promise.all(list.map((m) => get(m)))).filter(Boolean).map((r) => r.data);
+    if (!files.length) return null;
+    const tracks = new Map();
+    const showEps = new Map();
+    const names = {};
+    let episodes = 0, plays = 0;
+    const numberOnes = [];
+    const debuts = [];
+    for (const f of files) {
+      episodes += f.episodes; plays += f.plays;
+      Object.assign(names, f.names || {});
+      (f.showEps || f.busiest || []).forEach(([s, c]) => showEps.set(s, (showEps.get(s) || 0) + c));
+      debuts.push(...(f.debuts || []).map((s) => ({ show: s, month: f.period })));
+      const top = rowsOf(f, 1)[0];
+      if (top) numberOnes.push({ month: f.period, ...top });
+      for (const [artist, title, e, idx, l, first] of f.tracks) {
+        const k = `${n(artist)}|${n(title)}`;
+        let m = tracks.get(k);
+        if (!m) { m = { artist, title, episodes: 0, showSet: new Set(), monthSet: new Set(), latest: null, first }; tracks.set(k, m); }
+        m.episodes += e;
+        idx.forEach((i) => m.showSet.add(f.showList[i]));
+        m.monthSet.add(f.period);
+        m.first = Math.min(m.first, first);
+        const lat = { show: f.showList[l[0]], episode: l[1], offset: l[2], d: l[3] };
+        if (!m.latest || lat.d > m.latest.d) m.latest = lat;
+      }
+    }
+    const all = [...tracks.values()].map(({ showSet, monthSet, ...m }) => ({ ...m, shows: showSet.size, showSet, months: monthSet.size }))
+      .filter((m) => m.episodes >= 2)
+      .sort((a, b) => b.shows - a.shows || b.episodes - a.episodes);
+    all.forEach((m) => { m.latest.title = (names[m.latest.show] || [])[0] || showName(m.latest.show); });
+    // artists: across their tracks (split "A, B & C" into each artist)
+    const artists = new Map();
+    for (const m of all) {
+      for (const a of String(m.artist).split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean)) {
+        const k = n(a);
+        if (!k) continue;
+        let r = artists.get(k);
+        if (!r) { r = { artist: a, showSet: new Set(), tracks: 0, top: m }; artists.set(k, r); }
+        m.showSet.forEach((s) => r.showSet.add(s));
+        r.tracks++;
+      }
+    }
+    const topArtists = [...artists.values()].map((r) => ({ artist: r.artist, shows: r.showSet.size, tracks: r.tracks, top: r.top }))
+      .sort((a, b) => b.shows - a.shows || b.tracks - a.tracks).slice(0, 10);
+    // tracks first played this year that the most shows picked up
+    const yearStart = Date.UTC(y, 0, 1);
+    const breakouts = all.filter((m) => m.first >= yearStart + 14 * 864e5).slice(0, 5);
+    // played in every month so far
+    const evergreen = all.filter((m) => m.months === files.length && files.length >= 3).slice(0, 5);
+    // shows that shared the most tracks
+    const pairs = new Map();
+    for (const m of all.slice(0, 3000)) {
+      const s = [...m.showSet].filter((x) => !CATCH_ALL.test(x)).sort();
+      if (s.length < 2 || s.length > 12) continue;
+      for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) { const k = `${s[i]}|${s[j]}`; pairs.set(k, (pairs.get(k) || 0) + 1); }
+    }
+    const topPair = [...pairs].sort((a, b) => b[1] - a[1])[0];
+    const busiest = [...showEps].filter(([s]) => !CATCH_ALL.test(s)).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([show, count]) => ({ show, count, name: (names[show] || [])[0] || showName(show), img: (names[show] || [])[1] || '' }));
+    const peak = files.slice().sort((a, b) => b.episodes - a.episodes)[0];
+    all.forEach((m) => { delete m.showSet; });
+    return {
+      year: y, months: files.length, complete: files.length === 12 && files.every((f) => f.complete),
+      episodes, plays, shows: showEps.size, uniqueTracks: files.reduce((s, f) => s + f.uniqueTracks, 0),
+      top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
+      debuts: debuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
+      pair: topPair ? { a: topPair[0].split('|')[0], b: topPair[0].split('|')[1], count: topPair[1], names } : null,
+      peak: peak ? { month: peak.period, episodes: peak.episodes } : null
+    };
+  }
+
+  return { get, peek, months, year, showName };
 })();

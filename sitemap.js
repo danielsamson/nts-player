@@ -2,8 +2,10 @@
 // of pages it publishes for search engines). NTS's API has no date search and its
 // "recently added" list stops after about 12 days; the sitemap lists every episode.
 // sitemap1 holds the newest ~48,000 episodes (back to early 2021), sitemap2 the rest.
-const { net } = require('electron');
 const zlib = require('zlib');
+// Inside the app use Electron's network stack; in scripts (GitHub Actions) plain fetch
+let doFetch = (url) => fetch(url);
+try { const { net } = require('electron'); if (net?.fetch) doFetch = (url) => net.fetch(url); } catch {}
 
 const BASE = 'https://www.nts.live';
 const MAX_AGE = 6 * 3600e3;
@@ -11,7 +13,7 @@ const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 
 const cache = new Map();      // sitemap url -> { at, episodes: [{ show, episode, d }] }
 
 async function fetchGz(url) {
-  const res = await net.fetch(url);
+  const res = await doFetch(url);
   if (!res.ok) throw new Error(`Sitemap ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   return (buf[0] === 0x1f && buf[1] === 0x8b ? zlib.gunzipSync(buf) : buf).toString('utf8');
@@ -53,4 +55,11 @@ async function episodesBetween(from, to) {
   return out.filter((e) => { const k = `${e.show}/${e.episode}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
-module.exports = { episodesBetween };
+// Every episode in the sitemap (both files): for working out when shows started
+async function allEpisodes() {
+  const out = [];
+  for (const url of await files()) out.push(...await load(url));
+  return out;
+}
+
+module.exports = { episodesBetween, allEpisodes };

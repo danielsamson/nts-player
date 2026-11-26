@@ -11,7 +11,8 @@
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
-    "test": "node tests/app.test.js"
+    "test": "node tests/app.test.js",
+    "charts": "node scripts/build-charts.js"
   },
   "devDependencies": {
     "d3": "^7.9.0",
@@ -29,7 +30,6 @@
       "account.js",
       "live-tracks.js",
       "desktop.js",
-      "sitemap.js",
       "src/**/*",
       "build/icon.png",
       "build/thumb-*.png"

@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('nts', {
   getLive: () => ipcRenderer.invoke('nts:live'),
   api: (path) => ipcRenderer.invoke('nts:api', path),
-  episodesBetween: (from, to) => ipcRenderer.invoke('nts:episodes-between', from, to),
+  chart: (name) => ipcRenderer.invoke('charts:get', name),
   copy: (text) => ipcRenderer.invoke('clipboard:write', text),
   focus: () => ipcRenderer.invoke('win:focus'),
   setWide: (wide) => ipcRenderer.invoke('win:set-wide', wide),

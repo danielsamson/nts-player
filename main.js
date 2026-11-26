@@ -4,6 +4,7 @@ const account = require('./account');
 const liveTracks = require('./live-tracks');
 const desktop = require('./desktop');
 const path = require('path');
+const fs = require('fs');
 
 const LIVE_API = 'https://www.nts.live/api/v2/live';
 // Your NTS sign-in lives in its own persistent browser session, separate from
@@ -110,11 +111,27 @@ ipcMain.handle('nts:api', async (_e, apiPath) => {
   return res.json();
 });
 
-// Episodes broadcast between two dates (ms), from nts.live's sitemap: for the monthly chart
-const sitemap = require('./sitemap');
-ipcMain.handle('nts:episodes-between', async (_e, from, to) => {
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from || to - from > 40 * 864e5) throw new Error('Invalid date range');
-  return sitemap.episodesBetween(from, to);
+// "Most played on NTS" data: worked out daily by the Charts workflow and published to the
+// repo's data branch, so the app downloads small files instead of reading tracklists.
+// Finished months never change: kept on disk for good. The rest are refreshed every 6 hours.
+const CHARTS = 'https://raw.githubusercontent.com/danielsamson/nts-player/data/charts';
+const chartMem = new Map();
+ipcMain.handle('charts:get', async (_e, name) => {
+  if (typeof name !== 'string' || !/^(index|recent|\d{4}-\d{2})$/.test(name)) throw new Error('Invalid chart');
+  const hit = chartMem.get(name);
+  if (hit && (hit.data.complete || Date.now() - hit.at < 6 * 3600e3)) return hit.data;
+  const file = path.join(app.getPath('userData'), 'charts', `${name}.json`);
+  try {
+    const disk = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (disk.complete) { chartMem.set(name, { at: Date.now(), data: disk }); return disk; }
+  } catch {}
+  const res = await net.fetch(`${CHARTS}/${name}.json`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Charts ${res.status}`);
+  const data = await res.json();
+  chartMem.set(name, { at: Date.now(), data });
+  try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(data)); } catch {}
+  return data;
 });
 
 // ---- NTS Supporter sign-in ----

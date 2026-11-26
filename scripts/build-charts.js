@@ -163,7 +163,8 @@ function same(artist, title, rArtist, rTitle) {
 }
 async function getJson(url, tries = 5) {
   for (let i = 0; i < tries; i++) {
-    const r = await fetch(url, { headers: UA });
+    let r;
+    try { r = await fetch(url, { headers: UA }); } catch { await sleep(2000 * 2 ** i); continue; }   // network hiccup: try again
     if (r.status === 503 || r.status === 429) { await sleep(2000 * 2 ** i); continue; }   // busy: wait longer each time
     if (!r.ok) throw new Error(`${new URL(url).host} ${r.status}`);
     return r.json();

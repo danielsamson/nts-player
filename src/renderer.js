@@ -224,12 +224,22 @@ function liveSaveButton(t) {
 
 // ---- Now-playing bar: live radio or an archive episode ----
 let nextText = '';
-let nowArtUrl = '';
-function setNowArt(url) {
-  nowArtUrl = url || '';
-  const img = $('nowArtImg');
-  if (url) img.src = url; else img.removeAttribute('src');
-  renderNowbar();
+let nowArtUrl = '';     // archive track's cover
+let liveArtUrl = '';    // live track's cover (Supporters)
+function setNowArt(url) { nowArtUrl = url || ''; renderNowbar(); }
+function setLiveArt(url) { liveArtUrl = url || ''; renderNowbar(); }
+// The art box is always there: the cover when there is one, otherwise a plain white label.
+// A new cover fades in over the old one once it has loaded, so it never flashes empty.
+let shownArt = null;
+function paintNowArt(url) {
+  if (url === shownArt) return;
+  shownArt = url;
+  const box = $('nowArt'), img = $('nowArtImg');
+  if (!url) { box.classList.add('is-blank'); img.removeAttribute('src'); return; }
+  const pre = new Image();
+  pre.onload = () => { if (shownArt !== url) return; img.src = url; box.classList.remove('is-blank'); };
+  pre.onerror = () => { if (shownArt === url) { box.classList.add('is-blank'); img.removeAttribute('src'); } };
+  pre.src = url;
 }
 const fmtMs = (ms) => fmtOffset(Math.max(0, Math.floor((ms || 0) / 1000)));
 
@@ -263,11 +273,13 @@ function renderNowbar() {
       : a.loading ? 'Loading…'
       : [nowTrackText(a), `${fmtMs(a.position)} / ${a.duration ? fmtMs(a.duration) : '–'}`].filter(Boolean).join(' · ');
     $('seekFill').style.width = a.duration ? `${Math.min(100, (a.position / a.duration) * 100)}%` : '0%';
-    $('nowArt').hidden = !nowArtUrl;
+    $('nowArt').hidden = false;
+    paintNowArt(nowArtUrl);
     document.title = `NTS Archive · ${a.episode.title}`;
   } else {
     $('nowKind').textContent = '';
-    $('nowArt').hidden = true;
+    $('nowArt').hidden = false;
+    paintNowArt(playing && LiveNow?.track ? liveArtUrl : '');
     $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
     const lt = LiveNow?.track;
     $('next').textContent = !navigator.onLine ? 'Offline · waiting for a connection'
@@ -1032,6 +1044,8 @@ var LiveNow = (() => {   // var: the now-playing bar may ask before this line ha
     const first = !key;
     key = k;
     track = t;
+    liveArtUrl = '';
+    if (t) Art.get(t, 'high').then((art) => { if (key === k) setLiveArt(art?.small || ''); }).catch(() => {});
     renderNowbar();
     if (typeof NowSave !== 'undefined') NowSave.update();
     if (typeof Stage !== 'undefined') Stage.render();

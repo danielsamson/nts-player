@@ -425,7 +425,19 @@ body.playing .track__art { background: var(--grey-1); }
 
 /* Album art of the current archive track in the now-playing bar */
 .nowbar__art { width: var(--bar); flex-shrink: 0; border-right: var(--rule); background: var(--grey-4); }
-.nowbar__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nowbar__art img { width: 100%; height: 100%; object-fit: cover; display: block; animation: artIn .35s ease; }
+/* No cover (or live without a track ID): a plain white label, so the box never comes and goes */
+.nowbar__art.is-blank {
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #1d1d1d, #111 60%, #181818);
+}
+.nowbar__art.is-blank img { display: none; }
+.nowbar__art.is-blank::after {
+  content: ''; width: 38%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, #111 0 6%, #f2efe8 7%);
+}
+@keyframes artIn { from { opacity: .3; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .nowbar__art img { animation: none; } }
 
 /* ======================================================================
    Wide view: thin strip on the left, the stage on the right.
@@ -1122,11 +1134,11 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .trackweb__actions .loader { padding: 0; }
 
 /* nodes and links */
-.tw-link { stroke: var(--grey-4); stroke-width: 1; transition: stroke .15s, opacity .15s; }
-.tw-link.is-lit { stroke: var(--grey-1); }
-.tw-link.is-dim { opacity: .2; }
-.tw-node { cursor: pointer; transition: opacity .15s; }
-.tw-node.is-dim { opacity: .2; }
+.tw-link { stroke: var(--grey-4); stroke-width: 1; opacity: .55; transition: stroke .35s ease, opacity .35s ease; }
+.tw-link.is-lit { stroke: var(--grey-1); opacity: 1; }
+.tw-link.is-dim { opacity: .12; }
+.tw-node { cursor: pointer; transition: opacity .35s ease; }
+.tw-node.is-dim { opacity: .25; }
 .tw-shape { fill: var(--grey-4); }
 .tw-ring { fill: none; stroke: var(--grey-3); stroke-width: 1; }
 .tw-node.is-expanded .tw-ring { stroke: var(--grey-1); }
@@ -1143,14 +1155,21 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-badge rect { fill: var(--white); }
 .tw-badge text { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--black); pointer-events: none; }
 /* labels */
-.tw-label { pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
+/* Labels fade in and out; a thick black outline keeps lines from cutting through the text */
+.tw-label { pointer-events: none; paint-order: stroke; stroke: var(--black); stroke-width: 5px; stroke-linejoin: round;
+  opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility 0s linear .3s; }
+.tw-label.is-on, .tw-node.is-hover .tw-label, .tw-node.is-selected .tw-label {
+  opacity: 1; visibility: visible; transition: opacity .3s ease, visibility 0s; }
+.tw-node.is-dim .tw-label { opacity: 0; }
+/* No cover: a plain white-label disc, not a grey blob */
+.tw-node--track:not(.has-img) .tw-shape { fill: #1c1c1c; stroke: var(--grey-3); stroke-width: 1; }
+.tw-hole { fill: var(--grey-2); }
+.tw-node--track.has-img .tw-hole { display: none; }
 .tw-label__title { font: 700 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; fill: var(--grey-1); }
 .tw-label__sub { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); }
 @media (prefers-reduced-motion: reduce) { .tw-node.is-loading .tw-body { animation: none; opacity: .6; } }
 
 /* Track labels only where they help: root, selected, expanded, hovered, or zoomed in */
-.tw-node--track:not(.is-root):not(.is-selected):not(.is-expanded):not(.is-popular):not(:hover) .tw-label { display: none; }
-.trackweb__svg.is-zoomed .tw-node--track .tw-label { display: block; }
 
 /* Track web: shows, shared tracks, followed shows */
 .tw-node--show .tw-shape { fill: var(--grey-4); }
@@ -1159,7 +1178,6 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-star { font: 700 11px/1 sans-serif; fill: var(--white); paint-order: stroke; stroke: var(--black); stroke-width: 3px; }
 .tw-link--show { stroke: var(--grey-3); stroke-dasharray: 3 3; }
 .tw-node--track.is-shared .tw-ring { stroke: var(--white); stroke-width: 1.5; }
-.tw-node--track.is-shared .tw-label { display: block !important; }
 .tw-node.is-followed .tw-ring, .tw-node.is-followed .tw-life { stroke: var(--live); }
 .trackweb__meta { font-size: 12px; line-height: 16px; color: var(--grey-2); margin: -6px 0 10px; }
 .trackweb__group { padding: 8px 10px 4px; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); border-bottom: 1px solid var(--grey-4); }
@@ -1175,5 +1193,3 @@ body.playing .channel .track__time { color: var(--grey-3); }
 }
 
 /* Label collisions: hidden labels come back on hover */
-.tw-label.is-culled { display: none !important; }
-.tw-node:hover .tw-label.is-culled, .tw-node.is-selected .tw-label.is-culled { display: block !important; }

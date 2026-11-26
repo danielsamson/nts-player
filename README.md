@@ -81,7 +81,7 @@ opens next to the player so you can watch it, and each step is logged in the ter
 ### Tracks and artwork
 
 - **Album covers** for tracks in tracklists, the now-playing bar, the Windows media
-  overlay and notifications.
+  overlay and notifications. When there's no cover, a plain white label stands in.
 - **Click a track** to copy "Artist - Title".
 
 ### Track web (prototype)
@@ -99,9 +99,9 @@ shared between them light up, and the show's panel lists the ones it played most
 carry their stand-in popularity: how many episodes, since when, how often, ★ if featured
 by NTS, and a red outline if you follow them.
 
-When the web gets crowded, labels that would overlap are hidden, keeping the most useful
-(the selected node, your starting track, expanded and shared tracks). Hover a node to see
-any label, or zoom in.
+When the web gets crowded, labels that would overlap fade out, keeping the most useful
+(the selected node, your starting track, expanded and shared tracks). Rest on a node to
+see its label and its connections, or zoom in.
 
 ### Wide view
 

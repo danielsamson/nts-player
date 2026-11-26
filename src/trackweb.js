@@ -43,6 +43,7 @@ const TrackWeb = (() => {
 
   let nodes = [], links = [], byId = new Map(), linkIds = new Set();
   let selected = null, rootId = null, sim = null, svg, gZoom, gLinks, gNodes, zoom;
+  let zoomed = false, hovered = null;
   let built = false;
   let holdTimer = null;
 
@@ -198,8 +199,9 @@ const TrackWeb = (() => {
     gNodes = gZoom.append('g').attr('class', 'tw-nodes');
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
       gZoom.attr('transform', e.transform);
-      svg.classed('is-zoomed', e.transform.k > 1.3);      // zoomed in: show every track label
-      cullLabels();
+      const z = e.transform.k > 1.3;                      // zoomed in: every track may show its label
+      if (z !== zoomed) { zoomed = z; cullLabels(); }
+      else cullLabelsSoon();
     });
     svg.call(zoom).on('dblclick.zoom', null);
     svg.on('click', (e) => { if (e.target === svg.node()) select(null); });
@@ -234,14 +236,15 @@ const TrackWeb = (() => {
         .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; d.held = false; }))
       .on('click', (e, d) => { e.stopPropagation(); select(d); })
       .on('dblclick', (e, d) => { e.stopPropagation(); select(d); expand(d); })
-      .on('mouseenter', (e, d) => highlight(d))
-      .on('mouseleave', () => highlight(null));
+      .on('mouseenter', (e, d) => hoverSoon(d))
+      .on('mouseleave', () => hoverSoon(null));
     enter.each(function (d) {
       const g = d3.select(this);
       const shape = g.append('g').attr('class', 'tw-body');
       if (d.type === 'track') {
         shape.append('circle').attr('class', 'tw-shape');
         shape.append('image').attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
+        shape.append('circle').attr('class', 'tw-hole');
         shape.append('circle').attr('class', 'tw-ring');
       } else {
         shape.append('rect').attr('class', 'tw-shape');
@@ -292,7 +295,12 @@ const TrackWeb = (() => {
   function labelPriority(d) {
     return d === selected ? 6 : d.id === rootId ? 5 : d.expanded ? 4 : d.inWeb >= 2 ? 3 : (d.plays || 0) >= 3 ? 2 : d.type !== 'track' ? 1 : 0;
   }
-  let cullQueued = false;
+  // Which labels show: every node that usually has one (all tracks when zoomed in), minus
+  // those that would overlap a more important one. Labels fade in and out (CSS); one
+  // that's showing keeps its place over an equal newcomer, so they don't swap as nodes drift.
+  const wantsLabel = (d) => labelled(d) || (zoomed && d.type === 'track');
+  let cullQueued = false, cullTimer = null;
+  function cullLabelsSoon() { clearTimeout(cullTimer); cullTimer = setTimeout(cullLabels, 120); }
   function cullLabels() {
     if (cullQueued || !gNodes) return;
     cullQueued = true;
@@ -301,11 +309,11 @@ const TrackWeb = (() => {
       const items = [];
       gNodes.selectAll('g.tw-node').each(function (d) {
         const label = this.querySelector('.tw-label');
-        label.classList.remove('is-culled');
-        if (getComputedStyle(label).display === 'none') return;
+        if (!wantsLabel(d)) { label.classList.remove('is-on'); return; }
         const b = label.getBBox();
         if (!b.width) return;
-        items.push({ label, d, x: d.x + b.x - 2, y: d.y + b.y - 1, w: b.width + 4, h: b.height + 2, p: labelPriority(d) });
+        const was = label.classList.contains('is-on');
+        items.push({ label, d, x: d.x + b.x - 3, y: d.y + b.y - 2, w: b.width + 6, h: b.height + 4, p: labelPriority(d) + (was ? .5 : 0) });
       });
       items.sort((a, b) => b.p - a.p || (b.d.plays || 0) - (a.d.plays || 0));
       const kept = [];
@@ -314,7 +322,8 @@ const TrackWeb = (() => {
       const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
       for (const it of items) {
         const clash = kept.some((k) => hit(it, k)) || (it.p < 5 && bodies.some((b) => b.n !== it.d && hit(it, b)));
-        if (clash) it.label.classList.add('is-culled'); else kept.push(it);
+        it.label.classList.toggle('is-on', !clash);
+        if (!clash) kept.push(it);
       }
     });
   }
@@ -359,6 +368,7 @@ const TrackWeb = (() => {
         const r = d.r;
         if (d.type === 'track') {
           g.selectAll('.tw-shape, .tw-ring').attr('r', r);
+          g.select('.tw-hole').attr('r', Math.max(2, r * .32));
           g.select('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2).attr('href', d.img || null);
         } else {
           g.selectAll('rect.tw-shape, rect.tw-ring').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2);
@@ -393,11 +403,25 @@ const TrackWeb = (() => {
 
   let lastCull = 0;
   function ticked() {
-    if (Date.now() - lastCull > 400) { lastCull = Date.now(); cullLabels(); }
+    if (Date.now() - lastCull > 700) { lastCull = Date.now(); cullLabels(); }
     gLinks.selectAll('line')
       .attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
     gNodes.selectAll('g.tw-node').attr('transform', (d) => `translate(${d.x},${d.y})`);
+  }
+
+  // Hover reacts after a short pause, so brushing past nodes (or nodes drifting under a
+  // still cursor) doesn't flash the whole web
+  let hoverTimer = null;
+  function hoverSoon(d) {
+    clearTimeout(hoverTimer);
+    hoverTimer = setTimeout(() => {
+      if (hovered === d) return;
+      hovered = d;
+      highlight(d);
+      gNodes.selectAll('g.tw-node').classed('is-hover', (n) => n === d);
+      if (d) gNodes.selectAll('g.tw-node').filter((n) => n === d).raise();   // its label sits on top
+    }, d ? 140 : 220);
   }
 
   function highlight(d) {

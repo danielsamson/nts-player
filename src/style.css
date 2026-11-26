@@ -1270,3 +1270,5 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-lane__shade { fill: rgba(0, 0, 0, .55); opacity: 0; transition: opacity .15s; pointer-events: none; }
 .tw-lane__track .tw-play-icon { fill: var(--white); opacity: 0; }
 .tw-lane__track:hover .tw-lane__shade, .tw-lane__track:hover .tw-play-icon { opacity: 1; }
+.tw-lane.is-approx .tw-lane__line { stroke-dasharray: 4 4; }
+.tw-lane.is-approx .tw-lane__title { fill: var(--grey-3); }

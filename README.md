@@ -104,7 +104,8 @@ still to come show as grey circles with a play button (click to skip to it). Cli
 track in the timeline and up to four other episodes that played it appear above, each
 lined up so that track sits right above it: see what other DJs played around it, and
 press play on any of their tracks to jump into that episode (it becomes the timeline you
-follow).
+follow). Episodes whose tracklist has no times are shown too, dashed, with their tracks
+spaced evenly.
 
 Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
 or **Explore this show** on any episode, to bring in its episodes six at a time: tracks

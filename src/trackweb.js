@@ -882,7 +882,9 @@ const TrackWeb = (() => {
     const eps = (info?.plays || []).map((p) => {
       const m = /^\/shows\/([^/]+)\/episodes\/([^/]+)/.exec(p.path || '');
       return m && { show: m[1], episode: m[2], title: p.title, date: p.date };
-    }).filter((e) => e && epId(e.show, e.episode) !== follow.ep.id).slice(0, 8);
+    }).filter((e) => e && epId(e.show, e.episode) !== follow.ep.id);
+    const total = Math.max(eps.length, (d.plays || 0) - 1);    // other episodes it was played in
+    eps.splice(8);
     if (!eps.length) { compare.status = 'Not found in any other NTS episode.'; paintInfo(); return; }
     compare.status = `Lining up ${eps.length} other episode${eps.length === 1 ? '' : 's'}…`;
     paintInfo();
@@ -891,17 +893,25 @@ const TrackWeb = (() => {
       if (!tracklists.has(id)) tracklists.set(id, window.nts.api(`/api/v2/shows/${ep.show}/episodes/${ep.episode}/tracklist`).catch(() => null));
       const rows = ((await tracklists.get(id))?.results || []).filter((r) => r.title);
       const hit = rows.find((r) => sameTrack(r, d)) || rows.find((r) => Archive.sameTrack(r, d));
-      const anchor = hit && rowOffset(hit);
-      if (!Number.isFinite(anchor)) return null;            // no time for it there: can't line it up
-      return { ep, rows: rows.filter((r) => Number.isFinite(rowOffset(r))), anchor, hit };
+      if (!hit) return null;                                    // not in that tracklist after all
+      const anchor = rowOffset(hit);
+      if (Number.isFinite(anchor)) {
+        rows.forEach((r) => { r.at = rowOffset(r); });
+        return { ep, rows: rows.filter((r) => Number.isFinite(r.at)), anchor, hit };
+      }
+      // no times listed: space its tracks evenly in tracklist order, still lined up on this one
+      const hi = rows.indexOf(hit);
+      rows.forEach((r, i) => { r.at = i * 240; });
+      return { ep, rows, anchor: hit.at, hit, approx: true };
     }));
     if (token !== compareToken) return;
-    const ok = lanes.filter(Boolean).slice(0, MAX_LANES);
-    const untimed = lanes.filter((l) => !l).length;
+    const found = lanes.filter(Boolean);
+    const ok = found.filter((l) => !l.approx).concat(found.filter((l) => l.approx)).slice(0, MAX_LANES);   // timed ones first
     compare.lanes = ok;
+    const approx = ok.filter((l) => l.approx).length;
     compare.status = ok.length
-      ? `Also in ${ok.length} other episode${ok.length === 1 ? '' : 's'}, lined up above at this track${untimed ? ` (${untimed} more had no times to line up)` : ''}. Press play on any track up there to jump into that episode.`
-      : `Played in ${eps.length} other episode${eps.length === 1 ? '' : 's'}, but ${eps.length === 1 ? 'its tracklist has' : 'their tracklists have'} no times to line up.`;
+      ? `${ok.length < total ? `Showing ${ok.length} of ${total}` : `Also in ${ok.length}`} other episode${total === 1 ? '' : 's'}, lined up above at this track${approx ? ` (${approx} with no times listed: spaced evenly, dashed)` : ''}. Press play on any track up there to jump into that episode.`
+      : `NTS lists it in ${eps.length} other episode${eps.length === 1 ? '' : 's'}, but couldn't find it in ${eps.length === 1 ? 'that tracklist' : 'their tracklists'}.`;
     drawLanes(d);
     paintInfo();
   }
@@ -916,17 +926,17 @@ const TrackWeb = (() => {
     compare.lanes.forEach((lane, k) => {
       const y = TOP - k * GAP;
       const x = (sec) => ax + (sec - lane.anchor) * pps;
-      const last = Math.max(...lane.rows.map(rowOffset));
-      const g = gLanes.append('g').attr('class', 'tw-lane').attr('transform', `translate(0,${y})`).style('--lane-delay', `${k * 90}ms`);
+      const last = Math.max(...lane.rows.map((r) => r.at));
+      const g = gLanes.append('g').attr('class', `tw-lane${lane.approx ? ' is-approx' : ''}`).attr('transform', `translate(0,${y})`).style('--lane-delay', `${k * 90}ms`);
       g.append('line').attr('class', 'tw-lane__line').attr('x1', x(0)).attr('x2', x(last + 240)).attr('y1', 0).attr('y2', 0);
       // the episode's name next to the lined-up track (the lane's start may be off screen)
       g.append('text').attr('class', 'tw-lane__title').attr('x', ax + 18).attr('y', -16)
-        .text(`${clip(lane.ep.title, 44)}${lane.ep.date ? ' · ' + lane.ep.date : ''}`);
+        .text(`${clip(lane.ep.title, 44)}${lane.ep.date ? ' · ' + lane.ep.date : ''}${lane.approx ? ' · no times listed' : ''}`);
       lane.rows.forEach((row) => {
         const anchor = row === lane.hit;
         const r = anchor ? 12 : 8;
-        const t = g.append('g').attr('class', `tw-lane__track${anchor ? ' is-anchor' : ''}`).attr('transform', `translate(${x(rowOffset(row))},0)`)
-          .on('click', (e) => { e.stopPropagation(); Archive.playFrom(lane.ep.show, lane.ep.episode, rowOffset(row)); });
+        const t = g.append('g').attr('class', `tw-lane__track${anchor ? ' is-anchor' : ''}`).attr('transform', `translate(${x(row.at)},0)`)
+          .on('click', (e) => { e.stopPropagation(); Archive.playFrom(lane.ep.show, lane.ep.episode, lane.approx ? 0 : row.at); });
         t.append('circle').attr('class', 'tw-lane__dot').attr('r', r);
         const img = t.append('image').attr('x', -r).attr('y', -r).attr('width', r * 2).attr('height', r * 2)
           .attr('clip-path', 'url(#tw-circle)').attr('preserveAspectRatio', 'xMidYMid slice');
@@ -934,7 +944,8 @@ const TrackWeb = (() => {
         t.append('circle').attr('class', 'tw-lane__shade').attr('r', r);       // darkens the cover on hover
         t.append('path').attr('class', 'tw-play-icon').attr('d', playPath(r));
         t.append('text').attr('class', 'tw-lane__label').attr('y', r + 11).text(clip(`${row.title}`, 22));
-        t.append('title').text(`${row.artist} – ${row.title} · ${fmtOffset(rowOffset(row))}. Play from here in ${lane.ep.title}`);
+        t.append('title').text(lane.approx ? `${row.artist} – ${row.title}. No time listed: plays ${lane.ep.title} from the start`
+          : `${row.artist} – ${row.title} · ${fmtOffset(row.at)}. Play from here in ${lane.ep.title}`);
         Art.get({ artist: row.artist, title: row.title, isrc_id: row.isrc_id, deezer_track_id: row.deezer_track_id })
           .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
       });

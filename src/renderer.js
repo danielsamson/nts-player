@@ -89,7 +89,7 @@ function render() {
   $('time').textContent = info.start ? `${fmtTime(info.start)}–${fmtTime(info.end)}` : '';
   if ($('art').getAttribute('src') !== info.img) $('art').setAttribute('src', info.img);
   nextText = info.next?.broadcast_title
-    ? `Next ${fmtTime(info.next.start_timestamp)} · ${info.next.broadcast_title}` : '';
+    ? `Next ${fmtTime(info.next.start_timestamp)} · ${unescapeHtml(info.next.broadcast_title)}` : '';
   renderNowbar();
   recordLive();
   if (typeof Stage !== 'undefined') Stage.render();

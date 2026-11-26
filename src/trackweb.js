@@ -293,14 +293,15 @@ const TrackWeb = (() => {
 
   // Labels that would overlap are hidden, most important first. Hover still shows any.
   function labelPriority(d) {
-    return d === selected ? 6 : d.id === rootId ? 5 : d.expanded ? 4 : d.inWeb >= 2 ? 3 : (d.plays || 0) >= 3 ? 2 : d.type !== 'track' ? 1 : 0;
+    // shows and episodes are the web's landmarks: their names win over track names
+    return d === selected ? 6 : d.id === rootId ? 5 : d.type !== 'track' ? 4.2 : d.expanded ? 4 : d.inWeb >= 2 ? 3 : (d.plays || 0) >= 3 ? 2 : 0;
   }
   // Which labels show: every node that usually has one (all tracks when zoomed in), minus
   // those that would overlap a more important one. Labels fade in and out (CSS); one
   // that's showing keeps its place over an equal newcomer, so they don't swap as nodes drift.
   const wantsLabel = (d) => labelled(d) || (zoomed && d.type === 'track');
   let cullQueued = false, cullTimer = null;
-  function cullLabelsSoon() { clearTimeout(cullTimer); cullTimer = setTimeout(cullLabels, 120); }
+  function cullLabelsSoon() { clearTimeout(cullTimer); cullTimer = setTimeout(cullLabels, 250); }
   function cullLabels() {
     if (cullQueued || !gNodes) return;
     cullQueued = true;
@@ -313,7 +314,11 @@ const TrackWeb = (() => {
         const b = label.getBBox();
         if (!b.width) return;
         const was = label.classList.contains('is-on');
-        items.push({ label, d, x: d.x + b.x - 3, y: d.y + b.y - 2, w: b.width + 6, h: b.height + 4, p: labelPriority(d) + (was ? .5 : 0) });
+        // where it goes: below the node, or above it if that's free and below isn't
+        const up = (-d.r - 6) - (b.y + b.height);
+        const spots = [0, up].map((dy) => ({ dy, x: d.x + b.x - 2, y: d.y + b.y + dy - 1, w: b.width + 4, h: b.height + 2 }));
+        if (d.labelUp) spots.reverse();          // keep the side it's on unless it has to move
+        items.push({ label, d, spots, p: labelPriority(d) + (was ? .5 : 0) });
       });
       items.sort((a, b) => b.p - a.p || (b.d.plays || 0) - (a.d.plays || 0));
       const kept = [];
@@ -321,9 +326,14 @@ const TrackWeb = (() => {
       const bodies = nodes.map((n) => ({ x: n.x - n.r, y: n.y - n.r, w: n.r * 2, h: n.r * 2, n }));
       const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
       for (const it of items) {
-        const clash = kept.some((k) => hit(it, k)) || (it.p < 5 && bodies.some((b) => b.n !== it.d && hit(it, b)));
-        it.label.classList.toggle('is-on', !clash);
-        if (!clash) kept.push(it);
+        const free = (box) => !kept.some((k) => hit(box, k)) && (it.p >= 5 || !bodies.some((b) => b.n !== it.d && hit(box, b)));
+        // tracks only use the spot below; shows and episodes may move above
+        const spot = (it.d.type === 'track' ? it.spots.filter((x) => x.dy === 0) : it.spots).find(free);
+        it.label.classList.toggle('is-on', !!spot);
+        if (!spot) continue;
+        it.d.labelUp = spot.dy !== 0;
+        it.label.setAttribute('transform', spot.dy ? `translate(0,${spot.dy})` : '');
+        kept.push(spot);
       }
     });
   }
@@ -404,6 +414,7 @@ const TrackWeb = (() => {
   let lastCull = 0;
   function ticked() {
     if (Date.now() - lastCull > 700) { lastCull = Date.now(); cullLabels(); }
+    cullLabelsSoon();     // and once more when the movement stops, from where nodes ended up
     gLinks.selectAll('line')
       .attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);

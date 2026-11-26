@@ -815,7 +815,7 @@ const Archive = (() => {
     return [head, box];
   }
   // genre family names from NTS ("house / techno") as chip labels
-  const genreLabel = (name) => titleCase(name).replace(/\s*\/\s*/g, ' / ').replace(/\bRhythm & Blues\b/i, 'R&B');
+  const genreLabel = (name) => titleCase(name).replace(/\s*\/\s*/g, ' / ').replace(/\bRhythm & Blues\b|\bR'n'b\b/gi, 'R&B').replace(/\bUk\b/g, 'UK');
   async function renderChart(period = 'recent', genre = null) {
     const bar = backBar('Most played on NTS');
     const pick = el('select', 'chart-pick');

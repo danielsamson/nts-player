@@ -22,6 +22,8 @@ const DAY = 864e5;
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const JUNK = new Set(['id', 'unknown', 'untitled', 'tba', 'tbc', 'track id', 'unreleased', 'n a', 'na', 'various', 'various artists', 'unknown artist']);
+// tracklist labels that aren't artists (film clips, talk, idents): not counted as artists
+const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings']);
 
 const args = process.argv.slice(2);
 const outIdx = args.indexOf('--out');
@@ -95,7 +97,7 @@ async function build(period) {
       if (!m.firstBy.has(r.show) || r.d < m.firstBy.get(r.show)) m.firstBy.set(r.show, r.d);
       for (const name of splitArtists(x.artist)) {
         const ak = n(name);
-        if (!ak || JUNK.has(ak)) continue;
+        if (!ak || JUNK.has(ak) || NOT_ARTISTS.has(ak)) continue;
         let ar = artists.get(ak);
         if (!ar) { ar = { name, tracks: new Set(), shows: new Set() }; artists.set(ak, ar); }
         ar.tracks.add(t); ar.shows.add(r.show);

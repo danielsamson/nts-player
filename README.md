@@ -48,6 +48,11 @@ schedule, history and lists.
   track of the year, the top 10, artist of the year, number one month by month,
   how the top 10 moved month by month, each track's lifespan, breakouts, tracks played all
   year, the busiest and new shows, and a network of shows that played the same tracks.
+  **Stories** tells the year in headlines worked out from the data, each with a small
+  chart: how rarely NTS repeats itself, how fast tracks come and go, the biggest leap,
+  deep dives against breadth, the busiest month, who heard it first, the tastemaker of
+  the year, how new the top 100 was (first release years from MusicBrainz), and the
+  genres month by month. A story only shows when the numbers make it worth telling.
   Switch to **Timeline** for the months side by side, each month's top 8 with lines
   following a track from month to month; scroll back through earlier years.
 - **I'm feeling lucky** on Home plays a random episode from anywhere in the archive: any
@@ -280,7 +285,7 @@ allows them for signed apps, so Mac users download new versions from the release
 | Album covers | Deezer (by the track's Deezer ID or ISRC from NTS, or a search), then iTunes Search |
 | Apple Music links | iTunes Search, for the track you're listening to |
 | My NTS | NTS's own pages and buttons on `www.nts.live`, in your signed-in session |
-| Most played, NTS in <year> | Worked out once a day on GitHub (episode dates from nts.live's sitemap, tracklists from the NTS API) and published to this repo's `data` branch; the app downloads those files |
+| Most played, NTS in <year> | Worked out once a day on GitHub (episode dates from nts.live's sitemap, tracklists and genres from the NTS API, first release years from [MusicBrainz](https://musicbrainz.org)) and published to this repo's `data` branch; the app downloads those files |
 
 **Your data stays on your computer.** History, your place in an episode, settings and
 the artwork cache are stored locally. Cover and link lookups send only a track's artist

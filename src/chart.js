@@ -184,8 +184,12 @@ const Chart = (() => {
   }
 
   // ---- Stories: headlines worked out from the year, only the ones worth telling ----
+  // tracklist labels that aren't artists (film clips, talk, idents)
+  const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'various', 'various artists', 'unknown', 'unknown artist', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings']);
+  const unquote = (x) => String(x || '').replace(/^["“”'‘’]+|["“”'‘’]+$/g, '');
   function stories(y, files, all, monthFiles, names) {
     const out = [];
+    const q = (t) => `“${unquote(t)}”`;
     const nm = (a) => (names[a] || [])[0] || showName(a);
     const mName = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
     const pct = (x) => Math.round(x * 100);
@@ -213,8 +217,8 @@ const Chart = (() => {
     if (runs.length && months.length >= 4) {
       const top = runs[0];
       out.push({ id: 'fast', kicker: 'Fame is fast', headline: top.best <= 3 ? `No track lasted more than ${top.best} months in the top 20` : `${top.t.title} stayed in the top 20 for ${top.best} months`,
-        body: top.best <= 3 ? `The longest run in a monthly top 20 was ${top.best} months, by “${top.t.title}” (${top.t.artist}). On NTS, tracks catch on and move on within weeks.`
-          : `“${top.t.title}” (${top.t.artist}) held a place in the monthly top 20 for ${top.best} months in a row, the longest run of the year.`,
+        body: top.best <= 3 ? `The longest run in a monthly top 20 was ${top.best} months, by ${q(top.t.title)} (${top.t.artist}). On NTS, tracks catch on and move on within weeks.`
+          : `${q(top.t.title)} (${top.t.artist}) held a place in the monthly top 20 for ${top.best} months in a row, the longest run of the year.`,
         viz: { type: 'runs', months, rows: runs.slice(0, 5).map((r) => ({ t: r.t, on: months.map((m, i) => { const rk = monthFiles[i].map.get(key(r.t.artist, r.t.title))?.rank; return rk && rk <= 20 ? rk : null; }) })) } });
     }
 
@@ -229,7 +233,7 @@ const Chart = (() => {
     if (leap && leap.by >= 20) {
       const t = monthFiles.find((f) => f.period === leap.month).rows.find((r) => key(r.artist, r.title) === leap.k);
       if (t) out.push({ id: 'leap', kicker: 'The biggest leap', headline: `From #${leap.from} to #${leap.to}`,
-        body: `“${t.title}” by ${t.artist} jumped ${leap.by} places in ${mName(leap.month)}, the biggest climb into a monthly top 10 all year.`,
+        body: `${q(t.title)} by ${t.artist} jumped ${leap.by} places in ${mName(leap.month)}, the biggest climb into a monthly top 10 all year.`,
         viz: { type: 'leap', t, from: leap.from, to: leap.to } });
     }
 
@@ -237,11 +241,13 @@ const Chart = (() => {
     let obsession = null;
     for (const f of files) for (const [name, count, idx] of f.artists || []) {
       const shows = idx.map((i) => f.showList[i]);
+      if (NOT_ARTISTS.has(n(name)) || shows.every((x) => catchAll(x, names))) continue;
       if (shows.length <= 2 && count >= 10 && count > (obsession?.count || 0)) obsession = { name, count, shows, month: f.period };
     }
     const reach = new Map();
     for (const f of files) for (const [name, , idx] of f.artists || []) {
       const k = n(name);
+      if (NOT_ARTISTS.has(k)) continue;
       if (!reach.has(k)) reach.set(k, { name, shows: new Set() });
       idx.forEach((i) => reach.get(k).shows.add(f.showList[i]));
     }
@@ -265,9 +271,9 @@ const Chart = (() => {
 
     // 6. the rare repeat: one show playing one track again and again
     let repeat = null;
-    for (const f of files) for (const t of f.tracks) if (t[3].length === 1 && t[2] > (repeat?.times || 0)) repeat = { times: t[2], artist: t[0], title: t[1], show: f.showList[t[3][0]], month: f.period };
+    for (const f of files) for (const t of f.tracks) if (t[3].length === 1 && !catchAll(f.showList[t[3][0]], names) && t[2] > (repeat?.times || 0)) repeat = { times: t[2], artist: t[0], title: t[1], show: f.showList[t[3][0]], month: f.period };
     if (repeat && repeat.times >= 3) out.push({ id: 'repeat', kicker: 'On repeat', headline: `${repeat.times} plays, one show`,
-      body: `The most any show played one track in a month: ${nm(repeat.show)} played “${repeat.title}” by ${repeat.artist} ${repeat.times} times in ${mName(repeat.month)}.`,
+      body: `The most any show played one track in a month: ${nm(repeat.show)} played ${q(repeat.title)} by ${repeat.artist} ${repeat.times} times in ${mName(repeat.month)}.`,
       viz: { type: 'cover', t: { artist: repeat.artist, title: repeat.title } } });
 
     // 7. who heard it first
@@ -278,8 +284,8 @@ const Chart = (() => {
     if (ahead && ahead.l.days >= 14) {
       const w = Math.round(ahead.l.days / 7);
       out.push({ id: 'first', kicker: 'Who heard it first', headline: `${nm(ahead.l.first[0])}, ${w} week${w === 1 ? '' : 's'} ahead`,
-        body: `${nm(ahead.l.first[0])} played “${ahead.t.title}” (${ahead.t.artist}) ${w} week${w === 1 ? '' : 's'} before any other show. ${ahead.t.shows} shows had played it by the end of the year.`
-          + (number1 && all[0] !== ahead.t ? ` The track of the year, “${all[0].title}”, was first played by ${nm(number1.first[0])}.` : ''),
+        body: `${nm(ahead.l.first[0])} played ${q(ahead.t.title)} (${ahead.t.artist}) ${w} week${w === 1 ? '' : 's'} before any other show. ${ahead.t.shows} shows had played it by the end of the year.`
+          + (number1 && all[0] !== ahead.t ? ` The track of the year, ${q(all[0].title)}, was first played by ${nm(number1.first[0])}.` : ''),
         viz: { type: 'strip', t: ahead.t, firsts: ahead.l.all.map(([s, d]) => ({ show: nm(s), d: d * DAY })), year: y } });
     }
 
@@ -299,7 +305,7 @@ const Chart = (() => {
       const decades = new Map();
       dated.forEach((t) => { const d = Math.floor(t.released / 10) * 10; decades.set(d, (decades.get(d) || 0) + 1); });
       out.push({ id: 'decades', kicker: 'Old and new', headline: fresh / dated.length > 0.5 ? `${pct(fresh / dated.length)}% brand new` : `${pct(1 - fresh / dated.length)}% from before ${y - 1}`,
-        body: `Of the year's top 100 (${dated.length} with a known release year), ${fresh} came out in ${y - 1} or ${y}. The oldest: “${oldest.title}” by ${oldest.artist}, from ${oldest.released}.`,
+        body: `Of the year's top 100 (${dated.length} with a known release year), ${fresh} came out in ${y - 1} or ${y}. The oldest: ${q(oldest.title)} by ${oldest.artist}, from ${oldest.released}.`,
         viz: { type: 'decades', rows: [...decades].sort((a, b) => a[0] - b[0]) } });
     }
 
@@ -312,8 +318,11 @@ const Chart = (() => {
       const half = Math.floor(rows.length / 2);
       const avgOf = (rs, g) => rs.reduce((a, r) => a + r[g], 0) / Math.max(1, rs.length);
       const rise = topG.map((g) => ({ g, d: avgOf(rows.slice(half), g) - avgOf(rows.slice(0, half), g) })).sort((a, b) => b.d - a.d)[0];
-      out.push({ id: 'genres', kicker: 'The sound of the year', headline: `${topG[0]} led; ${rise.g} rose`,
-        body: `${topG[0]} was the most common tag on NTS this year. ${rise.g} grew the most, from ${pct(avgOf(rows.slice(0, half), rise.g))}% of episodes in the first half of the year to ${pct(avgOf(rows.slice(half), rise.g))}% in the second.`,
+      const rose = rise.d >= 0.02;
+      out.push({ id: 'genres', kicker: 'The sound of the year', headline: rose ? `${topG[0]} led; ${rise.g} rose` : `${topG[0]}, all year`,
+        body: `${topG[0]} was the most common tag on NTS this year, on ${pct(gTotals.get(topG[0]) / files.reduce((a2, f) => a2 + f.episodes, 0))}% of episodes. `
+          + (rose ? `${rise.g} grew the most, from ${pct(avgOf(rows.slice(0, half), rise.g))}% of episodes in the first half of the year to ${pct(avgOf(rows.slice(half), rise.g))}% in the second.`
+            : 'The mix of genres barely moved from month to month: NTS’s sound is broad and steady.'),
         viz: { type: 'stream', rows, keys: topG } });
     }
     return out;

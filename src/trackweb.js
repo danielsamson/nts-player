@@ -155,7 +155,7 @@ const TrackWeb = (() => {
     n.loading = true; paintNodes();
     const info = await Archive.findTrack({ artist: n.artist, title: n.title }).catch(() => null);
     n.loading = false; n.expanded = true;
-    const plays = info?.plays || [];
+    const plays = (info?.plays || []).slice(0, 16);
     // a track found by search: default to its latest episode (we know its position there)
     const m0 = info?.match;
     if (m0 && !n.via) { n.viaMatch = { show: m0.show, episode: m0.episode, title: m0.title, date: m0.date, offset: m0.offset }; }
@@ -800,7 +800,7 @@ const TrackWeb = (() => {
       sim.force('link').strength(0);
       sim.force('charge').strength(-30);
       drawAxis(items);
-      refitTimeline(compare?.lanes.length ? -235 - (compare.lanes.length - 1) * 85 - 40 : undefined);
+      refitTimeline(compare?.lanes.length ? -235 - (Math.min(compare.lanes.length, FIT_LANES) - 1) * 85 - 40 : undefined);
     } else {
       tl = null;
       clearLanes();
@@ -859,9 +859,10 @@ const TrackWeb = (() => {
     movePlayhead();
   }
   // ---------- timeline: the same track in other episodes, lined up above ----------
-  // Click a track in the timeline: up to 4 other episodes that played it appear above,
-  // each shifted so that track sits right above it, on the same time scale.
-  const MAX_LANES = 4;
+  // Click a track in the timeline: every other episode that played it appears above (up
+  // to the 50 NTS's search returns), each shifted so that track sits right above it, on
+  // the same time scale. The view fits the first few; drag down for the rest.
+  const FIT_LANES = 4;
   let compare = null;      // { track, lanes, status }
   let compareToken = 0;
   function clearLanes() {
@@ -884,11 +885,11 @@ const TrackWeb = (() => {
       return m && { show: m[1], episode: m[2], title: p.title, date: p.date };
     }).filter((e) => e && epId(e.show, e.episode) !== follow.ep.id);
     const total = Math.max(eps.length, (d.plays || 0) - 1);    // other episodes it was played in
-    eps.splice(8);
     if (!eps.length) { compare.status = 'Not found in any other NTS episode.'; paintInfo(); return; }
-    compare.status = `Lining up ${eps.length} other episode${eps.length === 1 ? '' : 's'}…`;
-    paintInfo();
-    const lanes = await Promise.all(eps.map(async (ep) => {
+    let done = 0;
+    const progress = () => { compare.status = `Lining up ${eps.length} other episode${eps.length === 1 ? '' : 's'}… ${done} of ${eps.length}`; paintInfo(); };
+    progress();
+    const lineUp = async (ep) => {
       const id = epId(ep.show, ep.episode);
       if (!tracklists.has(id)) tracklists.set(id, window.nts.api(`/api/v2/shows/${ep.show}/episodes/${ep.episode}/tracklist`).catch(() => null));
       const rows = ((await tracklists.get(id))?.results || []).filter((r) => r.title);
@@ -900,17 +901,27 @@ const TrackWeb = (() => {
         return { ep, rows: rows.filter((r) => Number.isFinite(r.at)), anchor, hit };
       }
       // no times listed: space its tracks evenly in tracklist order, still lined up on this one
-      const hi = rows.indexOf(hit);
       rows.forEach((r, i) => { r.at = i * 240; });
       return { ep, rows, anchor: hit.at, hit, approx: true };
+    };
+    // four tracklists at a time, counting as they come in
+    const lanes = new Array(eps.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      while (next < eps.length && token === compareToken) {
+        const i = next++;
+        lanes[i] = await lineUp(eps[i]).catch(() => null);
+        done++;
+        if (token === compareToken && (done % 3 === 0 || done === eps.length)) progress();
+      }
     }));
     if (token !== compareToken) return;
     const found = lanes.filter(Boolean);
-    const ok = found.filter((l) => !l.approx).concat(found.filter((l) => l.approx)).slice(0, MAX_LANES);   // timed ones first
+    const ok = found.filter((l) => !l.approx).concat(found.filter((l) => l.approx));   // timed ones first
     compare.lanes = ok;
     const approx = ok.filter((l) => l.approx).length;
     compare.status = ok.length
-      ? `${ok.length < total ? `Showing ${ok.length} of ${total}` : `Also in ${ok.length}`} other episode${total === 1 ? '' : 's'}, lined up above at this track${approx ? ` (${approx} with no times listed: spaced evenly, dashed)` : ''}. Press play on any track up there to jump into that episode.`
+      ? `${ok.length < total ? `Showing ${ok.length} of ${total >= 49 ? '50+' : total}` : `Also in ${ok.length}`} other episode${total === 1 ? '' : 's'}, lined up above at this track${approx ? ` (${approx} with no times listed: spaced evenly, dashed)` : ''}.${ok.length > FIT_LANES ? ' Drag down to see them all.' : ''} Press play on any track up there to jump into that episode.`
       : `NTS lists it in ${eps.length} other episode${eps.length === 1 ? '' : 's'}, but couldn't find it in ${eps.length === 1 ? 'that tracklist' : 'their tracklists'}.`;
     drawLanes(d);
     paintInfo();
@@ -946,11 +957,17 @@ const TrackWeb = (() => {
         t.append('text').attr('class', 'tw-lane__label').attr('y', r + 11).text(clip(`${row.title}`, 22));
         t.append('title').text(lane.approx ? `${row.artist} – ${row.title}. No time listed: plays ${lane.ep.title} from the start`
           : `${row.artist} – ${row.title} · ${fmtOffset(row.at)}. Play from here in ${lane.ep.title}`);
-        Art.get({ artist: row.artist, title: row.title, isrc_id: row.isrc_id, deezer_track_id: row.deezer_track_id })
-          .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
+        const loadCover = () => {
+          if (img.attr('href') || t.property('coverAsked')) return;
+          t.property('coverAsked', true);
+          Art.get({ artist: row.artist, title: row.title, isrc_id: row.isrc_id, deezer_track_id: row.deezer_track_id })
+            .then((a) => { if (a?.small) img.attr('href', a.small); }).catch(() => {});
+        };
+        if (k < FIT_LANES * 2 && Math.abs(lane.rows.indexOf(row) - lane.rows.indexOf(lane.hit)) <= 4) loadCover();
+        else t.on('mouseenter', loadCover);
       });
     });
-    refitTimeline(lastY - 40);
+    refitTimeline(TOP - (Math.min(compare.lanes.length, FIT_LANES) - 1) * GAP - 40);
   }
   // fit the timeline (and any lanes above it) in view, unless you've zoomed yourself
   function refitTimeline(topY) {

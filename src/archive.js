@@ -292,7 +292,7 @@ const Archive = (() => {
   // Gives the episodes a track was played on and its tracklist entry there (with the
   // Deezer ID / ISRC for an exact cover, and its timestamp for "Play from"). Cached.
   const TrackInfo = (() => {
-    const KEY = 'trackInfo:v3';
+    const KEY = 'trackInfo:v4';
     let cache;
     try { cache = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { cache = {}; }
     const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch {} };
@@ -332,7 +332,7 @@ const Archive = (() => {
           if (e) match = { show: ep.show, episode: ep.episode, title: plays[0].title, date: plays[0].date,
             offset: e.offset ?? e.offset_estimate, isrc_id: e.isrc_id, deezer_track_id: e.deezer_track_id };
         }
-        const info = { plays: plays.slice(0, 16), total: plays.length, match };
+        const info = { plays: plays.slice(0, 50), total: plays.length, match };
         cache[key] = info;
         save();
         return info;

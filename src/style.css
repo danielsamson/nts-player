@@ -1165,4 +1165,11 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .trackweb__group { padding: 8px 10px 4px; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); border-bottom: 1px solid var(--grey-4); }
 .trackweb__top { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; }
 .trackweb__top-label { width: 100%; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); }
-.trackweb__info { max-height: 40%; overflow-y: auto; }
+.trackweb__info { max-height: 45%; overflow-y: auto; }
+
+.trackweb__play { width: auto; height: var(--btn-m); padding: 0 14px; }
+.trackweb__in { font-size: 12px; line-height: 16px; color: var(--grey-2); }
+.trackweb__pick {
+  height: var(--btn-m); max-width: 280px; background: var(--black); color: var(--grey-1); border: 1px solid var(--grey-3);
+  font: 700 12px/14px "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; padding: 0 6px;
+}

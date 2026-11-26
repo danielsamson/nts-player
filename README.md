@@ -88,9 +88,9 @@ opens next to the player so you can watch it, and each step is logged in the ter
 In the wide view, switch the stage to **Track web** to explore NTS through what DJs
 played. Search for a track (or start from the one playing, or **Open in Track web** on any
 track page). Round nodes are tracks with their covers, square nodes are episodes; a line
-means "this episode played this track". Click a node to expand it: a track shows the
-episodes that played it, an episode shows its tracklist. Pick a track to play it from that
-point in the episode, open its details, save it, or start a new web from it.
+means "this episode played this track". Click a node to select it; **Expand** (or double-click) grows the web:
+a track shows the episodes that played it, an episode shows its tracklist. Pick a track to **play it from that
+point** in the episode you found it through (or choose another), open its details, save it, or start a new web from it.
 
 Tracks are sized by how many NTS episodes played them (with a count). Search for a show,
 or **Explore this show** on any episode, to bring in its episodes six at a time: tracks

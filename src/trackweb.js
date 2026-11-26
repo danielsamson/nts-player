@@ -44,14 +44,19 @@ const TrackWeb = (() => {
   let nodes = [], links = [], byId = new Map(), linkIds = new Set();
   let selected = null, rootId = null, sim = null, svg, gZoom, gLinks, gNodes, zoom;
   let built = false;
+  let holdTimer = null;
 
   // ---------- data ----------
   function addNode(n) {
     if (byId.has(n.id)) return byId.get(n.id);
     if (nodes.length >= MAX_NODES) return null;
     const near = n.near && byId.get(n.near);
-    n.x = near ? near.x + (Math.random() - .5) * 60 : (Math.random() - .5) * 40;
-    n.y = near ? near.y + (Math.random() - .5) * 60 : (Math.random() - .5) * 40;
+    if (near) {
+      near.kids = (near.kids || 0) + 1;
+      const a = near.kids * 2.4;                       // golden-angle spiral around the parent
+      const dist = 55 + Math.sqrt(near.kids) * 6;
+      n.x = near.x + Math.cos(a) * dist; n.y = near.y + Math.sin(a) * dist;
+    } else { n.x = 0; n.y = 0; }
     n.r = n.type === 'track' ? 16 : n.type === 'show' ? 20 : 12;
     nodes.push(n); byId.set(n.id, n);
     if (n.type === 'track') { loadCover(n); loadCount(n); }
@@ -66,12 +71,25 @@ const TrackWeb = (() => {
     linkIds.add(id);
     links.push({ id, source: a.id, target: b.id, ...data });
   }
+  // Repaint at most once a frame, and only nudge the layout gently and rarely
+  let paintQueued = false;
+  function schedulePaint() {
+    if (paintQueued) return;
+    paintQueued = true;
+    requestAnimationFrame(() => { paintQueued = false; paintNodes(); });
+  }
+  let settleTimer = null;
+  function settle() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { if (sim && sim.alpha() < .05) sim.alpha(.05).restart(); }, 600);
+  }
+
   async function loadCover(n) {
     n.artLoading = true;
     const art = await Art.get({ artist: n.artist, title: n.title, isrc_id: n.isrc_id, deezer_track_id: n.deezer_track_id }).catch(() => null);
     n.artLoading = false;
     if (art?.small) n.img = art.small;
-    paintNodes();
+    schedulePaint();
   }
   // Show artwork for an episode node (from the episode details; cached)
   const showArt = new Map();
@@ -85,7 +103,7 @@ const TrackWeb = (() => {
     }
     n.img = await showArt.get(key);
     n.artLoading = false;
-    paintNodes();
+    schedulePaint();
   }
   async function loadShowNode(n) {
     n.artLoading = true;
@@ -93,7 +111,7 @@ const TrackWeb = (() => {
     n.title = n.meta.name;
     n.img = n.meta.img;
     n.artLoading = false;
-    paintNodes(); paintInfo();
+    schedulePaint(); if (selected === n) paintInfo();
   }
 
   // ---------- exploring a show: bring in its episodes, newest first ----------
@@ -127,9 +145,8 @@ const TrackWeb = (() => {
     if (c == null || !byId.has(n.id)) return;
     n.plays = c;
     n.r = 13 + Math.min(13, Math.sqrt(Math.max(0, c - 1)) * 3.2);
-    paintNodes();
-    sim?.force('collide').radius((d) => d.r + 8);
-    sim?.alpha(.15).restart();
+    schedulePaint();
+    settle();
   }
 
   // Expand a track: the episodes that played it
@@ -138,6 +155,9 @@ const TrackWeb = (() => {
     const info = await Archive.findTrack({ artist: n.artist, title: n.title }).catch(() => null);
     n.loading = false; n.expanded = true;
     const plays = info?.plays || [];
+    // a track found by search: default to its latest episode (we know its position there)
+    const m0 = info?.match;
+    if (m0 && !n.via) { n.viaMatch = { show: m0.show, episode: m0.episode, title: m0.title, date: m0.date, offset: m0.offset }; }
     if (!plays.length) showSnack('No other NTS episodes found for this track');
     plays.forEach((p) => {
       const m = /^\/shows\/([^/]+)\/episodes\/([^/]+)/.exec(p.path || '');
@@ -156,8 +176,10 @@ const TrackWeb = (() => {
     n.trackCount = (tl?.results || []).length;
     (tl?.results || []).forEach((t) => {
       if (!t.title) return;
+      const offset = t.offset ?? t.offset_estimate;
       const tn = addNode({ id: trackId(t), type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id, near: n.id });
-      addLink(tn, n, { offset: t.offset ?? t.offset_estimate });
+      if (tn && !tn.via && offset != null) { tn.via = n.id; }   // where we found it
+      addLink(tn, n, { offset });
     });
     if (nodes.length >= MAX_NODES) showSnack('The web is full: start a new one from a track');
     update();
@@ -186,6 +208,7 @@ const TrackWeb = (() => {
       .force('collide', d3.forceCollide((d) => d.r + 8))
       .force('x', d3.forceX(0).strength(.03))
       .force('y', d3.forceY(0).strength(.03))
+      .velocityDecay(.6)           // more damping: drift, don't jump
       .on('tick', ticked);
     new ResizeObserver(center).observe(host);
   }
@@ -206,8 +229,9 @@ const TrackWeb = (() => {
       .call(d3.drag()
         .on('start', (e, d) => { if (!e.active) sim.alphaTarget(.2).restart(); d.fx = d.x; d.fy = d.y; })
         .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
-        .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }))
-      .on('click', (e, d) => { e.stopPropagation(); onNodeClick(d); })
+        .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; d.held = false; }))
+      .on('click', (e, d) => { e.stopPropagation(); select(d); })
+      .on('dblclick', (e, d) => { e.stopPropagation(); select(d); expand(d); })
       .on('mouseenter', (e, d) => highlight(d))
       .on('mouseleave', () => highlight(null));
     enter.each(function (d) {
@@ -239,9 +263,19 @@ const TrackWeb = (() => {
       g.select('image').on('error', function () { d3.select(this).attr('href', null); d.img = ''; });
     });
     paintNodes();
+    // Hold the existing web still while the new nodes settle in, then let go gently
+    const fresh = new Set(enter.data());
+    if (nodes.length > fresh.size) {
+      nodes.forEach((n) => { if (!fresh.has(n) && n.fx == null) { n.fx = n.x; n.fy = n.y; n.held = true; } });
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        nodes.forEach((n) => { if (n.held) { n.fx = null; n.fy = null; n.held = false; } });
+        sim.alpha(Math.max(sim.alpha(), .08)).restart();
+      }, 1400);
+    }
     sim.nodes(nodes);
     sim.force('link').links(links);
-    sim.alpha(.8).restart();
+    sim.alpha(Math.max(sim.alpha(), nodes.length < 3 ? .8 : .3)).restart();   // a nudge, not a shake
     paintInfo();
   }
 
@@ -331,8 +365,7 @@ const TrackWeb = (() => {
   }
 
   // ---------- interaction ----------
-  function onNodeClick(d) {
-    select(d);
+  function expand(d) {
     if (d.expanded || d.loading) return;
     if (d.type === 'track') expandTrack(d);
     else if (d.type === 'episode') expandEpisode(d);
@@ -340,22 +373,32 @@ const TrackWeb = (() => {
   }
   function select(d) { selected = d; paintNodes(); paintInfo(); }
 
-  // An episode this track is linked to with a known position (for "Play from")
-  function playableEpisode(t) {
+  // Episodes this track can be played from (with its position), the one we found it
+  // through first; for a searched-for track, its latest episode
+  function playOptions(t) {
+    const opts = [];
     for (const l of links) {
+      if (l.kind === 'show') continue;
       const other = l.source.id === t.id ? l.target : l.target.id === t.id ? l.source : null;
-      if (other?.type === 'episode' && l.offset != null) return { ep: other, offset: l.offset };
+      if (other?.type === 'episode' && l.offset != null) opts.push({ ep: other, offset: l.offset });
     }
-    return null;
+    opts.sort((a, b) => (b.ep.id === t.via) - (a.ep.id === t.via));
+    if (!opts.length && t.viaMatch?.offset != null) {
+      const m = t.viaMatch;
+      opts.push({ ep: { show: m.show, episode: m.episode, title: m.title, date: m.date }, offset: m.offset });
+    }
+    return opts;
   }
+  const playableEpisode = (t) => playOptions(t)[0] || null;
 
   function paintInfo() {
     const box = host.querySelector('.trackweb__info');
     box.replaceChildren();
+    box.scrollTop = 0;
     const d = selected;
     const hint = el('p', 'trackweb__hint',
       !nodes.length ? 'Search for a track or a show, or start from the one playing.'
-        : d ? '' : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to expand it. Bigger tracks, with a number, were played in more episodes.`);
+        : d ? '' : `${nodes.filter((n) => n.type === 'track').length} tracks · ${nodes.filter((n) => n.type === 'episode').length} episodes. Click a node to select it, double-click to expand it. Bigger tracks, with a number, were played in more episodes.`);
     if (!d) { box.append(hint); return; }
     const title = el('p', 'trackweb__title', d.title);
     if (d.type === 'show') return paintShowInfo(box, d);
@@ -366,8 +409,26 @@ const TrackWeb = (() => {
       : `${d.date ? `Episode of ${d.date}` : 'Episode'}${d.trackCount ? ` · ${d.trackCount} tracks` : ''}${d.shared ? ` · ${d.shared} shared` : ''}`);
     const actions = el('div', 'trackweb__actions');
     if (d.type === 'track') {
-      const p = playableEpisode(d);
-      if (p) actions.append(btn(`▶ Play from ${fmtOffset(p.offset)} · ${p.ep.title}`, () => Archive.playFrom(p.ep.show, p.ep.episode, p.offset)));
+      const opts = playOptions(d);
+      const p = opts[0];
+      if (p) {
+        const play = el('button', 'episode-play trackweb__play');
+        let choice = p;
+        const paintPlay = () => { play.textContent = `▶ Play from ${fmtOffset(choice.offset)}`; };
+        paintPlay();
+        play.addEventListener('click', () => Archive.playFrom(choice.ep.show, choice.ep.episode, choice.offset));
+        actions.append(play);
+        if (opts.length > 1) {
+          const pick = el('select', 'trackweb__pick');
+          pick.setAttribute('aria-label', 'Episode to play it from');
+          opts.forEach((o, i) => { const op = el('option', null, `in ${o.ep.title}${o.ep.date ? ' · ' + o.ep.date : ''}`); op.value = i; pick.append(op); });
+          pick.addEventListener('change', () => { choice = opts[Number(pick.value)]; paintPlay(); });
+          actions.append(pick);
+        } else {
+          actions.append(el('span', 'trackweb__in', `in ${p.ep.title}${p.ep.date ? ' · ' + p.ep.date : ''}`));
+        }
+      }
+      if (!d.expanded) actions.append(btn(d.loading ? 'Finding episodes…' : 'Expand: other episodes', () => expand(d)));
       actions.append(btn('Details', () => openInPanel(() => Archive.showTrack(d.artist, d.title))));
       actions.append(btn('Start a web here', () => start({ artist: d.artist, title: d.title, isrc_id: d.isrc_id, deezer_track_id: d.deezer_track_id })));
       if (p && supporter) {
@@ -379,6 +440,7 @@ const TrackWeb = (() => {
         }));
       }
     } else {
+      if (!d.expanded) actions.append(btn(d.loading ? 'Loading tracklist…' : 'Expand: tracklist', () => expand(d)));
       actions.append(btn('▶ Play episode', () => Archive.playFrom(d.show, d.episode, 0)));
       actions.append(btn('Explore this show', () => { const s = showNodeFor(d); update(); select(s); addShowEpisodes(s); }));
       actions.append(btn('Open episode', () => openInPanel(() => Archive.showEpisode(d.show, d.episode))));

@@ -41,16 +41,62 @@ const YearPlay = (() => {
       if (src) { const w = el('div', `${cls} has-img`); const im = el('img'); im.alt = ''; im.src = src; w.append(im); return w; }
       return t ? coverImg(t, cls) : el('div', cls);
     };
-    b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'));
+    if (halftone) {
+      // a real halftone: the picture blurred and grey, multiplied by a dot pattern, then the contrast
+      // pushed until each dot snaps to a hard edge, sized by the tone under it
+      const ht = el('div', 'yp-ht');
+      ht.append(layer('yp-ht__img'), el('div', 'yp-ht__dots'));
+      b.append(ht);
+    } else b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'));
     if (extra) b.append(extra);
     // torn slices for the corrupted moments: copies of the picture, a band each, shoved sideways
-    if (src || t) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
-    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__dots'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'));
+    if (!halftone && (src || t)) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
+    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__snow'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'), el('div', 'yp-bg__head'));
     return b;
+  }
+  // running lines of type behind a scene: rows of the words sliding past, alternating direction,
+  // outlined with a solid row here and there. vertical: columns sliding up and down instead
+  function kinetic(text, { rows = 5, angle = -4, size = '13vw', speed = 34, solid = [], vertical = false, opacity = 0.5 } = {}) {
+    const k = el('div', `yp-kin${vertical ? ' yp-kin--v' : ''}`);
+    k.style.setProperty('--a', `${angle}deg`);
+    k.style.setProperty('--s', size);
+    k.style.setProperty('--o', opacity);
+    for (let r = 0; r < rows; r++) {
+      const row = el('div', `yp-kin__row${r % 2 ? ' is-back' : ''}${solid.includes(r) ? ' is-solid' : ''}`);
+      row.textContent = `${text} · `.repeat(10);
+      row.style.setProperty('--sp', `${speed + (r % 3) * 6}s`);
+      k.append(row);
+    }
+    return k;
+  }
+  // the tape never sits still: the wobble's noise changes several times a second, and white
+  // drop-out streaks flick across
+  let jitterTimer = null;
+  function jitter() {
+    clearInterval(jitterTimer);
+    if (reduced()) return;
+    jitterTimer = setInterval(() => {
+      if (!root || paused) return;
+      const turb = root.querySelector('#yp-vhs feTurbulence');
+      if (turb) turb.setAttribute('seed', String(1 + Math.floor(Math.random() * 999)));
+      const bg = root.querySelector('.yp-scene .yp-bg, .yp-gate .yp-bg');
+      if (bg && Math.random() < 0.45) {
+        for (let i = 0, n = 1 + Math.floor(Math.random() * 3); i < n; i++) {
+          const d = el('span', 'yp-drop');
+          d.style.top = `${Math.random() * 100}%`;
+          d.style.left = `${Math.random() * 70}%`;
+          d.style.width = `${8 + Math.random() * 45}%`;
+          bg.append(d);
+          setTimeout(() => d.remove(), 60 + Math.random() * 90);
+        }
+      }
+    }, 110);
   }
   // now and then the tape corrupts: slices jump, colours bleed, the noise flares
   function corrupt(bg, strong = false) {
     if (!bg?.isConnected || reduced()) return;
+    const disp = root?.querySelector('#yp-vhs feDisplacementMap');
+    if (disp) { disp.setAttribute('scale', String(strong ? 70 : 28 + Math.random() * 30)); setTimeout(() => disp.setAttribute('scale', '9'), strong ? 380 : 200); }
     bg.querySelectorAll('.yp-bg__slice').forEach((sl) => {
       const top = Math.random() * 85, h = 3 + Math.random() * (strong ? 22 : 12);
       sl.style.setProperty('--t', `${top}%`);
@@ -99,8 +145,21 @@ const YearPlay = (() => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('class', 'yp-filters'); svg.setAttribute('aria-hidden', 'true');
-    svg.innerHTML = [['yp-outline', 1.6], ['yp-outline-thick', 2.6]].map(([id, r]) =>
-      `<filter id="${id}" x="-2%" y="-2%" width="104%" height="104%"><feMorphology in="SourceAlpha" operator="erode" radius="${r}" result="in"/><feComposite in="SourceGraphic" in2="in" operator="out"/></filter>`).join('');
+    svg.innerHTML = [['yp-outline', 1.6], ['yp-outline-thick', 2.6], ...[2, 3, 4, 5, 6, 8].map((r) => [`yp-outline-${r}`, r])].map(([id, r]) =>
+      `<filter id="${id}" x="-2%" y="-2%" width="104%" height="104%"><feMorphology in="SourceAlpha" operator="erode" radius="${r}" result="in"/><feComposite in="SourceGraphic" in2="in" operator="out"/></filter>`).join('')
+      // worn tape: each line wobbles sideways (noise that changes several times a second), and the
+      // colours come apart: red one way, blue the other, smeared along the line
+      + `<filter id="yp-vhs" x="-4%" y="0" width="108%" height="100%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.00001 0.28" numOctaves="1" seed="2" result="n"/>
+          <feColorMatrix in="n" type="matrix" values="1 0 0 0 0  0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 1" result="nx"/>
+          <feDisplacementMap in="SourceGraphic" in2="nx" scale="9" xChannelSelector="R" yChannelSelector="G" result="d"/>
+          <feColorMatrix in="d" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+          <feOffset in="r" dx="5" result="ro"/><feGaussianBlur in="ro" stdDeviation="2.5 0" result="rb"/>
+          <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+          <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+          <feOffset in="b" dx="-5" result="bo"/><feGaussianBlur in="bo" stdDeviation="2.5 0" result="bb"/>
+          <feBlend in="rb" in2="g" mode="screen" result="rg"/><feBlend in="rg" in2="bb" mode="screen"/>
+        </filter>`;
     return svg;
   }
   // ---- poster type ----
@@ -151,7 +210,15 @@ const YearPlay = (() => {
         return Math.min(cap, (100 * W) / w);
       });
       const even = box.dataset.even ? Math.min(...sizes) : 0;
-      lines.forEach((line, i) => { line.style.fontSize = `${even || sizes[i]}px`; });
+      lines.forEach((line, i) => {
+        const fs = even || sizes[i];
+        line.style.fontSize = `${fs}px`;
+        // an outline's weight follows the type size (about 2.5% of it), so big letters don't go spindly
+        if (line.classList.contains('is-outline')) {
+          const r = [2, 3, 4, 5, 6, 8].reduce((a, b) => (Math.abs(b - fs * 0.025) < Math.abs(a - fs * 0.025) ? b : a));
+          line.style.filter = `url(#yp-outline-${r})`;
+        }
+      });
     });
   }
   // a numeral so big it runs off the edge of the screen, behind everything
@@ -218,7 +285,7 @@ const YearPlay = (() => {
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
       box.append(g, poster([[`${once} of 100`, 'outline'], 'played once'], { d: 2.2, max: 0.2, cls: 'yp-poster--center yp-poster--narrow' }),
         rise(tape(`Only ${100 - once} came back, on any show.`, 'yp-tape--sub'), 2.9));
-      return [backdrop(null, 'don-t-assume', null, true), box];
+      return [backdrop(null, 'don-t-assume', kinetic('Played once', { rows: 7, angle: 0, size: '11vh', speed: 26, solid: [3], opacity: 0.35 }), true), box];
     } });
 
     // 3. the countdown, 5 to 2: the number runs off the edge, the title stacks beside the cover
@@ -233,7 +300,7 @@ const YearPlay = (() => {
           rise(tape(`${t.artist}`, 'yp-tape--sub'), 0.6), rise(tape(`${fmt(t.shows)} shows`, 'yp-tape--sub'), 0.7));
         row.append(tx);
         box.append(row);
-        return [backdrop(t), giant(String(rank), 'yp-giant-bg--left'), box];
+        return [backdrop(t, null, kinetic(t.title, { rows: 3, angle: 0, size: '30vh', speed: 22, opacity: 0.32 })), giant(String(rank), 'yp-giant-bg--left'), box];
       } });
     });
 
@@ -245,14 +312,13 @@ const YearPlay = (() => {
         poster(splitLines(t1.title, t1.title.length > 8 ? 2 : 1), { even: true, d: 0.9, max: 0.3, cls: 'yp-poster--beside' }));
       const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist} · played by `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' shows');
       box.append(rise(n, 1.4));
-      return [backdrop(t1), el('div', 'yp-side', `Track of the year · ${year} · Track of the year · ${year}`), box];
+      return [backdrop(t1, null, kinetic(t1.title, { rows: 4, angle: -9, size: '17vw', speed: 40, solid: [1], opacity: 0.45 })), el('div', 'yp-side', `Track of the year · ${year} · Track of the year · ${year}`), box];
     } });
 
     // 5. artist of the year: the name, as big as it goes
     const a1 = s.topArtists?.[0];
     if (a1) out.push({ dur: 8, track: a1.top, build() {
-      const runs = el('div', 'yp-marquee');
-      for (let r = 0; r < 6; r++) { const row = el('div', `yp-marquee__row${r % 2 ? ' is-back' : ''}`); row.textContent = `${a1.artist} · `.repeat(8); runs.append(row); }
+      const runs = kinetic(a1.artist, { rows: 6, angle: -4, size: '13vw', solid: [2], opacity: 0.6 });
       const box = el('div', 'yp-frame yp-frame--bottom');
       const parts = splitLines(a1.artist, a1.artist.length > 10 ? 2 : 1);
       box.append(rise(tape('Artist of the year', 'yp-label'), 0.1), poster(parts.map((p, i) => (i % 2 ? [p, 'outline'] : p)), { d: 0.3, max: 0.32 }));
@@ -265,7 +331,7 @@ const YearPlay = (() => {
     if ((s.numberOnes || []).length > 2) out.push({ dur: 10, cls: 'yp-panelscene', build() {
       const g = el('div', `yp-tiles${s.numberOnes.length > 6 ? ' yp-tiles--many' : ''}`);
       s.numberOnes.forEach((t, i) => g.append(rise(tile(t, monthShort(t.month), `${t.shows} shows`), 0.6 + i * 0.22)));
-      return [backdrop(s.numberOnes[0], 'music-to-dance-to'), whitePanel({ icon: '✦', label: 'Number one, month by month', title: [['Number one', 'outline'], 'every month'], body: g })];
+      return [backdrop(s.numberOnes[0], 'music-to-dance-to', kinetic(s.numberOnes.map((t) => t.title).join(' · '), { rows: 4, vertical: true, size: '13vh', speed: 60, solid: [1], opacity: 0.55 })), whitePanel({ icon: '✦', label: 'Number one, month by month', title: [['Number one', 'outline'], 'every month'], body: g })];
     } });
 
     // 7. the biggest leap: the rank counting down, huge, off the edge
@@ -276,7 +342,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
         rise(tape(`${t.artist} · #${leap.viz.from} → #${leap.viz.to} in a month`, 'yp-tape--sub'), 2.7));
-      return [backdrop(t), giant(num, 'is-outline yp-giant-bg--left'), box];
+      return [backdrop(t, null, kinetic(`#${leap.viz.from} → #${leap.viz.to}`, { rows: 6, angle: -14, size: '9vw', speed: 18, opacity: 0.35 })), giant(num, 'is-outline yp-giant-bg--left'), box];
     } });
 
     // 8. who heard it first: the show's name across the frame, the shows after it along the year
@@ -296,7 +362,7 @@ const YearPlay = (() => {
         line.append(dot);
       });
       box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
-      return [backdrop(v.t, 'audio-research', null, true), box];
+      return [backdrop(v.t, 'audio-research', kinetic(v.firsts[0].show, { rows: 6, vertical: true, size: '15vh', speed: 30, solid: [4], opacity: 0.4 }), true), box];
     } });
 
     // 9. rising: new in the last three months, as tiles
@@ -304,7 +370,7 @@ const YearPlay = (() => {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
       const g = el('div', 'yp-tiles yp-tiles--five');
       s.breakouts.forEach((t, i) => g.append(rise(tile(t, `#${i + 1}`, `${t.shows} shows`), 0.6 + i * 0.22)));
-      return [backdrop(s.breakouts[0]), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
+      return [backdrop(s.breakouts[0], null, kinetic('New', { rows: 5, vertical: true, size: '22vh', speed: 14, solid: [2], opacity: 0.5 })), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
         foot: 'First played in the last three months and already picked up by the most shows.' })];
     } });
 
@@ -321,7 +387,8 @@ const YearPlay = (() => {
         months.append(c);
       });
       box.append(rise(months, 0.8), rise(tape(`Played in ${lr.months} of ${s.months} months. Most tracks on NTS last a few weeks.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));
-      return [backdrop(lr), giant(`${lr.months}/${s.months}`, 'is-outline yp-giant-bg--left'), box];
+      const ms = (s.monthList || []).map((m) => monthShort(m)).join(' ');
+      return [backdrop(lr, null, kinetic(ms, { rows: 8, angle: 0, size: '8vh', speed: 50, opacity: 0.3 })), giant(`${lr.months}/${s.months}`, 'is-outline yp-giant-bg--left'), box];
     } });
 
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way
@@ -347,7 +414,7 @@ const YearPlay = (() => {
           el('span', 'yp-genre__pct', `${Math.round(g.share * 100)}%`), tag);
         chart.append(rise(row, 0.5 + i * 0.25));
       });
-      return [backdrop(null, 'lsd'), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
+      return [backdrop(null, 'lsd', kinetic(list.map((g) => g.k).join(' · '), { rows: 4, vertical: true, size: '12vh', speed: 45, solid: [0], opacity: 0.55 })), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
         foot: 'Share of the year’s episodes tagged with each genre. ▲ ▼ more or less of it by the end of the year.' })];
     } });
 
@@ -360,7 +427,7 @@ const YearPlay = (() => {
       const covers = el('div', 'yp-fan');
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));
       box.append(covers);
-      return [backdrop(taste.viz.rows[0], null, null, true), box];
+      return [backdrop(taste.viz.rows[0], null, kinetic('First', { rows: 6, angle: -6, size: '20vh', speed: 16, solid: [1, 4], opacity: 0.35 }), true), box];
     } });
 
     // 13. outro
@@ -373,7 +440,7 @@ const YearPlay = (() => {
       const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ url: 'https://www.nts.live/supporters' }); });
       acts.append(again, cards, sup);
       box.append(rise(acts, 0.9));
-      return [backdrop(t1, 'sedative', null, true), box];
+      return [backdrop(t1, 'sedative', kinetic('End of tape', { rows: 6, angle: 0, size: '13vh', speed: 30, solid: [2], opacity: 0.35 }), true), box];
     } });
     return out;
   }
@@ -460,6 +527,7 @@ const YearPlay = (() => {
     const stage = el('div', 'yp-stage');
     const hint = el('p', 'yp-hint', 'Click for the next one · hold to pause');
     root.append(stage, osd(s.year), top, hint, outlineFilters());
+    jitter();
     onResize = () => root && fitPosters(root);
     window.addEventListener('resize', onResize);
     loadMoods();
@@ -503,7 +571,7 @@ const YearPlay = (() => {
     setTimeout(() => withMusic.focus(), 50);
   }
   let onResize = null;
-  function stop() { clearInterval(clock); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
+  function stop() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {
     if (!root) return false;

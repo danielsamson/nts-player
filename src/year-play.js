@@ -449,12 +449,14 @@ const YearPlay = (() => {
     } });
 
     // 9. rising: new in the last three months, as tiles
-    if ((s.breakouts || []).length >= 3) out.push({ dur: 9, track: s.breakouts[0], cls: 'yp-panelscene', build() {
+    if ((s.breakouts || []).length >= 3) out.push({ dur: 9, track: s.breakouts[0], build() {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
       const g = el('div', 'yp-tiles yp-tiles--five');
       s.breakouts.forEach((t, i) => g.append(rise(tile(t, `#${i + 1}`, `${t.shows} shows`), 0.6 + i * 0.22)));
-      return [backdrop(s.breakouts[0]), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
-        foot: 'First played in the last three months and already picked up by the most shows.' })];
+      const box = el('div', 'yp-frame yp-risescene');
+      box.append(rise(tape('Rising', 'yp-label'), 0), poster([['New since', 'outline'], since], { d: 0.15, max: 0.14, cls: 'yp-rise__title' }), g,
+        rise(tape('First played in the last three months and already picked up by the most shows.', 'yp-tape--sub'), 1.9));
+      return [backdrop(s.breakouts[0], null, null, true), box];
     } });
 
     // 10. the long runner: 11 / 11, a month at a time lighting up
@@ -547,6 +549,7 @@ const YearPlay = (() => {
     clearTimeout(cutTimer); cutTimer = setTimeout(() => root?.classList.remove('is-cut'), 450);
     const bg = scene.querySelector('.yp-bg');
     corrupt(bg, true);
+    if (!reduced()) hiss();
     clearTimeout(glitchTimer);
     const again = () => { glitchTimer = setTimeout(() => { if (!paused) corrupt(bg); if (bg?.isConnected) again(); }, 1400 + Math.random() * 3600); };
     again();
@@ -560,12 +563,44 @@ const YearPlay = (() => {
     if (play) setPaused(false);
     if (music && sc.track && playable(sc.track)) {
       const t = sc.track, k = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
-      if (k !== playingKey) { playingKey = k; Archive.playFrom(t.latest.show, t.latest.episode, t.latest.offset); }
+      if (k !== playingKey) { playingKey = k; crossTo(t); }
     }
     root.querySelector('.yp-hint').hidden = at !== 1;
   }
   const next = () => { if (at < scenes.length - 1) show(at + 1); };
   const prev = () => show(at - 1);
+  // Music between scenes: the old track fades down, the new one starts and fades up (like a mix,
+  // not a hard cut). Uses the player's own volume (the slider's level) as the target.
+  let fadeTimer = null;
+  const level = () => { const v = document.getElementById('volume'); const m = document.getElementById('audio')?.muted; return m ? 0 : Number(v?.value ?? 0.8); };
+  function ramp(from, to, ms, done) {
+    clearInterval(fadeTimer);
+    const t0 = performance.now();
+    fadeTimer = setInterval(() => {
+      const p = Math.min(1, (performance.now() - t0) / ms);
+      ArchivePlayer.setVolume(from + (to - from) * p);
+      if (p >= 1) { clearInterval(fadeTimer); done?.(); }
+    }, 40);
+  }
+  function crossTo(t) {
+    const target = level();
+    const playing = ArchivePlayer.state.playing;
+    const go = () => { ArchivePlayer.setVolume(0); Archive.playFrom(t.latest.show, t.latest.episode, t.latest.offset).then(() => setTimeout(() => ramp(0, target, 1100), 500)); };
+    if (playing) ramp(target, 0, 450, go); else go();
+  }
+  // tape hiss on the hard cuts: a short burst of filtered noise, quiet
+  let actx = null;
+  function hiss(ms = 260, gain = 0.05) {
+    try {
+      actx ||= new AudioContext();
+      const n = Math.floor(actx.sampleRate * ms / 1000), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.6;
+      const g = actx.createGain(); g.gain.value = gain * level() / 0.8;
+      src.connect(bp).connect(g).connect(actx.destination); src.start();
+    } catch {}
+  }
   let cutTimer = null, glitchTimer = null, clock = null, t0 = 0, held = 0;
   function setPaused(p) {
     paused = p;
@@ -655,7 +690,8 @@ const YearPlay = (() => {
     setTimeout(() => withMusic.focus(), 50);
   }
   let onResize = null;
-  function stop() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
+  function stop() { clearInterval(fadeTimer); stopInner(); }
+  function stopInner() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {
     if (!root) return false;

@@ -2057,3 +2057,16 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp.is-paused .yp-endlogo { animation-play-state: paused; }
 @media (max-width: 559px) { .yp-giant-bg--count { font-size: 30vh; top: 9vh; bottom: auto; } }
 @media (prefers-reduced-motion: reduce) { .yp-endlogo { display: none; } }
+/* rising, in the dark: tiles inverted over the tape */
+.yp-risescene { justify-content: center; }
+.yp-rise__title { width: min(56vw, 640px); margin-bottom: 2.4vh; }
+.yp-risescene .yp-tiles { width: min(90vw, 920px); }
+.yp-risescene .yp-tile { background: #000; border-color: rgba(255,255,255,.7); color: var(--white); }
+.yp-risescene .yp-tile__artist { color: rgba(255,255,255,.7); }
+.yp-risescene .yp-tile__tags span { border-color: rgba(255,255,255,.7); }
+.yp-risescene .yp-tile .yp-cover { background: #222; }
+@media (max-width: 559px) { .yp-rise__title { width: 86vw; } .yp-risescene .yp-tiles { width: 100%; } }
+.yp-risescene { padding-top: 104px; }
+.yp-risescene .yp-tile .yp-cover { width: 100%; }
+.yp-risescene .yp-tiles { max-height: 46vh; }
+.yp-risescene .yp-tiles .yp-cover { max-height: 24vh; }

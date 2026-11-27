@@ -91,6 +91,17 @@ const YearPlay = (() => {
   const story = (s, id) => (s.stories || []).find((x) => x.id === id);
   const playable = (t) => t?.latest && Number.isFinite(t.latest.offset);
 
+  // Outlined type: the text drawn solid, then shrunk and cut out of itself, leaving just the
+  // edge of each letter's silhouette (a text stroke would also trace the overlapping pieces
+  // the letters are built from, inside them)
+  function outlineFilters() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'yp-filters'); svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = [['yp-outline', 1.6], ['yp-outline-thick', 2.6]].map(([id, r]) =>
+      `<filter id="${id}" x="-2%" y="-2%" width="104%" height="104%"><feMorphology in="SourceAlpha" operator="erode" radius="${r}" result="in"/><feComposite in="SourceGraphic" in2="in" operator="out"/></filter>`).join('');
+    return svg;
+  }
   // ---- poster type ----
   // Split a title into up to n lines of similar length (by characters)
   function splitLines(text, n) {
@@ -443,7 +454,7 @@ const YearPlay = (() => {
     top.append(bars, browse, close);
     const stage = el('div', 'yp-stage');
     const hint = el('p', 'yp-hint', 'Click for the next one · hold to pause');
-    root.append(stage, osd(s.year), top, hint);
+    root.append(stage, osd(s.year), top, hint, outlineFilters());
     onResize = () => root && fitPosters(root);
     window.addEventListener('resize', onResize);
     loadMoods();

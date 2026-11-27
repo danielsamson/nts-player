@@ -1605,7 +1605,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* artist: the name running across */
 .yp-marquee { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 1vh; transform: rotate(-4deg) scale(1.15); opacity: .55; }
-.yp-marquee__row { white-space: nowrap; font-size: clamp(56px, 13vw, 170px); line-height: .95; font-weight: 700; text-transform: uppercase; color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,.55); animation: ypSlide 30s linear infinite; }
+.yp-marquee__row { white-space: nowrap; font-size: clamp(56px, 13vw, 170px); line-height: .95; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,.55); filter: url(#yp-outline); animation: ypSlide 30s linear infinite; }
 .yp-marquee__row.is-back { animation-direction: reverse; }
 
 /* number ones */
@@ -1761,14 +1761,14 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-poster--narrow { width: min(76vw, 820px); }
 .yp-poster__line { display: block; overflow: hidden; white-space: nowrap; font-size: 100px; line-height: .84; font-weight: 700; text-transform: uppercase; letter-spacing: -.012em; padding: .03em 0 .05em; color: var(--white); }
 .yp-poster__inner { display: inline-block; transform: translateY(108%); animation: ypLine .75s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: var(--d, 0s); }
-.yp-poster__line.is-outline { color: transparent; -webkit-text-stroke: max(1.5px, .018em) var(--white); }
+.yp-poster__line.is-outline { color: var(--white); filter: url(#yp-outline); }
 @keyframes ypLine { to { transform: none; } }
 .yp.is-paused .yp-scene .yp-poster__inner { animation-play-state: paused; }
 /* giant numerals running off the edge, behind the words */
 .yp-giant-bg { position: absolute; z-index: 1; font-weight: 700; line-height: .74; letter-spacing: -.04em; color: var(--white); white-space: nowrap; pointer-events: none; font-size: 112vh; }
 .yp-giant-bg--left { left: -2.5vw; bottom: -13vh; }
 .yp-giant-bg--center { left: 50%; top: 50%; transform: translate(-50%, -46%); font-size: 96vh; }
-.yp-giant-bg.is-outline { color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.55); }
+.yp-giant-bg.is-outline { color: rgba(255,255,255,.6); filter: url(#yp-outline-thick); }
 .yp-giant-bg { animation: ypGiant 1.1s cubic-bezier(.2, .8, .2, 1) both; }
 .yp-giant-bg--center { animation-name: ypGiantC; }
 @keyframes ypGiant { from { opacity: 0; transform: translateY(14vh); } to { opacity: 1; transform: none; } }
@@ -1821,7 +1821,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 /* the leap's numeral is an outline, so the title over it reads */
 .yp-scene, .yp-gate { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 @media (max-width: 559px) {
-  .yp-countdown .yp-giant-bg { color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.7); }
+  .yp-countdown .yp-giant-bg { color: rgba(255,255,255,.75); filter: url(#yp-outline-thick); }
   .yp-frame--center { padding-top: 92px; }
 }
 /* hierarchy: one lead per scene; supporting lines a clear step down but readable; labels small */
@@ -1839,3 +1839,5 @@ body.playing .channel .track__time { color: var(--grey-3); }
   .yp-hero .yp-cover--hero { width: 46vw; }
   .yp-poster--narrow.yp-poster--center { width: 86vw; }
 }
+
+.yp-filters { position: absolute; width: 0; height: 0; overflow: hidden; }

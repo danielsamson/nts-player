@@ -17,7 +17,7 @@ const YearPlay = (() => {
   let moodsP = null;
   const loadMoods = () => (moodsP ||= window.nts.api('/api/v2/moods').then((r) => (r.results || []).forEach((m) => { moods[m.id] = m.image?.medium_large || m.image?.large || ''; })).catch(() => { moodsP = null; }));
   // colour casts like NTS's moods: blue, magenta, red, yellow, cyan, orange
-  const TINTS = ['#4b3cff', '#d42bd8', '#ff2a1a', '#ffd000', '#00b8c4', '#ff7a00'];
+  const TINTS = ['#4b3cff', '#d42bd8', '#00b8c4', '#e3c000', '#2fbf71', '#7a4dff'];   // (no red: NTS keeps red for live)
 
   // a cover image that fills its box once found
   function coverImg(t, cls = 'yp-cover') {
@@ -59,6 +59,16 @@ const YearPlay = (() => {
     bg.style.setProperty('--hue', `${Math.round((Math.random() - 0.5) * 160)}deg`);
     bg.classList.add('is-corrupt');
     setTimeout(() => bg.classList.remove('is-corrupt'), strong ? 420 : 90 + Math.random() * 260);
+  }
+  // caption text gets its own inline layer, so each line's black block hugs its words (ragged,
+  // like nts.live) instead of the block filling the column
+  function inkLines(root) {
+    root.querySelectorAll('.yp-kicker, .yp-head, .yp-title, .yp-year--outro, .yp-sub, .yp-artist').forEach((e) => {
+      if (e.querySelector(':scope > .yp-ink')) return;
+      const ink = el('span', 'yp-ink');
+      ink.append(...e.childNodes);
+      e.append(ink);
+    });
   }
   // text that rises in, after `d` seconds
   const rise = (node, d = 0) => { node.classList.add('yp-rise'); node.style.setProperty('--d', `${d}s`); return node; };
@@ -300,6 +310,7 @@ const YearPlay = (() => {
     const scene = el('section', `yp-scene ${sc.cls || ''}`);
     scene.style.setProperty('--tint', TINTS[at % TINTS.length]);
     scene.append(...sc.build());
+    inkLines(scene);
     stage.replaceChildren(scene);
     // a tape glitch on the cut, then now and then while it plays
     root.classList.remove('is-cut'); void root.offsetWidth; root.classList.add('is-cut');
@@ -405,6 +416,7 @@ const YearPlay = (() => {
     gt.append(rise(acts, 0.5));
     gate.append(backdrop(s.top?.[0]), gt);
     gt.classList.add('yp-corner');
+    inkLines(gate);
     stage.append(gate);
     setPaused(true);
     setTimeout(() => withMusic.focus(), 50);

@@ -272,6 +272,41 @@ const Chart = (() => {
       oldest && { kind: 'Oldest record box', show: oldest[0], name: label(oldest[0]), text: `half its charted tracks came out before ${oldest[2] + 1}`, t: oldest[1].datedTracks.sort((a, b) => a.released - b.released)[0] || oldest[1].tracks[0] },
       widest && { kind: 'Widest range', show: widest[0], name: label(widest[0]), text: `played across ${widest[2]} genres`, t: widest[1].tracks[widest[1].tracks.length - 1] }
     ].filter((c) => c && c.t);
+    // the year it happened: artists whose plays jumped in one month (news: a death, a return,
+    // an anniversary). Shows per month per artist; a spike is a month with 7+ shows and at least
+    // four times the artist's usual month
+    const am = new Map();                // artist key -> { name, months: Map(month -> Set(show)), tracks: Map(month -> best track row) }
+    for (const f of files) for (const t of f.tracks) {
+      for (const a of String(t[0]).split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((x) => x.trim()).filter(Boolean)) {
+        const k = n(a); if (!k) continue;
+        let r = am.get(k); if (!r) { r = { name: a, months: new Map(), best: new Map() }; am.set(k, r); }
+        if (!r.months.has(f.period)) r.months.set(f.period, new Set());
+        const set = r.months.get(f.period);
+        t[3].forEach((i) => { if (!catchAll(f.showList[i], names)) set.add(f.showList[i]); });
+        const b = r.best.get(f.period);
+        if (!b || t[3].length > b[3].length) r.best.set(f.period, t);
+      }
+    }
+    const ctx = (await window.nts.chart(`context-${y}`).catch(() => null))?.moments || [];
+    const spikes = [];
+    for (const [k, r] of am) {
+      const vals = list.map((mm) => r.months.get(mm)?.size || 0);
+      const peak = Math.max(...vals); if (peak < 7) continue;
+      const at = vals.indexOf(peak), usual = (vals.reduce((a, b) => a + b, 0) - peak) / Math.max(1, vals.length - 1);
+      if (peak < 4 * Math.max(usual, 0.75)) continue;
+      const month = list[at];
+      const row = r.best.get(month), f = files.find((x) => x.period === month);
+      const t = row && { artist: row[0], title: row[1], latest: { show: f.showList[row[4][0]], episode: row[4][1], offset: row[4][2], d: row[4][3], title: (names[f.showList[row[4][0]]] || [])[0] || showName(f.showList[row[4][0]]) } };
+      // the context line, when one has been written for it (a month either side of the peak)
+      const mi = (m) => +m.slice(0, 4) * 12 + +m.slice(5);
+      const c = ctx.find((x) => n(x.artist) === k && Math.abs(mi(x.month) - mi(month)) <= 1);
+      spikes.push({ artist: r.name, month, peak, usual: Math.round(usual * 10) / 10, vals, t, text: c?.text || '', source: c?.source || '' });
+    }
+    // the clearest moments first; at most two a month, captioned ones preferred
+    spikes.sort((a, b) => (b.text ? 1 : 0) - (a.text ? 1 : 0) || b.peak / Math.max(1, b.usual) - a.peak / Math.max(1, a.usual));
+    const perM = new Map();
+    const moments = spikes.filter((x) => { const c = perM.get(x.month) || 0; if (c >= 2) return false; perM.set(x.month, c + 1); return true; })
+      .slice(0, 12).sort((a, b) => a.month.localeCompare(b.month) || b.peak - a.peak);
     // the show most in tune with NTS: it played the most of the year's top 100
     const tune = new Map();
     all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
@@ -286,7 +321,7 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
-      inTune, deepCuts, characters,
+      inTune, deepCuts, characters, moments,
       // comebacks: old records (10+ years) that suddenly spread to many shows in one month
       comebacks: all.slice(0, 400).filter((m) => m.released && m.released <= y - 10).map((m) => {
         const vals = list.map((mm) => m.perMonth[mm] || 0);

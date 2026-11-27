@@ -781,6 +781,44 @@ const YearPlay = (() => {
       box.append(list, rise(tape('Played again and again by one show, and by no one else.', 'yp-tape--sub'), 1.8));
       return [backdrop(s.deepCuts[0], null, null, true), box];
     } });
+    // the year it happened: the months, a moment pinned where an artist suddenly spread; hover one
+    // for what happened, click its cover to hear it on the show that played it
+    // only moments we can explain (a checked line in the context file); unexplained spikes are noise here
+    const mo = (s.moments || []).filter((x) => x.t && x.text);
+    if (mo.length >= 3) out.push({ dur: 12, track: mo[0].t, cls: 'yp-happened', build() {
+      const box = el('div', 'yp-frame yp-happen');
+      box.append(rise(tape('The year it happened', 'yp-label'), 0), poster([['What the world', 'outline'], 'did to NTS'], { d: 0.15, max: 0.1, cls: 'yp-deep__title' }));
+      const line = el('div', 'yp-happen__line');
+      const months = s.monthList || [];
+      months.forEach((m, i) => { const tk = el('span', 'yp-happen__month', monthShort(m)); tk.style.left = `${((i + 0.5) / months.length) * 100}%`; line.append(tk); });
+      const detail = el('div', 'yp-happen__detail');
+      const pick = (x, pin) => {
+        line.querySelectorAll('.yp-happen__pin').forEach((p) => p.classList.toggle('is-on', p === pin));
+        const u = Math.round(x.usual);
+        const usual = x.usual < 1 ? 'barely played' : `about ${u} show${u === 1 ? '' : 's'} a month`;
+        const month = new Date(Date.UTC(+x.month.slice(0, 4), +x.month.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
+        detail.replaceChildren(el('span', 'yp-happen__artist', x.artist),
+          el('span', 'yp-happen__jump', `${usual} → ${x.peak} shows in ${month}`),
+          x.text ? el('span', 'yp-happen__text', x.text) : el('span', 'yp-happen__text is-quiet', `Played most: ${x.t.title}`));
+      };
+      const used = new Map();
+      mo.forEach((x, i) => {
+        const mi = months.indexOf(x.month); if (mi < 0) return;
+        const lane = used.get(mi) || 0; used.set(mi, lane + 1);
+        const twin = mo.filter((y) => y.month === x.month).length > 1;
+        const pin = el('div', 'yp-happen__pin');
+        // two in a month sit side by side, either side of the month
+        pin.style.left = `calc(${((mi + 0.5) / months.length) * 100}% + ${twin ? (lane ? 0.5 : -0.5) : 0} * var(--pw))`;
+        pin.style.setProperty('--d', `${0.8 + i * 0.18}s`);
+        pin.append(coverImg(x.t, 'yp-cover'), el('span', 'yp-happen__name', x.artist));
+        pin.addEventListener('pointerenter', () => pick(x, pin));
+        line.append(pin);
+        if (i === 0) setTimeout(() => pick(x, pin), 0);
+      });
+      box.append(line, rise(detail, 1.4));
+      return [backdrop(mo[0].t, 'audio-research', null, true), box];
+    } });
+
     // the shows' characters: deepest crate, oldest record box, widest range
     if ((s.characters || []).length >= 2) out.push({ dur: 10, build() {
       const box = el('div', 'yp-frame yp-chars');

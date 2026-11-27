@@ -1972,3 +1972,21 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-poster__inner { position: relative; }
 .yp-giant-bg.is-faint { color: rgba(255,255,255,.22); }
 @media (max-width: 559px) { .yp-countdown .yp-giant-bg { filter: none; color: rgba(255,255,255,.3); } }
+
+/* ---- type, as nts.live uses it: Univers Condensed bold caps for labels, condensed regular for
+   supporting lines, a plain sans for blurbs; the VHS face only in the camcorder overlay ---- */
+.yp { --yp-sans: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.yp-label { font: 700 clamp(12px, 1.25vw, 15px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px 4px; }
+.yp-tape--sub { font: 400 clamp(17px, 1.9vw, 25px)/1.2 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: none; letter-spacing: 0; text-shadow: none; padding: 6px 10px 5px; }
+.yp-tapenum { font-family: "NTS Condensed", "Arial Narrow", Arial, sans-serif; }
+.yp-tapenum .yp-count { font-weight: 700; text-shadow: none; letter-spacing: -.01em; }
+.yp-tapenum span:last-child { font-size: clamp(12px, 1.3vw, 15px); font-weight: 700; letter-spacing: .06em; }
+/* the plain sans: blurbs and footnotes */
+.yp-white__foot { font: 400 clamp(12px, 1.2vw, 14px)/1.45 var(--yp-sans); }
+.yp-gate .yp-tape--sub, .yp-blurb { font-family: var(--yp-sans); font-size: clamp(14px, 1.5vw, 19px); }
+/* data in the condensed face */
+.yp-genre__rank, .yp-genre__pct, .yp-one__month, .yp-months span, .yp-list__rank, .yp-tile__row { font-family: "NTS Condensed", "Arial Narrow", Arial, sans-serif; font-weight: 700; }
+.yp-tile__row { font-size: clamp(10px, 1vw, 12px); letter-spacing: .03em; }
+.yp-genre__pct { font-size: clamp(16px, 1.8vw, 22px); }
+.yp-one__month { font-size: 12px; }
+@media (max-width: 559px) { .yp-tape--sub { font-size: 16px; } }

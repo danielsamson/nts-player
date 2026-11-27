@@ -145,15 +145,7 @@ const YearPlay = (() => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('class', 'yp-filters'); svg.setAttribute('aria-hidden', 'true');
-    // the letter grown outward with a round brush (blur, then a hard threshold), with the letter
-    // itself cut out: the hollow is exactly the letter, the line sits around it
-    const sizes = [['yp-outline', 1.6], ['yp-outline-thick', 3], ...[2, 3, 4, 5, 6, 8].map((r) => [`yp-outline-${r}`, r])];
-    const ring = (id, r, color) => `<filter id="${id}" x="-5%" y="-10%" width="110%" height="120%" color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="${(r * 0.75).toFixed(2)}" result="b"/>
-        <feComponentTransfer in="b" result="grown"><feFuncA type="linear" slope="24" intercept="-2.6"/></feComponentTransfer>
-        <feComposite in="grown" in2="SourceAlpha" operator="out" result="ring"/>
-        <feFlood flood-color="${color}"/><feComposite in2="ring" operator="in"/></filter>`;
-    svg.innerHTML = sizes.map(([id, r]) => ring(id, r, '#fff') + ring(`${id}-k`, r, '#000')).join('')
+    svg.innerHTML = ''
       // worn tape: each line wobbles sideways (noise that changes several times a second), and the
       // colours come apart: red one way, blue the other, smeared along the line
       + `<filter id="yp-vhs" x="-4%" y="0" width="108%" height="100%" color-interpolation-filters="sRGB">
@@ -168,6 +160,51 @@ const YearPlay = (() => {
           <feBlend in="rb" in2="g" mode="screen" result="rg"/><feBlend in="rg" in2="bb" mode="screen"/>
         </filter>`;
     return svg;
+  }
+  // Outlined text as vector, Illustrator style: the same words as SVG text with a stroke, the stroke
+  // masked by the letters' own fill so only the outer half shows (no lines inside the letters,
+  // where the shapes they're built from overlap). Drawn over the element, whose own text is hidden.
+  let outlineIds = 0;
+  function vectorOutline(node, { weight = 0.025, color = '#fff', opacity = 1 } = {}) {
+    node.querySelector(':scope > .yp-vo')?.remove();
+    const text = node.textContent;
+    if (!text.trim()) return;
+    const cs = getComputedStyle(node);
+    const fs = parseFloat(cs.fontSize);
+    // where the baseline sits: a zero-size marker at the end of the text
+    const mark = document.createElement('span');
+    mark.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+    node.append(mark);
+    const box = node.getBoundingClientRect(), mb = mark.getBoundingClientRect();
+    mark.remove();
+    const base = mb.top - box.top;
+    const sw = Math.max(2, fs * weight) * 2;            // twice: the inner half is masked away
+    const pad = sw;
+    const ns = 'http://www.w3.org/2000/svg', id = `yp-vo-${++outlineIds}`;
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'yp-vo');
+    svg.setAttribute('aria-hidden', 'true');
+    const W = box.width + pad * 2, H = box.height + pad * 2;
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    svg.setAttribute('viewBox', `${-pad} ${-pad} ${W} ${H}`);
+    svg.style.cssText = `position:absolute;left:${-pad}px;top:${-pad}px;overflow:visible;pointer-events:none;opacity:${opacity}`;
+    const t = (attrs) => {
+      const e = document.createElementNS(ns, 'text');
+      e.textContent = cs.textTransform === 'uppercase' ? text.toUpperCase() : text;
+      Object.entries({ x: 0, y: base, 'font-family': cs.fontFamily, 'font-size': fs, 'font-weight': cs.fontWeight, 'letter-spacing': cs.letterSpacing === 'normal' ? 0 : cs.letterSpacing, ...attrs })
+        .forEach(([k, v]) => e.setAttribute(k, v));
+      return e;
+    };
+    const mask = document.createElementNS(ns, 'mask');
+    mask.id = id;
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    const rect = document.createElementNS(ns, 'rect');
+    Object.entries({ x: -pad, y: -pad, width: W, height: H, fill: '#fff' }).forEach(([k, v]) => rect.setAttribute(k, v));
+    mask.append(rect, t({ fill: '#000' }));
+    svg.append(mask, t({ fill: 'none', stroke: color, 'stroke-width': sw, 'stroke-linejoin': 'round', mask: `url(#${id})` }));
+    if (cs.position === 'static') node.style.position = 'relative';
+    node.style.color = 'transparent';
+    node.append(svg);
   }
   // ---- poster type ----
   // Split a title into up to n lines of similar length (by characters)
@@ -220,11 +257,12 @@ const YearPlay = (() => {
       lines.forEach((line, i) => {
         const fs = even || sizes[i];
         line.style.fontSize = `${fs}px`;
-        // an outline's weight follows the type size (about 2.5% of it), so big letters don't go spindly
-        if (line.classList.contains('is-outline')) {
-          const r = [2, 3, 4, 5, 6, 8].reduce((a, b) => (Math.abs(b - fs * 0.025) < Math.abs(a - fs * 0.025) ? b : a));
-          line.style.filter = `url(#yp-outline-${r}${line.closest('.yp-white') ? '-k' : ''})`;
-        }
+      });
+      // outlined lines: drawn as vector once sized
+      lines.filter((l) => l.classList.contains('is-outline')).forEach((line) => {
+        const inner = line.querySelector('.yp-poster__inner');
+        inner.querySelector(':scope > .yp-vo')?.remove();
+        vectorOutline(inner, { weight: 0.022, color: line.closest('.yp-white') ? '#000' : '#fff' });
       });
     });
   }
@@ -349,7 +387,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
         rise(tape(`${t.artist} · #${leap.viz.from} → #${leap.viz.to} in a month`, 'yp-tape--sub'), 2.7));
-      return [backdrop(t, null, kinetic(`#${leap.viz.from} → #${leap.viz.to}`, { rows: 6, angle: -14, size: '9vw', speed: 18, opacity: 0.35 })), giant(num, 'is-outline yp-giant-bg--left'), box];
+      return [backdrop(t, null, kinetic(`#${leap.viz.from} → #${leap.viz.to}`, { rows: 6, angle: -14, size: '9vw', speed: 18, opacity: 0.35 })), giant(num, 'is-faint yp-giant-bg--left'), box];
     } });
 
     // 8. who heard it first: the show's name across the frame, the shows after it along the year
@@ -463,8 +501,9 @@ const YearPlay = (() => {
     scene.append(...sc.build());
     inkLines(scene);
     stage.replaceChildren(scene);
-    fitPosters(scene);
-    document.fonts?.ready.then(() => { if (scene.isConnected) fitPosters(scene); });
+    const outlineGiants = () => scene.querySelectorAll('.yp-giant-bg.is-outline').forEach((g) => vectorOutline(g, { weight: 0.012, opacity: 0.6 }));
+    fitPosters(scene); outlineGiants();
+    document.fonts?.ready.then(() => { if (scene.isConnected) { fitPosters(scene); outlineGiants(); } });
     // a tape glitch on the cut, then now and then while it plays
     root.classList.remove('is-cut'); void root.offsetWidth; root.classList.add('is-cut');
     clearTimeout(cutTimer); cutTimer = setTimeout(() => root?.classList.remove('is-cut'), 450);

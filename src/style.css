@@ -1605,7 +1605,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* artist: the name running across */
 .yp-marquee { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 1vh; transform: rotate(-4deg) scale(1.15); opacity: .55; }
-.yp-marquee__row { white-space: nowrap; font-size: clamp(56px, 13vw, 170px); line-height: .95; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,.55); filter: url(#yp-outline); animation: ypSlide 30s linear infinite; }
+.yp-marquee__row { white-space: nowrap; font-size: clamp(56px, 13vw, 170px); line-height: .95; font-weight: 700; text-transform: uppercase; color: rgba(255,255,255,.55); animation: ypSlide 30s linear infinite; }
 .yp-marquee__row.is-back { animation-direction: reverse; }
 
 /* number ones */
@@ -1761,14 +1761,14 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-poster--narrow { width: min(76vw, 820px); }
 .yp-poster__line { display: block; overflow: hidden; white-space: nowrap; font-size: 100px; line-height: .84; font-weight: 700; text-transform: uppercase; letter-spacing: -.012em; padding: .03em 0 .05em; color: var(--white); }
 .yp-poster__inner { display: inline-block; transform: translateY(108%); animation: ypLine .75s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: var(--d, 0s); }
-.yp-poster__line.is-outline { color: var(--white); filter: url(#yp-outline); }
+.yp-poster__line.is-outline { color: var(--white); }
 @keyframes ypLine { to { transform: none; } }
 .yp.is-paused .yp-scene .yp-poster__inner { animation-play-state: paused; }
 /* giant numerals running off the edge, behind the words */
 .yp-giant-bg { position: absolute; z-index: 1; font-weight: 700; line-height: .74; letter-spacing: -.04em; color: var(--white); white-space: nowrap; pointer-events: none; font-size: 112vh; }
 .yp-giant-bg--left { left: -2.5vw; bottom: -13vh; }
 .yp-giant-bg--center { left: 50%; top: 50%; transform: translate(-50%, -46%); font-size: 96vh; }
-.yp-giant-bg.is-outline { color: rgba(255,255,255,.6); filter: url(#yp-outline-thick); }
+.yp-giant-bg.is-outline { color: rgba(255,255,255,.6); }
 .yp-giant-bg { animation: ypGiant 1.1s cubic-bezier(.2, .8, .2, 1) both; }
 .yp-giant-bg--center { animation-name: ypGiantC; }
 @keyframes ypGiant { from { opacity: 0; transform: translateY(14vh); } to { opacity: 1; transform: none; } }
@@ -1821,7 +1821,6 @@ body.playing .channel .track__time { color: var(--grey-3); }
 /* the leap's numeral is an outline, so the title over it reads */
 .yp-scene, .yp-gate { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 @media (max-width: 559px) {
-  .yp-countdown .yp-giant-bg { color: rgba(255,255,255,.75); filter: url(#yp-outline-thick); }
   .yp-frame--center { padding-top: 92px; }
 }
 /* hierarchy: one lead per scene; supporting lines a clear step down but readable; labels small */
@@ -1950,7 +1949,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 
 /* ---- kinetic type behind the scenes ---- */
 .yp-kin { position: absolute; inset: -25% -10%; display: flex; flex-direction: column; justify-content: center; gap: 1vh; transform: rotate(var(--a, 0deg)); opacity: var(--o, .5); pointer-events: none; overflow: hidden; }
-.yp-kin__row { white-space: nowrap; font-size: var(--s, 13vw); line-height: .88; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; color: rgba(255,255,255,.75); filter: url(#yp-outline); animation: ypSlide var(--sp, 34s) linear infinite; }
+.yp-kin__row { white-space: nowrap; font-size: var(--s, 13vw); line-height: .88; font-weight: 700; text-transform: uppercase; letter-spacing: -.01em; color: rgba(255,255,255,.75); animation: ypSlide var(--sp, 34s) linear infinite; }
 .yp-kin__row.is-back { animation-direction: reverse; }
 .yp-kin__row.is-solid { filter: none; color: rgba(255,255,255,.3); }
 .yp-kin--v { flex-direction: row; justify-content: flex-start; inset: -10% auto -10% 0; width: 42%; gap: 0; transform: none; }
@@ -1967,7 +1966,9 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-kin__row.is-solid { color: rgba(255,255,255,.34); }
 .yp-white .yp-kin__row { color: rgba(0,0,0,.2); }
 /* giant outline numerals: thicker */
-.yp-giant-bg.is-outline { filter: url(#yp-outline-6); }
-.yp-giant-bg.is-outline { filter: url(#yp-outline-6) opacity(.6); }
 .yp-poster__line.is-outline { letter-spacing: .02em; }
-@media (max-width: 559px) { .yp-countdown .yp-giant-bg { filter: url(#yp-outline-5) opacity(.75); } }
+/* outlines are vector now (vectorOutline in year-play.js): no filters */
+.yp-poster__line.is-outline, .yp-giant-bg.is-outline { filter: none !important; }
+.yp-poster__inner { position: relative; }
+.yp-giant-bg.is-faint { color: rgba(255,255,255,.22); }
+@media (max-width: 559px) { .yp-countdown .yp-giant-bg { filter: none; color: rgba(255,255,255,.3); } }

@@ -145,8 +145,15 @@ const YearPlay = (() => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('class', 'yp-filters'); svg.setAttribute('aria-hidden', 'true');
-    svg.innerHTML = [['yp-outline', 1.6], ['yp-outline-thick', 2.6], ...[2, 3, 4, 5, 6, 8].map((r) => [`yp-outline-${r}`, r])].map(([id, r]) =>
-      `<filter id="${id}" x="-2%" y="-2%" width="104%" height="104%"><feMorphology in="SourceAlpha" operator="erode" radius="${r}" result="in"/><feComposite in="SourceGraphic" in2="in" operator="out"/></filter>`).join('')
+    // the letter grown outward with a round brush (blur, then a hard threshold), with the letter
+    // itself cut out: the hollow is exactly the letter, the line sits around it
+    const sizes = [['yp-outline', 1.6], ['yp-outline-thick', 3], ...[2, 3, 4, 5, 6, 8].map((r) => [`yp-outline-${r}`, r])];
+    const ring = (id, r, color) => `<filter id="${id}" x="-5%" y="-10%" width="110%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="${(r * 0.75).toFixed(2)}" result="b"/>
+        <feComponentTransfer in="b" result="grown"><feFuncA type="linear" slope="24" intercept="-2.6"/></feComponentTransfer>
+        <feComposite in="grown" in2="SourceAlpha" operator="out" result="ring"/>
+        <feFlood flood-color="${color}"/><feComposite in2="ring" operator="in"/></filter>`;
+    svg.innerHTML = sizes.map(([id, r]) => ring(id, r, '#fff') + ring(`${id}-k`, r, '#000')).join('')
       // worn tape: each line wobbles sideways (noise that changes several times a second), and the
       // colours come apart: red one way, blue the other, smeared along the line
       + `<filter id="yp-vhs" x="-4%" y="0" width="108%" height="100%" color-interpolation-filters="sRGB">
@@ -216,7 +223,7 @@ const YearPlay = (() => {
         // an outline's weight follows the type size (about 2.5% of it), so big letters don't go spindly
         if (line.classList.contains('is-outline')) {
           const r = [2, 3, 4, 5, 6, 8].reduce((a, b) => (Math.abs(b - fs * 0.025) < Math.abs(a - fs * 0.025) ? b : a));
-          line.style.filter = `url(#yp-outline-${r})`;
+          line.style.filter = `url(#yp-outline-${r}${line.closest('.yp-white') ? '-k' : ''})`;
         }
       });
     });

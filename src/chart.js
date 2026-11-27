@@ -169,6 +169,8 @@ const Chart = (() => {
         if (days) idx.forEach((i, j) => { const s = f.showList[i]; if (!m.firstBy.has(s) || days[j] < m.firstBy.get(s)) m.firstBy.set(s, days[j]); });
         if (e >= 2) { const yr = f.years?.[ri]; if (yr) m.released = yr; ri++; }
         m.perMonth[f.period] = idx.length;
+        m.monthShows ||= {};
+        m.monthShows[f.period] = idx.map((i) => { const sh = f.showList[i]; return (f.names?.[sh] || [])[0] || showName(sh); });
         // genres it was played under (episodes per genre family), for tags
         if (fams && f.families) { m.genres ||= {}; fams.forEach(([fi, ss, ge]) => {
           const nm = f.families[fi]?.[1]; if (!nm) return;
@@ -185,7 +187,10 @@ const Chart = (() => {
         if (!m.latest || (timed(lat) && !timed(m.latest)) || (lat.d > m.latest.d && (timed(lat) || !timed(m.latest)))) m.latest = lat;
       }
     }
-    const all = [...tracks.values()].map(({ showSet, monthSet, ...m }) => ({ ...m, shows: showSet.size, showSet, months: monthSet.size }))
+    // a show named after the track (its theme tune, played every episode) isn't a long runner
+    const slug = (x) => n(x).replace(/ /g, '-');
+    const themeOf = (m) => [...m.showSet].find((sh) => { const t = slug(m.title); return t.length > 5 && (sh === t || sh.startsWith(t + '-') || sh.endsWith('-' + t)); });
+    const all = [...tracks.values()].map(({ showSet, monthSet, ...m }) => ({ ...m, shows: showSet.size, showSet, months: monthSet.size, theme: themeOf({ ...m, showSet }) }))
       .filter((m) => m.episodes >= 2)
       .sort((a, b) => b.shows - a.shows || b.episodes - a.episodes);
     all.forEach((m) => {
@@ -219,7 +224,7 @@ const Chart = (() => {
     breakouts.since = riseFrom;
     // long runners: played in most of the months (not just the busiest weeks)
     const minMonths = Math.max(4, Math.ceil(files.length * 0.4));     // NTS rarely repeats: 5 of 11 months is a long run
-    const evergreen = files.length >= 4 ? all.filter((m) => m.months >= minMonths).sort((a, b) => b.months - a.months || b.shows - a.shows).slice(0, 5) : [];
+    const evergreen = files.length >= 4 ? all.filter((m) => m.months >= minMonths && !m.theme).sort((a, b) => b.months - a.months || b.shows - a.shows).slice(0, 5) : [];
     if (evergreen.length < 3) evergreen.length = 0;     // one or two isn't a story
     // shows that shared the most tracks
     const pairs = new Map();
@@ -244,7 +249,7 @@ const Chart = (() => {
       .map(([k, c]) => ({ a: k.split('|')[0], b: k.split('|')[1], count: c }));
     // deep cuts: tracks one show kept coming back to that (almost) nobody else played
     const seenBy = new Set();
-    const deepCuts = all.filter((m) => m.shows === 1 && m.episodes >= 3 && !catchAll([...m.showSet][0], names))
+    const deepCuts = all.filter((m) => m.shows === 1 && m.episodes >= 3 && !m.theme && !catchAll([...m.showSet][0], names))
       .sort((a, b) => b.episodes - a.episodes)
       .filter((m) => { const sh = [...m.showSet][0]; if (seenBy.has(sh)) return false; seenBy.add(sh); return true; })      // one per show
       .slice(0, 5)
@@ -356,7 +361,7 @@ const Chart = (() => {
         .sort((a, b) => b.gl.length - a.gl.length || b.shows - a.shows).slice(0, 3),
       // loyalty: a track one show kept playing month after month
       loyal: (() => { // (4+ months; on a tie the show that broadcasts least wins, so loyalty isn't just a daily slot)
-        const t = all.filter((m) => m.shows === 1 && m.months >= 4 && !catchAll(m.latest.show, names))
+        const t = all.filter((m) => m.shows === 1 && m.months >= 4 && !m.theme && !catchAll(m.latest.show, names))
           .sort((a, b) => b.months - a.months || (showEps.get(a.latest.show) || 0) - (showEps.get(b.latest.show) || 0))[0];
         return t ? { ...t, by: (names[t.latest.show] || [])[0] || showName(t.latest.show) } : null; })(),
       // the oldest records among the year's 200 most played (first release year known)

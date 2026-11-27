@@ -32,6 +32,7 @@ const YearPlay = (() => {
       wrap.classList.add('yp-hot', 'yp-playable');
       wrap.dataset.tip = `${t.title} · ${t.artist}${t.released ? ` · ${t.released}` : ''}`;
       wrap.append(keepButton(t));
+      if (t.released) wrap.append(el('span', 'yp-yearbadge', String(t.released)));
       wrap.addEventListener('click', (e) => {
         e.stopPropagation();
         playingKey = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
@@ -509,7 +510,7 @@ const YearPlay = (() => {
         row.append(rise(coverImg(t, 'yp-cover yp-cover--split'), 0.1));
         const tx = el('div', 'yp-splittext');
         tx.append(poster(splitLines(t.title, t.title.length > 14 ? 3 : 2), { even: true, d: 0.25, max: 0.2 }),
-          rise(tape(`${t.artist}`, 'yp-tape--sub'), 0.6), rise(tape(`${fmt(t.shows)} shows`, 'yp-tape--sub'), 0.7));
+          rise(tape(`${t.artist}${t.released ? `, ${t.released}` : ''}`, 'yp-tape--sub'), 0.6), rise(tape(`${fmt(t.shows)} shows`, 'yp-tape--sub'), 0.7));
         row.append(tx);
         box.append(row);
         return [backdrop(t, null, kinetic(t.title, { rows: 3, angle: 0, size: '30vh', speed: 22, opacity: 0.32 })), giant(String(rank), 'yp-giant-bg--left'), box];
@@ -529,7 +530,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(coverImg(t1, 'yp-cover yp-cover--hero'), 0.3), rise(tape('Track of the year', 'yp-label'), 0.6),
         poster(splitLines(t1.title, t1.title.length > 8 ? 2 : 1), { even: true, d: 0.9, max: 0.3, cls: 'yp-poster--beside' }));
-      const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist}. `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' different shows reached for it.');
+      const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist}${t1.released ? `, ${t1.released}` : ''}. `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' different shows reached for it.');
       box.append(rise(n, 1.4));
       return [backdrop(t1), box];
     } });
@@ -566,7 +567,7 @@ const YearPlay = (() => {
       const num = el('span'); num.append(counter(leap.viz.to, { from: leap.viz.from, prefix: '#', d: 0.6, ms: 2200 }));
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
-        rise(tape(`${t.artist}. From #${leap.viz.from} to #${leap.viz.to} in a single month.`, 'yp-tape--sub'), 2.7));
+        rise(tape(`${t.artist}${t.released ? `, ${t.released}` : ''}. From #${leap.viz.from} to #${leap.viz.to} in a single month.`, 'yp-tape--sub'), 2.7));
       return [backdrop(t), giant(num, 'yp-giant-bg--left yp-giant-bg--count'), box];
     } });
 
@@ -620,6 +621,8 @@ const YearPlay = (() => {
       (s.monthList || []).forEach((m, i) => {
         const c = el('span', (lr.perMonth?.[m] || 0) > 0 ? 'is-on' : '', monthShort(m).slice(0, 1));
         c.style.setProperty('--d', `${0.9 + i * 0.14}s`);
+        const who = lr.monthShows?.[m];
+        if (who?.length) { c.classList.add('yp-hot'); c.dataset.tip = `${monthShort(m)}: ${who.slice(0, 3).join(', ')}${who.length > 3 ? ` +${who.length - 3}` : ''}`; }
         months.append(c);
       });
       box.append(rise(months, 0.8), rise(tape(`On in ${lr.months} of ${s.months} months. Most tracks here last a few weeks. This one kept coming back.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));

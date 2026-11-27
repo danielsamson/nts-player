@@ -708,6 +708,47 @@ const YearPlay = (() => {
         foot: 'How much of the year each sound took up, by episode. The arrows show where it was heading by the end.' })];
     } });
 
+    // genre dives: pick a genre, see (and play) what its shows played most this year
+    out.push({ ch: 2.3, dur: 12, build() {
+      const box = el('div', 'yp-frame yp-dive');
+      box.append(rise(tape('Genre dives', 'yp-label'), 0), poster([['Go', 'outline'], 'deeper'], { d: 0.15, max: 0.075, cls: 'yp-deep__title yp-dive__head' }));
+      const chips = el('div', 'yp-dive__chips');
+      const stage = el('div', 'yp-dive__stage');
+      stage.append(el('p', 'yp-tape yp-tape--sub', 'Digging…'));
+      box.append(rise(chips, 0.5), rise(stage, 0.7));
+      const released = new Map((s.top || []).map((t) => [`${t.artist}|${t.title}`.toLowerCase(), t.released]));
+      const label = (nm) => String(nm).replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\s*\/\s*/g, ' / ').replace(/\bR'n'b\b|\bRhythm & Blues\b/gi, 'R&B').replace(/\bUk\b/g, 'UK');
+      Chart.get(String(year)).then((res) => {
+        const fams = res ? Chart.families(res, 8).slice(0, 9) : [];
+        if (!fams.length) { stage.replaceChildren(el('p', 'yp-tape yp-tape--sub', 'No genre charts for this year yet.')); return; }
+        const pick = (f, btn) => {
+          chips.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+          const rows = res.rowsFor(f.id, 5).map((r) => ({ ...r, released: released.get(`${r.artist}|${r.title}`.toLowerCase()) }));
+          const [one, ...rest] = rows;
+          const lead = el('div', 'yp-dive__lead');
+          const tx = el('div', 'yp-dive__leadtext');
+          tx.append(el('span', 'yp-dive__kicker', `#1 in ${label(f.name)}`), el('span', 'yp-dive__title', one.title),
+            el('span', 'yp-dive__meta', `${one.artist}${one.released ? `, ${one.released}` : ''}. ${one.shows} ${label(f.name)} shows played it.`));
+          lead.append(coverImg(one, 'yp-cover'), tx);
+          const list = el('div', 'yp-dive__rest');
+          rest.forEach((r, i) => {
+            const c = el('div', 'yp-dive__item');
+            c.append(coverImg(r, 'yp-cover'), el('span', 'yp-dive__n', `#${i + 2} · ${r.shows} shows`), el('span', 'yp-dive__t', r.title), el('span', 'yp-dive__a', r.artist));
+            list.append(c);
+          });
+          stage.replaceChildren(lead, list);
+          stage.classList.remove('is-in'); void stage.offsetWidth; stage.classList.add('is-in');
+        };
+        chips.replaceChildren(...fams.map((f, i) => {
+          const b = el('button', 'yp-dive__chip', label(f.name));
+          b.addEventListener('click', (e) => { e.stopPropagation(); pick(f, b); });
+          if (i === 0) setTimeout(() => pick(f, b), 0);
+          return b;
+        }));
+      });
+      return [backdrop(null, 'music-to-dance-to'), box];
+    } });
+
     // 12. tastemaker of the year
     const taste = story(s, 'tastemaker');
     if (taste) out.push({ ch: 3.2, dur: 8, track: taste.viz.rows[0], build() {

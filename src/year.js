@@ -354,6 +354,7 @@ const Year = (() => {
       if (!wrap.dataset.kept) setTimeout(() => { scroller.scrollLeft = scroller.scrollWidth; }, 30);   // newest at the right
     });
   }
+  let opener = null;
   let mode = 'cards', deck = { cards: [], stories: [] };
   function setMode(m) {
     mode = m;
@@ -368,13 +369,14 @@ const Year = (() => {
     at = Math.max(0, Math.min(cards.length - 1, i));
     const stage = box.querySelector('.year__stage');
     stage.replaceChildren(cards[at]);
-    box.querySelector('.year__count').textContent = `${at + 1} / ${cards.length}`;
+    box.querySelector('.year__count').textContent = box.querySelector('.year__pos').textContent = `${at + 1} / ${cards.length}`;
     box.querySelector('.year__prev').disabled = at === 0;
     box.querySelector('.year__next').disabled = at === cards.length - 1;
   }
   const onKey = (e) => {
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Tab') { window.trapTab?.(box, e); e.stopPropagation(); return; }
     if (mode === 'timeline') return;
     else if (e.key === 'ArrowRight') { e.preventDefault(); show(at + 1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); show(at - 1); }
@@ -384,16 +386,20 @@ const Year = (() => {
   async function open(year) {
     y = year;
     if (!box) {
+      mode = 'cards';                       // a fresh overlay starts on the cards
+      opener = document.activeElement;      // focus goes back here on close
       box = el('div', 'year');
+      box.tabIndex = -1;
       box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', `NTS in ${year}`);
       box.innerHTML = '<div class="year__top"><select class="year__pick" aria-label="Year"></select><div class="year__modes"><button class="year__mode active" data-mode="cards">Cards</button><button class="year__mode" data-mode="stories">Stories</button><button class="year__mode" data-mode="timeline">Timeline</button></div><span class="year__count"></span><button class="year__close" aria-label="Close">×</button></div>'
-        + '<button class="year__prev" aria-label="Previous">‹</button><div class="year__stage"></div><button class="year__next" aria-label="Next">›</button>';
+        + '<button class="year__prev" aria-label="Previous">‹</button><div class="year__stage"></div><button class="year__next" aria-label="Next">›</button><span class="year__pos" aria-hidden="true"></span>';
       box.querySelector('.year__close').addEventListener('click', close);
       box.querySelectorAll('.year__mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
       box.querySelector('.year__prev').addEventListener('click', () => show(at - 1));
       box.querySelector('.year__next').addEventListener('click', () => show(at + 1));
       box.querySelector('.year__pick').addEventListener('change', (e) => open(+e.target.value));
       document.body.append(box);
+      box.focus();
       document.addEventListener('keydown', onKey, true);
     }
     const pick = box.querySelector('.year__pick');
@@ -413,6 +419,8 @@ const Year = (() => {
     document.removeEventListener('keydown', onKey, true);
     box.remove();
     box = null;
+    if (opener?.isConnected) opener.focus();
+    opener = null;
   }
   return { open, close };
 })();

@@ -1614,6 +1614,18 @@ const Stage = (() => {
   return { render, links, paintLinks };
 })();
 
+// Keep Tab inside a dialog: from the last control back to the first, and the other way
+function trapTab(box, e) {
+  if (e.key !== 'Tab') return;
+  const items = [...box.querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.disabled && x.offsetParent);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  const inside = box.contains(document.activeElement);
+  if (e.shiftKey && (document.activeElement === first || !inside)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (document.activeElement === last || !inside)) { e.preventDefault(); first.focus(); }
+}
+window.trapTab = trapTab;
+
 // ---- First launch: a short welcome ----
 function closeWelcome() {
   $('welcome').hidden = true;
@@ -1623,6 +1635,11 @@ function closeWelcome() {
 $('welcomeGo').addEventListener('click', closeWelcome);
 $('welcomeSignIn').addEventListener('click', () => { closeWelcome(); window.nts.signIn(); });
 $('welcome').addEventListener('click', (e) => { if (e.target === $('welcome')) closeWelcome(); });
+$('welcome').addEventListener('keydown', (e) => {
+  trapTab($('welcome'), e);
+  // Enter on the card itself means "Start listening"
+  if (e.key === 'Enter' && e.target.classList.contains('welcome__card')) { e.preventDefault(); closeWelcome(); }
+});
 if (localStorage.getItem('welcomeSeen') !== '1') {
   $('welcomeKey').textContent = /Mac/.test(navigator.platform) ? 'Cmd+Opt+P' : 'Ctrl+Alt+P';
   $('welcomeSignIn').hidden = supporter;

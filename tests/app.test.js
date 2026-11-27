@@ -199,6 +199,15 @@ async function mockAccount() {
     await waitFor(() => document.querySelectorAll('.tl__col').length === 2, null, { timeout: 10000, what: 'the timeline' });
     await win.keyboard.press('Escape');
     expect(await win.evaluate(() => !document.querySelector('.year')), 'Esc closes the year');
+    expect(await win.evaluate(() => document.activeElement?.classList.contains('chart-year')), 'focus goes back to the button that opened it');
+    // closed on the timeline, it reopens on the cards (it used to show the timeline under the Cards tab)
+    await win.click('.chart-year');
+    await waitFor(() => document.querySelector('.year__card'), null, { timeout: 10000, what: 'the cards on reopening' });
+    expect(await win.evaluate(() => document.querySelector('.year__mode.active').dataset.mode === 'cards' && !document.querySelector('.year').classList.contains('is-timeline')), 'reopens on the cards');
+    expect(await win.evaluate(() => document.querySelector('.year').contains(document.activeElement)), 'focus moves into the year');
+    await win.keyboard.press('ArrowRight');
+    expect(await win.evaluate(() => document.querySelector('.year__count').textContent.startsWith('2 /')), 'arrow keys move through the cards');
+    await win.keyboard.press('Escape');
     // trends on the chart rows: a line of shows per month
     await waitFor(() => document.querySelectorAll('.chart-row .spark').length > 0, null, { timeout: 10000, what: 'trend lines on the chart' });
     // the full chart, by genre: jazz has enough tracks for a chip, house / techno doesn't

@@ -191,6 +191,8 @@ const Archive = (() => {
       const card = el('div', 'onair__card' + (hearing ? ' onair__card--playing' : ''));
       const pic = el('button', 'onair__pic');
       pic.title = `Open NTS ${i + 1}`;
+      pic.setAttribute('aria-label', `Open NTS ${i + 1}`);
+      pic.tabIndex = -1;                    // the show title below does the same; one tab stop is enough
       if (info.img) { const im = el('img'); im.src = info.img; im.alt = ''; im.addEventListener('error', () => im.remove()); pic.append(im); }
       pic.addEventListener('click', () => setChannel(i));
       const playBtn = el('button', 'onair__play');

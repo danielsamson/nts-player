@@ -454,8 +454,10 @@ const YearPlay = (() => {
       const g = el('div', 'yp-tiles yp-tiles--five');
       s.breakouts.forEach((t, i) => g.append(rise(tile(t, `#${i + 1}`, `${t.shows} shows`), 0.6 + i * 0.22)));
       const box = el('div', 'yp-frame yp-risescene');
-      box.append(rise(tape('Rising', 'yp-label'), 0), poster([['New since', 'outline'], since], { d: 0.15, max: 0.14, cls: 'yp-rise__title' }), g,
-        rise(tape('First played in the last three months and already picked up by the most shows.', 'yp-tape--sub'), 1.9));
+      const from = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
+      const to = monthShort(s.monthList[s.monthList.length - 1]);
+      box.append(rise(tape(`Rising · ${from}–${to}`, 'yp-label'), 0), poster([['Breaking', 'outline'], 'through'], { d: 0.15, max: 0.14, cls: 'yp-rise__title' }), g,
+        rise(tape(`New in the last three months (${since} on) and already picked up by the most shows.`, 'yp-tape--sub'), 1.9));
       return [backdrop(s.breakouts[0], null, null, true), box];
     } });
 
@@ -512,6 +514,47 @@ const YearPlay = (() => {
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));
       box.append(covers);
       return [backdrop(taste.viz.rows[0], null, null, true), box];
+    } });
+
+    // ---- the shows ----
+    const nm = (a) => (s.names?.[a] || [])[0] || Chart.showName(a);
+    // new on NTS: the count, and their pictures
+    if ((s.debuts || []).length >= 3) out.push({ dur: 8, build() {
+      const box = el('div', 'yp-frame yp-showsplit');
+      const left = el('div', 'yp-showsplit__text');
+      const big = el('div', 'yp-showcount'); big.append(counter(s.debuts.length, { d: 0.3, ms: 1300 }));
+      left.append(rise(tape('New on NTS', 'yp-label'), 0), rise(big, 0.1), poster(['new shows'], { d: 0.4, max: 0.1 }),
+        rise(tape(`First broadcast in ${year}${s.complete ? '' : ', so far'}.`, 'yp-tape--sub'), 0.9));
+      const grid = el('div', 'yp-showgrid');
+      s.debuts.filter((d) => d.img).slice(0, 12).forEach((d, i) => {
+        const c = el('div', 'yp-showtile');
+        const im = el('img'); im.alt = ''; im.src = d.img; im.addEventListener('error', () => im.remove());
+        c.append(im, el('span', null, d.name));
+        grid.append(rise(c, 0.6 + i * 0.12));
+      });
+      box.append(left, grid);
+      return [backdrop(null, 'safe-for-work', null, true), box];
+    } });
+    // in tune with NTS
+    const words = (x) => String(x || '').toLowerCase().replace(/\bw\/.*$/, '').replace(/[^a-z0-9 ]/g, '').trim();
+    const told = words(story(s, 'tastemaker')?.headline);
+    const tuneS = (s.inTune || []).find((x) => !told || (!words(x.name).startsWith(told) && !told.startsWith(words(x.name))));
+    if (tuneS && tuneS.count >= 5) out.push({ dur: 8, track: tuneS.tracks[0], build() {
+      const box = el('div', 'yp-frame yp-frame--bottom');
+      box.append(rise(tape('In tune with NTS', 'yp-label'), 0), poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }));
+      const n = tape('', 'yp-tape--sub'); const ahead = (s.inTune || []).filter((x) => x.count > tuneS.count);
+      n.append('Played ', counter(tuneS.count, { d: 0.8, ms: 1100 }), ` of the year’s top 100 tracks. ${!ahead.length ? 'More than any other show.' : ahead.length === 1 ? `Second only to ${ahead[0].name}.` : `Only ${ahead.length} shows played more.`}`);
+      box.append(rise(n, 0.7));
+      return [backdrop(tuneS.tracks[0]), giant(String(tuneS.count), 'is-faint yp-giant-bg--right'), box];
+    } });
+    // shared taste: the two shows with the most tracks in common
+    const pr = s.pair;
+    if (pr && pr.count >= 3) out.push({ dur: 8, track: pr.tracks?.[0], build() {
+      const box = el('div', 'yp-frame yp-frame--bottom');
+      box.append(rise(tape('Shared taste', 'yp-label'), 0), poster([nm(pr.a), ['&', 'outline'], nm(pr.b)], { d: 0.2, step: 0.2, max: 0.14, cls: 'yp-pair' }));
+      const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ` tracks in common${pr.tracks?.length ? `, like ${pr.tracks.slice(0, 2).map((t) => t.title).join(' and ')}` : ''}.`);
+      box.append(rise(n, 1));
+      return [backdrop(pr.tracks?.[0], 'the-healing-place'), box];
     } });
 
     // 13. outro

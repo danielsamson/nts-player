@@ -234,6 +234,12 @@ const Chart = (() => {
     // shows that shared tracks: the strongest links, for the network
     const links = [...pairs].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 60)
       .map(([k, c]) => ({ a: k.split('|')[0], b: k.split('|')[1], count: c }));
+    // the show most in tune with NTS: it played the most of the year's top 100
+    const tune = new Map();
+    all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
+    // (the top few, so the story can skip one already told, like the tastemaker)
+    const inTune = [...tune].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sh, count]) => ({ show: sh, count, name: (names[sh] || [])[0] || showName(sh),
+      tracks: all.slice(0, 100).filter((m) => m.showSet.has(sh)).slice(0, 3) }));
     all.forEach((m) => { delete m.showSet; });
     const realDebuts = debuts.filter((d) => !catchAll(d.show, names));
     return {
@@ -242,6 +248,7 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
+      inTune,
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null,
       stories: stories(y, files, all, monthFiles, names),
       monthList: list, monthRanks, links, names,

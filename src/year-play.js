@@ -486,8 +486,8 @@ const YearPlay = (() => {
     // 10. the long runner: 11 / 11, a month at a time lighting up
     const lr = s.evergreen?.[0];
     if (lr) out.push({ dur: 8, track: lr, build() {
-      const box = el('div', 'yp-frame yp-frame--right');
-      box.append(rise(coverImg(lr, 'yp-cover yp-cover--chip'), 0), rise(tape('The long runner', 'yp-label'), 0.1), poster(splitLines(lr.title, lr.title.length > 14 ? 3 : 2), { even: true, d: 0.2, max: 0.1 }),
+      const box = el('div', 'yp-frame');
+      box.append(rise(tape('The long runner', 'yp-label'), 0.1), poster(splitLines(lr.title, lr.title.length > 14 ? 3 : 2), { even: true, d: 0.2, max: 0.1 }),
         rise(tape(lr.artist, 'yp-tape--sub'), 0.6));
       const months = el('div', 'yp-months');
       (s.monthList || []).forEach((m, i) => {
@@ -496,7 +496,12 @@ const YearPlay = (() => {
         months.append(c);
       });
       box.append(rise(months, 0.8), rise(tape(`Played in ${lr.months} of ${s.months} months. Most tracks on NTS last a few weeks.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));
-      return [backdrop(lr, 'lean-back'), giant(`${lr.months}/${s.months}`, 'is-faint yp-giant-bg--left'), box];
+      const l = el('div', 'yp-artsplit__text'); l.append(...box.childNodes);
+      box.classList.add('yp-artsplit');
+      const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
+      art.append(rise(coverImg(lr, 'yp-cover yp-cover--feature'), 0.3), rise(el('p', 'yp-artcap', `${lr.months} of ${s.months} months`), 0.6));
+      box.append(l, art);
+      return [backdrop(lr, 'lean-back'), box];
     } });
 
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way

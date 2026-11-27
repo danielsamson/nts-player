@@ -152,6 +152,7 @@ const Chart = (() => {
     const names = {};
     let episodes = 0, plays = 0;
     const numberOnes = [];
+    const showFams = new Map();          // show -> genre families it played tracks under
     const debuts = [];
     for (const f of files) {
       episodes += f.episodes; plays += f.plays;
@@ -169,7 +170,11 @@ const Chart = (() => {
         if (e >= 2) { const yr = f.years?.[ri]; if (yr) m.released = yr; ri++; }
         m.perMonth[f.period] = idx.length;
         // genres it was played under (episodes per genre family), for tags
-        if (fams && f.families) { m.genres ||= {}; fams.forEach(([fi, , ge]) => { const nm = f.families[fi]?.[1]; if (nm) m.genres[nm] = (m.genres[nm] || 0) + ge; }); }
+        if (fams && f.families) { m.genres ||= {}; fams.forEach(([fi, ss, ge]) => {
+          const nm = f.families[fi]?.[1]; if (!nm) return;
+          m.genres[nm] = (m.genres[nm] || 0) + ge;
+          if (Array.isArray(ss)) ss.forEach((i) => { const sh = f.showList[i]; if (!showFams.has(sh)) showFams.set(sh, new Set()); showFams.get(sh).add(nm); });
+        }); }
         m.episodes += e;
         idx.forEach((i) => m.showSet.add(f.showList[i]));
         m.monthSet.add(f.period);
@@ -235,6 +240,38 @@ const Chart = (() => {
     // shows that shared tracks: the strongest links, for the network
     const links = [...pairs].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).slice(0, 60)
       .map(([k, c]) => ({ a: k.split('|')[0], b: k.split('|')[1], count: c }));
+    // deep cuts: tracks one show kept coming back to that (almost) nobody else played
+    const seenBy = new Set();
+    const deepCuts = all.filter((m) => m.shows === 1 && m.episodes >= 3 && !catchAll([...m.showSet][0], names))
+      .sort((a, b) => b.episodes - a.episodes)
+      .filter((m) => { const sh = [...m.showSet][0]; if (seenBy.has(sh)) return false; seenBy.add(sh); return true; })      // one per show
+      .slice(0, 5)
+      .map((m) => ({ ...m, by: (names[[...m.showSet][0]] || [])[0] || showName([...m.showSet][0]) }));
+    // the shows' characters
+    const label = (sh) => (names[sh] || [])[0] || showName(sh);
+    const perShow = new Map();           // show -> { solo, dated: [years], tracks: [track] }
+    for (const m of tracks.values()) {
+      for (const sh of m.showSet) {
+        if (catchAll(sh, names)) continue;
+        let r = perShow.get(sh); if (!r) { r = { solo: 0, dated: [], tracks: [], soloTracks: [], datedTracks: [] }; perShow.set(sh, r); }
+        if (m.showSet.size === 1) { r.solo++; if (r.soloTracks.length < 3 && m.latest) r.soloTracks.push(m); }
+        if (m.released) { r.dated.push(m.released); if (m.latest) r.datedTracks.push(m); }
+        if (r.tracks.length < 12 && m.latest) r.tracks.push(m);
+      }
+    }
+    const median = (xs) => { const a = xs.slice().sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
+    // three different shows; deepest crate scored per episode, so a daily show doesn't win on volume
+    const used = new Set();
+    const best = (rows, cmp) => { const r = rows.sort(cmp).find(([sh]) => !used.has(sh)); if (r) used.add(r[0]); return r; };
+    const eps = (sh) => showEps.get(sh) || 1;
+    const solo = best([...perShow].filter(([sh, r]) => r.solo >= 8 && eps(sh) >= 3).map(([sh, r]) => [sh, r, r.solo / eps(sh)]), (a, b) => b[2] - a[2]);
+    const oldest = best([...perShow].filter(([, r]) => r.dated.length >= 5).map(([sh, r]) => [sh, r, median(r.dated)]), (a, b) => a[2] - b[2]);
+    const widest = best([...perShow].map(([sh, r]) => [sh, r, showFams.get(sh)?.size || 0]).filter((x) => x[2] >= 6), (a, b) => b[2] - a[2]);
+    const characters = [
+      solo && { kind: 'Deepest crate', show: solo[0], name: label(solo[0]), text: `${solo[1].solo} tracks no other show played, in ${eps(solo[0])} episodes`, t: solo[1].soloTracks[0] || solo[1].tracks[0] },
+      oldest && { kind: 'Oldest record box', show: oldest[0], name: label(oldest[0]), text: `half its charted tracks came out before ${oldest[2] + 1}`, t: oldest[1].datedTracks.sort((a, b) => a.released - b.released)[0] || oldest[1].tracks[0] },
+      widest && { kind: 'Widest range', show: widest[0], name: label(widest[0]), text: `played across ${widest[2]} genres`, t: widest[1].tracks[widest[1].tracks.length - 1] }
+    ].filter((c) => c && c.t);
     // the show most in tune with NTS: it played the most of the year's top 100
     const tune = new Map();
     all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
@@ -249,7 +286,7 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
-      inTune,
+      inTune, deepCuts, characters,
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null,
       stories: stories(y, files, all, monthFiles, names),
       monthList: list, monthRanks, links, names,

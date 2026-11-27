@@ -110,7 +110,7 @@ const Year = (() => {
     }
     // 11: outro
     const sup = el('button', 'year__link', 'Support NTS');
-    sup.addEventListener('click', () => window.nts.openLink({ url: 'https://www.nts.live/supporters' }));
+    sup.addEventListener('click', () => window.nts.openLink({ web: 'https://www.nts.live/supporters', apps: [] }));
     out.push(card(`NTS in ${s.year}`, 'That was the year', el('p', 'year__note', s.peak ? `The busiest month was ${monthName(s.peak.month)}, with ${plural(s.peak.episodes, 'episode')}.` : ''), sup));
     return out;
   }

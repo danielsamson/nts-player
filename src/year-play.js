@@ -30,7 +30,8 @@ const YearPlay = (() => {
     wrap.append(img);
     if (t.latest && Number.isFinite(t.latest.offset) && !/yp-bg|yp-wall|yp-ht/.test(cls)) {
       wrap.classList.add('yp-hot', 'yp-playable');
-      wrap.dataset.tip = `${t.title} · ${t.artist}`;
+      wrap.dataset.tip = `${t.title} · ${t.artist}${t.released ? ` · ${t.released}` : ''}`;
+      wrap.append(keepButton(t));
       wrap.addEventListener('click', (e) => {
         e.stopPropagation();
         playingKey = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
@@ -50,7 +51,7 @@ const YearPlay = (() => {
     const trk = el('span', 'yp-mini__track'), from = el('span', 'yp-mini__from');
     txt.append(trk, from);
     const play = el('button', 'yp-mini__btn', '❚❚'); play.setAttribute('aria-label', 'Pause');
-    const dig = el('button', 'yp-mini__btn yp-mini__dig', 'Episode ›'); dig.title = 'Open the episode this is playing from';
+    const dig = el('button', 'yp-mini__btn yp-mini__dig', '+ Crate'); dig.title = 'Keep the track playing now in your crate';
     p.append(art, txt, play, dig);
     const fmt2 = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
     let artKey = '';
@@ -75,12 +76,42 @@ const YearPlay = (() => {
     play.addEventListener('click', (e) => { e.stopPropagation(); ArchivePlayer.toggle(); });
     dig.addEventListener('click', (e) => {
       e.stopPropagation();
-      const ep = ArchivePlayer.state.episode; if (!ep) return;
-      opts.onClose?.(); Archive.showEpisode(ep.show, ep.episode);
+      const st = ArchivePlayer.state, ep = st.episode; if (!ep) return;
+      let cur = null;
+      for (const t of ep.tracks || []) { const o = t.offset ?? t.offset_estimate; if (o != null && o <= st.position / 1000) cur = t; }
+      if (!cur) return;
+      const t = { artist: cur.artist, title: cur.title, latest: { show: ep.show, episode: ep.episode, offset: cur.offset ?? cur.offset_estimate, title: ep.title } };
+      if (!crate.has(keyOf(t))) { crate.set(keyOf(t), t); paintCount(); toast(`In your crate: ${t.title}`); }
     });
     unPlayer?.(); unPlayer = ArchivePlayer.onChange(paint); paint(ArchivePlayer.state);
     return p;
   }
+  // ---- the crate: what you keep while you watch (for this viewing; saved to My NTS too when signed in) ----
+  const crate = new Map();               // key -> track
+  const keyOf = (t) => `${t.artist}|${t.title}`.toLowerCase();
+  function keepButton(t) {
+    const b = el('button', 'yp-keep', '+');
+    const paint = () => { const on = crate.has(keyOf(t)); b.textContent = on ? '✓' : '+'; b.classList.toggle('is-on', on); b.title = on ? 'In your crate (click to take it out)' : 'Keep it in your crate'; };
+    paint();
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const k = keyOf(t);
+      if (crate.has(k)) { crate.delete(k); toast(`Out of your crate: ${t.title}`); }
+      else {
+        crate.set(k, t);
+        toast(`In your crate: ${t.title}. It's waiting at the end`);
+        if (typeof supporter !== 'undefined' && supporter && t.latest?.episode) {
+          MyNTS.toggleTrack(t.latest.show, t.latest.episode, { artist: t.artist, title: t.title }, true,
+            { show: t.latest.show, episode: t.latest.episode, title: t.latest.title, offset: t.latest.offset }).catch(() => {});
+        }
+      }
+      root?.querySelectorAll('.yp-keep').forEach((x) => x.dispatchEvent(new Event('repaint')));
+      paintCount();
+    });
+    b.addEventListener('repaint', paint);
+    return b;
+  }
+  const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.textContent = crate.size ? `Crate ${crate.size}` : ''; c.hidden = !crate.size; } };
   // a short note at the bottom of the screen
   let toastTimer = null;
   function toast(text) {
@@ -94,8 +125,7 @@ const YearPlay = (() => {
   function showLink(node, alias) {
     if (!alias) return node;
     node.classList.add('yp-hot', 'yp-showlink');
-    node.dataset.tip = 'Open the show';
-    node.addEventListener('click', (e) => { e.stopPropagation(); opts.onClose?.(); Archive.showShow(alias); });
+    node.dataset.tip = node.querySelector('span')?.textContent || 'A show on NTS';
     return node;
   }
   // the scene's backdrop, treated like a tape still: the cover (or NTS mood footage) full-bleed,
@@ -667,6 +697,59 @@ const YearPlay = (() => {
       return [backdrop(pr.tracks?.[0], 'the-healing-place'), box];
     } });
 
+    // deep cuts: the tracks one show kept returning to
+    if ((s.deepCuts || []).length >= 3) out.push({ dur: 9, build() {
+      const box = el('div', 'yp-frame yp-deepcuts');
+      box.append(rise(tape('Deep cuts', 'yp-label'), 0), poster([['One show,', 'outline'], 'on repeat'], { d: 0.15, max: 0.12, cls: 'yp-deep__title' }));
+      const list = el('ol', 'yp-deep');
+      s.deepCuts.forEach((t, i) => {
+        const li = el('li');
+        const tx = el('div', 'yp-deep__text');
+        tx.append(el('span', 'yp-deep__t', t.title), el('span', 'yp-deep__a', t.artist), el('span', 'yp-deep__by', `${t.by} · ${t.episodes} times`));
+        li.append(coverImg(t, 'yp-cover'), tx);
+        list.append(rise(li, 0.6 + i * 0.18));
+      });
+      box.append(list, rise(tape('Played again and again by one show, and by no one else.', 'yp-tape--sub'), 1.8));
+      return [backdrop(s.deepCuts[0], null, null, true), box];
+    } });
+    // the shows' characters: deepest crate, oldest record box, widest range
+    if ((s.characters || []).length >= 2) out.push({ dur: 10, build() {
+      const box = el('div', 'yp-frame yp-chars');
+      box.append(rise(tape('The diggers', 'yp-label'), 0));
+      const row = el('div', 'yp-chars__row');
+      s.characters.forEach((c, i) => {
+        const card = el('div', 'yp-char');
+        card.append(el('span', 'yp-char__kind', c.kind), coverImg(c.t, 'yp-cover'), el('span', 'yp-char__name', c.name), el('span', 'yp-char__text', c.text));
+        row.append(rise(card, 0.4 + i * 0.3));
+      });
+      box.append(row);
+      return [backdrop(s.characters[0].t, 'audio-research', null, true), box];
+    } });
+    // your crate: what you kept, to play now (built when you get here)
+    out.push({ dur: 8, cls: 'yp-cratescene', build() {
+      const box = el('div', 'yp-frame yp-crate');
+      const items = [...crate.values()];
+      box.append(rise(tape('Your crate', 'yp-label'), 0));
+      if (!items.length) {
+        box.append(poster([['Nothing', 'outline'], 'kept yet'], { d: 0.15, max: 0.14 }),
+          rise(tape('Go back (←) and press + on any cover to keep it here.', 'yp-tape--sub'), 0.6));
+        return [backdrop(t1, null, null, true), box];
+      }
+      box.append(poster([`${items.length} to dig into`], { d: 0.15, max: 0.11 }));
+      const grid = el('div', 'yp-crate__grid');
+      items.forEach((t, i) => {
+        const c = el('div', 'yp-crate__item');
+        const links = el('div', 'yp-crate__links');
+        // for diggers: Bandcamp, Discogs, YouTube (they open in the browser; the year stays open)
+        try { Stage.links(t, null).filter(([n]) => ['Bandcamp', 'Discogs', 'YouTube'].includes(n)).forEach(([n, url]) => { const a = el('button', 'yp-crate__link', n); a.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ web: url, apps: [] }); }); links.append(a); }); } catch {}
+        c.append(coverImg(t, 'yp-cover'), el('span', 'yp-crate__t', t.title), el('span', 'yp-crate__a', `${t.artist}${t.latest?.title ? ' · from ' + t.latest.title : ''}`), links);
+        grid.append(rise(c, 0.4 + i * 0.1));
+      });
+      box.append(grid);
+      if (typeof supporter !== 'undefined' && supporter) box.append(rise(tape('Saved to your tracks in My NTS too.', 'yp-tape--sub'), 1));
+      return [backdrop(items[0], null, null, true), box];
+    } });
+
     // 13. outro
     out.push({ dur: 0, cls: 'yp-outro', build() {
       const box = el('div', 'yp-frame yp-frame--bottom');
@@ -674,7 +757,7 @@ const YearPlay = (() => {
       const acts = el('div', 'yp-actions');
       const again = el('button', 'yp-btn', 'Watch again'); again.addEventListener('click', (e) => { e.stopPropagation(); show(0, true); });
       const cards = el('button', 'yp-btn', 'Browse the cards'); cards.addEventListener('click', (e) => { e.stopPropagation(); opts.onBrowse?.(); });
-      const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ url: 'https://www.nts.live/supporters' }); });
+      const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ web: 'https://www.nts.live/supporters', apps: [] }); });
       acts.append(again, cards, sup);
       box.append(rise(acts, 2.9));
       const logo = el('div', 'yp-endlogo'); const im = el('img'); im.src = 'nts-logo.svg'; im.alt = 'NTS'; logo.append(im);
@@ -787,7 +870,7 @@ const YearPlay = (() => {
   // start: the first screen asks with or without music, then plays
   function start(container, s, o = {}) {
     stop();
-    opts = o; music = false; playingKey = null; auto = false;
+    opts = o; music = false; playingKey = null; auto = false; crate.clear();
     scenes = build(s);
     root = el('div', 'yp');
     const bars = el('div', 'yp-bars');
@@ -804,7 +887,8 @@ const YearPlay = (() => {
     const close = el('button', 'yp-topbtn yp-close', '×');
     close.setAttribute('aria-label', 'Close');
     close.addEventListener('click', (e) => { e.stopPropagation(); opts.onClose?.(); });
-    top.append(bars, autoBtn, browse, close);
+    const count = el('span', 'yp-cratecount'); count.hidden = true;
+    top.append(bars, count, autoBtn, browse, close);
     const stage = el('div', 'yp-stage');
     const hint = el('p', 'yp-hint', 'Take your time · click or → for the next · hover and click things to explore');
     const nudge = el('p', 'yp-nudge', 'Click to continue ›');

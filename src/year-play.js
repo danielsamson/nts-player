@@ -30,6 +30,10 @@ const YearPlay = (() => {
     wrap.append(img);
     if (t.latest?.episode && !/yp-bg|yp-wall|yp-ht/.test(cls)) {
       wrap.classList.add('yp-hot', 'yp-playable');
+      wrap.tabIndex = 0;
+      wrap.setAttribute('role', 'button');
+      wrap.setAttribute('aria-label', `Play ${t.title} by ${t.artist}`);
+      wrap.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === wrap) { e.preventDefault(); e.stopPropagation(); wrap.click(); } });
       wrap.dataset.tip = `${t.title} · ${t.artist}${t.released ? ` · ${t.released}` : ''}`;
       wrap.append(keepButton(t));
       if (t.released) wrap.append(el('span', 'yp-yearbadge', String(t.released)));
@@ -88,7 +92,8 @@ const YearPlay = (() => {
     return p;
   }
   // ---- the crate: what you keep while you watch (for this viewing; saved to My NTS too when signed in) ----
-  const crate = new Map();               // key -> track
+  const crate = new Map();               // key -> track (kept while the app is open, for one year)
+  let crateYear = null, lastAt = 0;      // where you'd got to, to carry on after closing
   // the same bookmark as everywhere else in the app
   const BOOKMARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
   const keyOf = (t) => `${t.artist}|${t.title}`.toLowerCase();
@@ -992,6 +997,7 @@ const YearPlay = (() => {
   // ---- playing ----
   function show(i, play = true) {
     at = Math.max(0, Math.min(scenes.length - 1, i));
+    lastAt = at;
     const sc = scenes[at];
     const stage = root.querySelector('.yp-stage');
     const scene = el('section', `yp-scene ${sc.cls || ''}`);
@@ -1094,7 +1100,8 @@ const YearPlay = (() => {
   // start: the first screen asks with or without music, then plays
   function start(container, s, o = {}) {
     stop();
-    opts = o; music = false; playingKey = null; auto = false; crate.clear();
+    opts = o; music = false; playingKey = null; auto = false;
+    if (crateYear !== s.year) { crate.clear(); crateYear = s.year; lastAt = 0; }
     scenes = build(s);
     root = el('div', 'yp');
     const bars = el('div', 'yp-bars');
@@ -1166,10 +1173,16 @@ const YearPlay = (() => {
     const withMusic = el('button', 'yp-btn yp-btn--on', '▶ Play with music');
     withMusic.title = 'Each track plays as it comes up (this stops what you’re listening to)';
     const without = el('button', 'yp-btn', 'Without music');
-    const go = (m) => (e) => { e.stopPropagation(); music = m; gate.remove(); show(0); };
+    const go = (m, from = 0) => (e) => { e.stopPropagation(); music = m; gate.remove(); show(from); };
     withMusic.addEventListener('click', go(true));
     without.addEventListener('click', go(false));
     acts.append(withMusic, without);
+    // been here before (this session): carry on from where you left off
+    if (lastAt > 0 && lastAt < scenes.length - 1) {
+      const carry = el('button', 'yp-btn yp-btn--carry', `Carry on from ${lastAt + 1} of ${scenes.length}${crate.size ? ` · ${crate.size} saved` : ''}`);
+      carry.addEventListener('click', go(true, lastAt));
+      acts.prepend(carry);
+    }
     gt.append(rise(acts, 0.5));
     gate.append(backdrop(s.top?.[0]), gt);
     stage.append(gate);

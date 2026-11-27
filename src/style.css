@@ -2370,3 +2370,27 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-pull__slot { margin-right: 20vh; }
 .yp-pull__slot.is-out .yp-pull__sleeve { place-items: center end; padding-right: 8px; }
 .yp-pull__slot.is-out .yp-pull__sleeve span { writing-mode: vertical-rl; padding: 10px 5px; }
+
+/* NTS in <year> on Home: a strip near the top */
+.year-card { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto auto; align-items: end; column-gap: 12px; width: 100%; padding: 14px 12px 12px; text-align: left; border-bottom: var(--rule);
+  background: #000 radial-gradient(ellipse at 85% 30%, rgba(212, 43, 216, .45), transparent 60%), radial-gradient(ellipse at 10% 120%, rgba(0, 184, 196, .35), transparent 55%); color: var(--white); }
+.year-card__kicker { grid-column: 1; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+.year-card__title { grid-column: 1; font-size: 30px; line-height: 30px; font-weight: 700; text-transform: uppercase; margin: 2px 0 4px; }
+.year-card__sub { grid-column: 1; font-size: 13px; line-height: 17px; opacity: .85; }
+.year-card__go { grid-column: 2; grid-row: 1 / -1; align-self: center; border: 1px solid var(--white); padding: 7px 12px 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.year-card:hover .year-card__go { background: var(--white); color: #000; }
+/* carry on */
+.yp-btn--carry { flex-basis: 100%; max-width: max-content; }
+/* keyboard focus on a cover: the play button and a ring */
+.yp-playable:focus-visible { outline: 2px solid var(--white); outline-offset: 3px; }
+.yp-playable:focus-visible::after { opacity: 1; }
+/* narrow window: genre dives in one column, the handoffs trimmed to three */
+@media (max-width: 559px) {
+  .yp-dive__stage { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .yp-dive__lead .yp-cover { width: 30vw; }
+  .yp-dive__leadtext { max-width: none; }
+  .yp-dive__rest { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .yp-ho__row:nth-child(n+4) { display: none; }
+  .yp-handoffs { padding-top: 80px; }
+}
+@media (max-width: 559px) { .yp-ho__covers { display: none; } .yp-ho__row { grid-template-columns: 1fr; gap: 6px; padding: 10px 0; } .yp-ho__n { grid-column: 1; } }

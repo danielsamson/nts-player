@@ -646,7 +646,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...onAirSection(), ...continueSection(), ...(await comingUpSection()), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...onAirSection(), ...yearCard(), ...continueSection(), ...(await comingUpSection()), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -831,6 +831,14 @@ const Archive = (() => {
     b.title = `The year on NTS in tracks: track of the year, top artists, number ones, busiest and new shows`;
     b.addEventListener('click', () => Year.open(thisYear));
     return b;
+  }
+  // NTS in <year>, near the top of Home (it was only a small link under the chart)
+  function yearCard() {
+    const b = el('button', 'year-card');
+    b.innerHTML = `<span class="year-card__kicker">The year on NTS</span><span class="year-card__title">NTS in ${thisYear}</span><span class="year-card__sub">The tracks, the shows, the moments. Take your time.</span><span class="year-card__go">Play ›</span>`;
+    b.addEventListener('click', () => Year.open(thisYear));
+    Chart.months().then((ms) => { if (!ms.some((m) => m.startsWith(`${thisYear}-`))) b.remove(); }).catch(() => b.remove());
+    return [b];
   }
   function chartSection() {
     const box = el('div', 'chart-box');

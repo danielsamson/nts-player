@@ -2,6 +2,13 @@
    square corners, condensed grotesque type, bold uppercase headings,
    red live dot, and the live channel inverting to white while playing. */
 
+/* VHS-style screen type for NTS in <year> (camcorder text, labels, numbers). SIL OFL 1.1, see fonts/OFL-VT323.txt */
+@font-face {
+  font-family: "Tape";
+  src: url("fonts/vt323-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
 @font-face {
   font-family: "NTS Condensed";
   src: local("Univers Condensed"), local("UniversCom-57Condensed"),
@@ -1739,3 +1746,81 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp .yp-kicker { position: relative; z-index: 1; margin-bottom: 6px; }
 .yp-center.yp-corner { gap: 4px; }
 .yp-center.yp-corner .yp-kicker { margin-bottom: 10px; }
+
+/* ======================================================================
+   NTS in <year>, played: poster typography
+   ====================================================================== */
+/* a scene's layout box: fills the frame, content placed by modifier */
+.yp-frame { position: relative; z-index: 2; width: 100%; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 84px 5vw 64px; }
+.yp-frame--bottom { justify-content: flex-end; }
+.yp-frame--center { align-items: center; text-align: center; }
+.yp-frame--right { padding-left: 42vw; }
+/* fitted lines: each fills the box's width (sized in JS), sliding up out of a mask */
+.yp-poster { width: 100%; display: flex; flex-direction: column; filter: drop-shadow(0 6px 40px rgba(0,0,0,.35)); }
+.yp-poster--center { align-items: center; margin: 0 auto; }
+.yp-poster--narrow { width: min(76vw, 820px); }
+.yp-poster__line { display: block; overflow: hidden; white-space: nowrap; font-size: 100px; line-height: .84; font-weight: 700; text-transform: uppercase; letter-spacing: -.012em; padding: .03em 0 .05em; color: var(--white); }
+.yp-poster__inner { display: inline-block; transform: translateY(108%); animation: ypLine .75s cubic-bezier(.2, .8, .2, 1) forwards; animation-delay: var(--d, 0s); }
+.yp-poster__line.is-outline { color: transparent; -webkit-text-stroke: max(1.5px, .018em) var(--white); }
+@keyframes ypLine { to { transform: none; } }
+.yp.is-paused .yp-scene .yp-poster__inner { animation-play-state: paused; }
+/* giant numerals running off the edge, behind the words */
+.yp-giant-bg { position: absolute; z-index: 1; font-weight: 700; line-height: .74; letter-spacing: -.04em; color: var(--white); white-space: nowrap; pointer-events: none; font-size: 112vh; }
+.yp-giant-bg--left { left: -2.5vw; bottom: -13vh; }
+.yp-giant-bg--center { left: 50%; top: 50%; transform: translate(-50%, -46%); font-size: 96vh; }
+.yp-giant-bg.is-outline { color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.55); }
+.yp-giant-bg { animation: ypGiant 1.1s cubic-bezier(.2, .8, .2, 1) both; }
+.yp-giant-bg--center { animation-name: ypGiantC; }
+@keyframes ypGiant { from { opacity: 0; transform: translateY(14vh); } to { opacity: 1; transform: none; } }
+@keyframes ypGiantC { from { opacity: 0; transform: translate(-50%, -38%); } to { opacity: 1; transform: translate(-50%, -46%); } }
+/* tape type: the VHS screen font, for labels, counts and the small print */
+.yp-tape { font-family: "Tape", "Courier New", monospace; font-size: clamp(19px, 2.3vw, 30px); line-height: 1; letter-spacing: .02em; text-transform: uppercase; color: var(--white); width: fit-content; max-width: min(72ch, 90vw); }
+.yp-label { background: var(--white); color: var(--black); padding: 3px 9px 1px; margin-bottom: 1.4vh; }
+.yp-tape--sub { background: var(--black); padding: 4px 9px 2px; margin-top: 6px; text-shadow: 0 0 6px rgba(255,255,255,.35); }
+.yp-frame--center .yp-tape { margin-left: auto; margin-right: auto; }
+.yp-tapenums { display: flex; flex-wrap: wrap; gap: 1vh 4vw; margin-top: 3vh; }
+.yp-tapenum { display: flex; flex-direction: column; font-family: "Tape", monospace; text-transform: uppercase; }
+.yp-tapenum .yp-count { font-size: clamp(40px, 6.4vw, 92px); line-height: .9; text-shadow: 0 0 14px rgba(255,255,255,.45); }
+.yp-tapenum span:last-child { font-size: clamp(16px, 1.8vw, 24px); color: rgba(255,255,255,.75); }
+/* countdown: the cover beside the stacked title, the number huge behind on the left */
+.yp-split { display: flex; align-items: center; gap: 3vw; width: 100%; }
+.yp-cover--split { width: clamp(130px, 30vh, 330px); flex: 0 0 auto; }
+.yp-splittext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* track of the year: the cover up on the right, the title across the bottom over it */
+.yp-hero .yp-cover--hero { position: absolute; right: 6vw; top: 11vh; width: min(50vh, 42vw); z-index: 0; }
+.yp-hero .yp-cover--hero img { animation: ypHero 11s ease-out forwards; }
+.yp-frame > .yp-poster, .yp-frame > .yp-tape { position: relative; z-index: 1; }
+/* a running label up the left edge */
+.yp-side { position: absolute; z-index: 2; left: 14px; top: 0; bottom: 0; display: flex; align-items: center; writing-mode: vertical-rl; transform: rotate(180deg); font: 400 clamp(15px, 1.6vw, 20px)/1 "Tape", monospace; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; pointer-events: none; }
+/* the camcorder text in the tape font too */
+.yp-osd { font: 400 clamp(20px, 2.4vw, 30px)/1 "Tape", "Courier New", monospace; letter-spacing: .04em; }
+/* data in tape type */
+.yp-genre__rank, .yp-genre__pct, .yp-one__month, .yp-months span, .yp-list__rank { font-family: "Tape", monospace; font-weight: 400; }
+.yp-genre__pct { font-size: clamp(20px, 2.4vw, 30px); }
+.yp-one__month { font-size: 16px; padding: 1px 6px 0; }
+.yp-months span { font-size: clamp(14px, 1.7vw, 20px); }
+@media (max-width: 559px) {
+  .yp-frame { padding: 74px 18px 56px; }
+  .yp-frame--right { padding-left: 18px; justify-content: flex-end; }
+  .yp-giant-bg { font-size: 62vh; }
+  .yp-giant-bg--left { left: -4vw; top: 8vh; bottom: auto; }
+  .yp-split { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .yp-cover--split { width: 120px; }
+  .yp-hero .yp-cover--hero { right: 18px; top: 80px; width: 52vw; }
+  .yp-side { display: none; }
+  .yp-tape { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .yp-poster__inner { animation: none; transform: none; }
+  .yp-giant-bg { animation: none; }
+}
+/* keep fitted lines inside the frame (a flex item's minimum width is otherwise its content) */
+.yp-frame > *, .yp-split, .yp-splittext { min-width: 0; max-width: 100%; }
+/* the camcorder text stays readable over a white numeral */
+.yp-osd { mix-blend-mode: difference; }
+/* the leap's numeral is an outline, so the title over it reads */
+.yp-scene, .yp-gate { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+@media (max-width: 559px) {
+  .yp-countdown .yp-giant-bg { color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.7); }
+  .yp-frame--center { padding-top: 92px; }
+}

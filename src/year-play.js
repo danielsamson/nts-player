@@ -832,6 +832,25 @@ const YearPlay = (() => {
       box.append(row);
       return [backdrop(s.characters[0].t, 'audio-research', null, true), box];
     } });
+    // who listens to whom: the handoffs between shows that keep repeating
+    const ho = s.handoffs || [];
+    if (ho.length >= 2) out.push({ dur: 11, track: ho[0].tracks[0], build() {
+      const box = el('div', 'yp-frame yp-handoffs');
+      box.append(rise(tape('Who listens to whom', 'yp-label'), 0), poster([['Passed', 'outline'], 'along'], { d: 0.15, max: 0.11, cls: 'yp-deep__title' }));
+      const list = el('div', 'yp-ho');
+      ho.forEach((h, i) => {
+        const row = el('div', 'yp-ho__row');
+        const names = el('div', 'yp-ho__names');
+        names.append(el('span', 'yp-ho__a', h.an), el('span', 'yp-ho__arrow', '→'), el('span', 'yp-ho__b', h.bn));
+        const covers = el('div', 'yp-ho__covers');
+        h.tracks.forEach((t) => covers.append(coverImg(t, 'yp-cover')));
+        row.append(names, el('span', 'yp-ho__n', `${h.count} tracks, about ${h.days} days later`), covers);
+        list.append(rise(row, 0.6 + i * 0.25));
+      });
+      box.append(list, rise(tape('One show plays it, the other picks it up within three weeks. Again and again.', 'yp-tape--sub'), 2));
+      return [backdrop(ho[0].tracks[0], null, null, true), box];
+    } });
+
     // your crate: what you kept, to play now (built when you get here)
     out.push({ dur: 8, cls: 'yp-cratescene', build() {
       const box = el('div', 'yp-frame yp-crate');

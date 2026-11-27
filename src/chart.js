@@ -4,7 +4,7 @@
 // Periods: 'recent' (the last 30 days) or a month 'YYYY-MM'. A year merges its months.
 
 const Chart = (() => {
-  const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const n = (x) => String(x || '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   const key = (a, t) => `${n(a)}|${n(t)}`;
   const ym = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   const shift = (m, k) => ym(new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1 + k, 1)));
@@ -291,10 +291,13 @@ const Chart = (() => {
     const spikes = [];
     for (const [k, r] of am) {
       const vals = list.map((mm) => r.months.get(mm)?.size || 0);
-      const peak = Math.max(...vals); if (peak < 7) continue;
+      const peak = Math.max(...vals);
       const at = vals.indexOf(peak), usual = (vals.reduce((a, b) => a + b, 0) - peak) / Math.max(1, vals.length - 1);
-      if (peak < 4 * Math.max(usual, 0.75)) continue;
       const month = list[at];
+      const mi0 = (m) => +m.slice(0, 4) * 12 + +m.slice(5);
+      // a checked context line lowers the bar (a real moment with fewer shows); otherwise 7+ shows
+      const known = ctx.some((x) => n(x.artist) === k && Math.abs(mi0(x.month) - mi0(month)) <= 1);
+      if (peak < (known ? 4 : 7) || peak < (known ? 3 : 4) * Math.max(usual, 0.75)) continue;
       const row = r.best.get(month), f = files.find((x) => x.period === month);
       const t = row && { artist: row[0], title: row[1], latest: { show: f.showList[row[4][0]], episode: row[4][1], offset: row[4][2], d: row[4][3], title: (names[f.showList[row[4][0]]] || [])[0] || showName(f.showList[row[4][0]]) } };
       // the context line, when one has been written for it (a month either side of the peak)
@@ -304,9 +307,26 @@ const Chart = (() => {
     }
     // the clearest moments first; at most two a month, captioned ones preferred
     spikes.sort((a, b) => (b.text ? 1 : 0) - (a.text ? 1 : 0) || b.peak / Math.max(1, b.usual) - a.peak / Math.max(1, a.usual));
-    const perM = new Map();
-    const moments = spikes.filter((x) => { const c = perM.get(x.month) || 0; if (c >= 2) return false; perM.set(x.month, c + 1); return true; })
+    const perM = new Map(), seenT = new Set();
+    const moments = spikes.filter((x) => { const tk = x.t && `${n(x.t.artist)}|${n(x.t.title)}`; if (tk && seenT.has(tk)) return false; if (tk) seenT.add(tk); return true; }).filter((x) => { const c = perM.get(x.month) || 0; if (c >= 2) return false; perM.set(x.month, c + 1); return true; })
       .slice(0, 12).sort((a, b) => a.month.localeCompare(b.month) || b.peak - a.peak);
+    // who listens to whom: show A plays a track, show B plays it within three weeks; the pairs that
+    // repeat across the tracks that spread (5+ shows). Listener series and catch-alls left out.
+    const SERIES = /^(dancing-\d{4}|coming-of-age|your-specialist-subject.*)$/;
+    const pairsH = new Map();
+    for (const m of all) {
+      const order = [...m.firstBy].filter(([sh]) => !catchAll(sh, names) && !SERIES.test(sh)).sort((a, b) => a[1] - b[1]);
+      if (order.length < 5) continue;
+      for (let i = 0; i < order.length; i++) for (let j = i + 1; j < order.length; j++) {
+        const gap = order[j][1] - order[i][1];
+        if (gap <= 0 || gap > 21) continue;
+        const key2 = `${order[i][0]}>${order[j][0]}`;
+        let r = pairsH.get(key2); if (!r) { r = { a: order[i][0], b: order[j][0], tracks: [], gaps: [] }; pairsH.set(key2, r); }
+        r.tracks.push(m); r.gaps.push(gap);
+      }
+    }
+    const handoffs = [...pairsH.values()].filter((r) => r.tracks.length >= 3).sort((x, y) => y.tracks.length - x.tracks.length).slice(0, 5)
+      .map((r) => ({ a: r.a, b: r.b, an: label(r.a), bn: label(r.b), count: r.tracks.length, days: Math.round(r.gaps.reduce((x, y) => x + y, 0) / r.gaps.length), tracks: r.tracks.slice(0, 3) }));
     // the show most in tune with NTS: it played the most of the year's top 100
     const tune = new Map();
     all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
@@ -321,7 +341,7 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
-      inTune, deepCuts, characters, moments,
+      inTune, deepCuts, characters, moments, handoffs,
       // comebacks: old records (10+ years) that suddenly spread to many shows in one month
       comebacks: all.slice(0, 400).filter((m) => m.released && m.released <= y - 10).map((m) => {
         const vals = list.map((mm) => m.perMonth[mm] || 0);

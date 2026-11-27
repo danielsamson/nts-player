@@ -375,7 +375,9 @@ const Year = (() => {
   function setMode(m) {
     mode = m;
     if (m === 'play') { startPlay(); return; }
+    const hadFocus = YearPlay.active && box.querySelector('.yp')?.contains(document.activeElement);
     YearPlay.stop();
+    if (hadFocus || !box.contains(document.activeElement)) box.focus();      // focus stays in the year
     box.querySelectorAll('.year__mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
     box.classList.toggle('is-timeline', m === 'timeline');
     if (m === 'timeline') { timeline(y); return; }

@@ -1841,3 +1841,76 @@ body.playing .channel .track__time { color: var(--grey-3); }
 }
 
 .yp-filters { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---- halftone mono (nts.live's 404 page): grey frames printed with a coarse dot screen ---- */
+.yp-bg__dots { display: none; position: absolute; inset: 0; pointer-events: none; }
+.yp-bg--halftone { background: #2b2b2b; }
+.yp-bg--halftone .yp-bg__img img { filter: grayscale(1) contrast(1.5) brightness(.75) blur(.4px); }
+.yp-bg--halftone .yp-bg__ghost, .yp-bg--halftone .yp-bg__tint { display: none; }
+.yp-bg--halftone .yp-bg__dots { display: block; background: radial-gradient(circle at center, transparent 0 1.3px, #1e1e1e 2.1px) 0 0 / 5px 5px; mix-blend-mode: multiply; opacity: .95; }
+.yp-bg--halftone .yp-bg__scan { opacity: .4; }
+.yp-bg--halftone::after { background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,.5)); }
+.yp-bg--halftone.is-corrupt .yp-bg__slice img { filter: grayscale(1) contrast(2.2) brightness(1.1); }
+
+/* ---- the white panel (an Infinite Mixtape page): footage left, black on white right ---- */
+.yp-white { position: absolute; z-index: 2; top: 0; right: 0; bottom: 0; width: 58%; box-sizing: border-box; background: #f4f4f1; color: var(--black);
+  display: flex; flex-direction: column; justify-content: center; padding: 70px 4vw 52px; overflow: hidden; animation: ypPanelIn .7s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes ypPanelIn { from { transform: translateX(100%); } to { transform: none; } }
+.yp-white__head { display: flex; align-items: center; gap: 10px; font: 700 clamp(14px, 1.5vw, 18px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.yp-white__icon { font-size: 1.4em; line-height: 1; }
+.yp-white .yp-poster { filter: none; margin: 1.4vh 0 0; }
+.yp-white .yp-poster__line { color: var(--black); }
+.yp-white .yp-poster__line.is-outline { color: var(--black); }
+.yp-white__rule { height: 1px; background: var(--black); margin: 2vh 0; }
+.yp-white__foot { font: 400 clamp(13px, 1.4vw, 16px)/1.35 "NTS Condensed", "Arial Narrow", Arial, sans-serif; margin-top: 2vh; color: #333; max-width: 60ch; }
+/* the footage fills the space left of the panel */
+.yp-panelscene .yp-bg { right: 42%; }
+.yp-panelscene .yp-osd__date { right: calc(58% + 16px); }
+/* tiles */
+.yp-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(92px, 9vw, 132px), 1fr)); gap: 14px 12px; }
+.yp-tiles--five { grid-template-columns: repeat(5, 1fr); }
+.yp-tile { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--black); padding: 6px; background: #fff; }
+.yp-tile .yp-cover { box-shadow: none; background: #ddd; }
+.yp-tile__row { display: flex; justify-content: space-between; gap: 4px; margin: 6px 0 3px; font: 400 clamp(13px, 1.2vw, 16px)/1 "Tape", monospace; text-transform: uppercase; }
+.yp-tile__title { font: 700 clamp(11px, 1.1vw, 14px)/1.1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yp-tile__artist { font-size: clamp(10px, 1vw, 12px); color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yp-tile__tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 5px; }
+.yp-tile__tags span { border: 1px solid var(--black); padding: 1px 4px; font: 700 9px/1.2 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* genres on white */
+.yp-white .yp-genres { width: 100%; }
+.yp-white .yp-genre { border-bottom-color: rgba(0,0,0,.15); }
+.yp-white .yp-genre__bar { background: rgba(0,0,0,.08); }
+.yp-white .yp-genre__bar::after { background: var(--black); }
+.yp-white .yp-genre__move, .yp-white .yp-genre__move.is-up, .yp-white .yp-genre__move.is-down { color: var(--black); }
+.yp-white .yp-genre { grid-template-columns: 1.6em minmax(6em, 11em) 1fr 3em 1.2em; }
+@media (max-width: 559px) {
+  .yp-white { top: auto; left: 0; width: 100%; height: 72%; padding: 18px 16px 50px; justify-content: flex-start; animation-name: ypPanelUp; }
+  @keyframes ypPanelUp { from { transform: translateY(100%); } to { transform: none; } }
+  .yp-panelscene .yp-bg { right: 0; bottom: 72%; }
+  .yp-panelscene .yp-osd__date { right: 16px; }
+  .yp-tiles, .yp-tiles--five { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .yp-tile__tags { display: none; }
+  .yp-white .yp-genre { grid-template-columns: 1.4em 1fr 2.6em 1em; }
+}
+@media (prefers-reduced-motion: reduce) { .yp-white { animation: none; } }
+/* many tiles (a year of number ones): six across, just the essentials */
+.yp-tiles--many { grid-template-columns: repeat(6, 1fr); gap: 10px 8px; }
+.yp-tiles--many .yp-tile__artist, .yp-tiles--many .yp-tile__tags span:nth-child(2) { display: none; }
+.yp-tiles--many .yp-tile { padding: 4px; }
+/* over the white panel, the bars and buttons along the top invert */
+.yp.is-panel .yp-top { background: none; mix-blend-mode: difference; }
+.yp.is-panel .yp-topbtn { background: transparent; }
+@media (max-width: 559px) { .yp-tiles--many { grid-template-columns: repeat(4, 1fr); } .yp-tiles--many .yp-tile__tags { display: none; } }
+.yp-tile__row span { white-space: nowrap; }
+@media (max-width: 559px) {
+  .yp-white { height: 82%; padding: 14px 14px 44px; }
+  .yp-panelscene .yp-bg { bottom: 82%; }
+  .yp-white .yp-poster { width: 72%; }
+  .yp-white__rule { margin: 1vh 0; }
+  .yp-white__foot { display: none; }
+  .yp-white .yp-genre { padding: 5px 0; gap: 6px; }
+  .yp-white .yp-genre__name { font-size: 16px; }
+  .yp-white .yp-genre__bar { height: 8px; }
+  .yp-tiles--many { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .yp-tiles--many .yp-tile__row span:last-child { display: none; }
+}

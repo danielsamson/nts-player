@@ -33,8 +33,9 @@ const YearPlay = (() => {
   // the scene's backdrop, treated like a tape still: the cover (or NTS mood footage) full-bleed,
   // a colour cast, a ghost of itself slightly off to the side, drifting slowly
   // (extra: something else to show on the tape, like the wall of covers)
-  function backdrop(t, mood, extra) {
-    const b = el('div', 'yp-bg');
+  // halftone: grey, printed with a coarse dot screen (like nts.live's 404 page), instead of a colour cast
+  function backdrop(t, mood, extra, halftone = false) {
+    const b = el('div', `yp-bg${halftone ? ' yp-bg--halftone' : ''}`);
     const src = mood && moods[mood];
     const layer = (cls) => {
       if (src) { const w = el('div', `${cls} has-img`); const im = el('img'); im.alt = ''; im.src = src; w.append(im); return w; }
@@ -44,7 +45,7 @@ const YearPlay = (() => {
     if (extra) b.append(extra);
     // torn slices for the corrupted moments: copies of the picture, a band each, shoved sideways
     if (src || t) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
-    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'));
+    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__dots'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'));
     return b;
   }
   // now and then the tape corrupts: slices jump, colours bleed, the noise flares
@@ -159,6 +160,26 @@ const YearPlay = (() => {
     if (typeof content === 'string') g.textContent = content; else g.append(content);
     return g;
   }
+  // The white panel (like an Infinite Mixtape page): the footage on the left, black type on white
+  // on the right: an icon and label, the title, a rule, the content
+  function whitePanel({ icon, label, title, body, foot }) {
+    const p = el('aside', 'yp-white');
+    const head = el('div', 'yp-white__head');
+    head.append(el('span', 'yp-white__icon', icon), el('span', 'yp-white__label', label));
+    p.append(rise(head, 0.1), poster(title, { d: 0.2, max: 0.11, cls: 'yp-white__title' }), rise(el('div', 'yp-white__rule'), 0.4), body);
+    if (foot) p.append(rise(el('p', 'yp-white__foot', foot), 1.8));
+    return p;
+  }
+  // An archive tile, as on nts.live: the cover, a row with a date on the left and a count on the
+  // right, the title, the artist, outlined genre tags
+  function tile(t, left, right) {
+    const c = el('div', 'yp-tile');
+    const row = el('div', 'yp-tile__row'); row.append(el('span', null, left), el('span', null, right));
+    c.append(coverImg(t, 'yp-cover'), row, el('span', 'yp-tile__title', t.title), el('span', 'yp-tile__artist', t.artist));
+    if (t.tags?.length) { const tags = el('div', 'yp-tile__tags'); t.tags.forEach((g) => tags.append(el('span', null, g))); c.append(tags); }
+    c.title = `${t.artist} – ${t.title}`;
+    return c;
+  }
   // a line of tape type (the VHS screen font): labels, counts, dates
   const tape = (text, cls = '') => el('p', `yp-tape ${cls}`, text);
 
@@ -197,7 +218,7 @@ const YearPlay = (() => {
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
       box.append(g, poster([[`${once} of 100`, 'outline'], 'played once'], { d: 2.2, max: 0.2, cls: 'yp-poster--center yp-poster--narrow' }),
         rise(tape(`Only ${100 - once} came back, on any show.`, 'yp-tape--sub'), 2.9));
-      return [backdrop(null, 'don-t-assume'), box];
+      return [backdrop(null, 'don-t-assume', null, true), box];
     } });
 
     // 3. the countdown, 5 to 2: the number runs off the edge, the title stacks beside the cover
@@ -240,19 +261,11 @@ const YearPlay = (() => {
       return [backdrop(a1.top, null, runs), box];
     } });
 
-    // 6. number one, month by month
-    if ((s.numberOnes || []).length > 2) out.push({ dur: 9, build() {
-      const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['Number one', 'outline'], 'month by month'], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
-      const g = el('div', 'yp-ones yp-panel');
-      s.numberOnes.forEach((t, i) => {
-        const c = el('div', 'yp-one');
-        c.append(coverImg(t, 'yp-cover'), el('span', 'yp-one__month', monthShort(t.month)), el('span', 'yp-one__title', t.title), el('span', 'yp-one__artist', t.artist));
-        c.title = `${t.artist} – ${t.title}`;
-        g.append(rise(c, 0.5 + i * 0.3));
-      });
-      box.append(g);
-      return [backdrop(null, 'music-to-dance-to'), box];
+    // 6. number one, month by month: a white panel of archive tiles
+    if ((s.numberOnes || []).length > 2) out.push({ dur: 10, cls: 'yp-panelscene', build() {
+      const g = el('div', `yp-tiles${s.numberOnes.length > 6 ? ' yp-tiles--many' : ''}`);
+      s.numberOnes.forEach((t, i) => g.append(rise(tile(t, monthShort(t.month), `${t.shows} shows`), 0.6 + i * 0.22)));
+      return [backdrop(s.numberOnes[0], 'music-to-dance-to'), whitePanel({ icon: '✦', label: 'Number one, month by month', title: [['Number one', 'outline'], 'every month'], body: g })];
     } });
 
     // 7. the biggest leap: the rank counting down, huge, off the edge
@@ -283,23 +296,16 @@ const YearPlay = (() => {
         line.append(dot);
       });
       box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
-      return [backdrop(v.t, 'audio-research'), box];
+      return [backdrop(v.t, 'audio-research', null, true), box];
     } });
 
-    // 9. rising: new in the last three months
-    if ((s.breakouts || []).length >= 3) out.push({ dur: 8, track: s.breakouts[0], build() {
+    // 9. rising: new in the last three months, as tiles
+    if ((s.breakouts || []).length >= 3) out.push({ dur: 9, track: s.breakouts[0], cls: 'yp-panelscene', build() {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
-      const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['New since', 'outline'], since], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
-      const list = el('div', 'yp-list yp-panel');
-      s.breakouts.forEach((t, i) => {
-        const r = el('div', 'yp-list__row');
-        const tx = el('div', 'yp-rowtext'); tx.append(el('span', 'yp-list__title', t.title), el('span', 'yp-list__artist', `${t.artist} · ${t.shows} shows`));
-        r.append(el('span', 'yp-list__rank', String(i + 1)), coverImg(t, 'yp-cover yp-cover--row'), tx);
-        list.append(rise(r, 0.6 + i * 0.25));
-      });
-      box.append(list);
-      return [backdrop(s.breakouts[0]), box];
+      const g = el('div', 'yp-tiles yp-tiles--five');
+      s.breakouts.forEach((t, i) => g.append(rise(tile(t, `#${i + 1}`, `${t.shows} shows`), 0.6 + i * 0.22)));
+      return [backdrop(s.breakouts[0]), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
+        foot: 'First played in the last three months and already picked up by the most shows.' })];
     } });
 
     // 10. the long runner: 11 / 11, a month at a time lighting up
@@ -321,16 +327,14 @@ const YearPlay = (() => {
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way
     // each went (the last three months against the first three)
     const gen = story(s, 'genres');
-    if (gen) out.push({ dur: 9, build() {
+    if (gen) out.push({ dur: 9, cls: 'yp-panelscene', build() {
       const v = gen.viz;
       const avg = (rows, k) => rows.reduce((a, r) => a + (r[k] || 0), 0) / Math.max(1, rows.length);
       const n3 = Math.min(3, Math.floor(v.rows.length / 2));
       const list = v.keys.map((k) => ({ k, share: avg(v.rows, k), move: avg(v.rows.slice(-n3), k) - avg(v.rows.slice(0, n3), k) }))
         .sort((a, b) => b.share - a.share).slice(0, 6);
       const max = list[0]?.share || 1;
-      const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['The sound', 'outline'], 'of the year'], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
-      const chart = el('div', 'yp-genres yp-panel');
+      const chart = el('div', 'yp-genres');
       list.forEach((g, i) => {
         const row = el('div', 'yp-genre');
         const bar = el('span', 'yp-genre__bar');
@@ -343,8 +347,8 @@ const YearPlay = (() => {
           el('span', 'yp-genre__pct', `${Math.round(g.share * 100)}%`), tag);
         chart.append(rise(row, 0.5 + i * 0.25));
       });
-      box.append(chart, rise(tape('Share of the year’s episodes tagged with each genre · ▲▼ more or less by the end of the year', 'yp-tape--sub'), 2.2));
-      return [backdrop(null, 'lsd'), box];
+      return [backdrop(null, 'lsd'), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
+        foot: 'Share of the year’s episodes tagged with each genre. ▲ ▼ more or less of it by the end of the year.' })];
     } });
 
     // 12. tastemaker of the year
@@ -356,7 +360,7 @@ const YearPlay = (() => {
       const covers = el('div', 'yp-fan');
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));
       box.append(covers);
-      return [backdrop(taste.viz.rows[0]), box];
+      return [backdrop(taste.viz.rows[0], null, null, true), box];
     } });
 
     // 13. outro
@@ -369,7 +373,7 @@ const YearPlay = (() => {
       const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ url: 'https://www.nts.live/supporters' }); });
       acts.append(again, cards, sup);
       box.append(rise(acts, 0.9));
-      return [backdrop(t1, 'sedative'), box];
+      return [backdrop(t1, 'sedative', null, true), box];
     } });
     return out;
   }
@@ -381,6 +385,7 @@ const YearPlay = (() => {
     const stage = root.querySelector('.yp-stage');
     const scene = el('section', `yp-scene ${sc.cls || ''}`);
     scene.style.setProperty('--tint', TINTS[at % TINTS.length]);
+    root.classList.toggle('is-panel', (sc.cls || '').includes('yp-panelscene'));
     scene.append(...sc.build());
     inkLines(scene);
     stage.replaceChildren(scene);

@@ -161,13 +161,15 @@ const Chart = (() => {
       const top = rowsOf(f, 1)[0];
       if (top) numberOnes.push({ month: f.period, ...top });
       let ri = 0;
-      for (const [artist, title, e, idx, l, first, days] of f.tracks) {
+      for (const [artist, title, e, idx, l, first, days, fams] of f.tracks) {
         const k = `${n(artist)}|${n(title)}`;
         let m = tracks.get(k);
         if (!m) { m = { artist, title, episodes: 0, showSet: new Set(), monthSet: new Set(), perMonth: {}, firstBy: new Map(), latest: null, first }; tracks.set(k, m); }
         if (days) idx.forEach((i, j) => { const s = f.showList[i]; if (!m.firstBy.has(s) || days[j] < m.firstBy.get(s)) m.firstBy.set(s, days[j]); });
         if (e >= 2) { const yr = f.years?.[ri]; if (yr) m.released = yr; ri++; }
         m.perMonth[f.period] = idx.length;
+        // genres it was played under (episodes per genre family), for tags
+        if (fams && f.families) { m.genres ||= {}; fams.forEach(([fi, , ge]) => { const nm = f.families[fi]?.[1]; if (nm) m.genres[nm] = (m.genres[nm] || 0) + ge; }); }
         m.episodes += e;
         idx.forEach((i) => m.showSet.add(f.showList[i]));
         m.monthSet.add(f.period);
@@ -179,7 +181,13 @@ const Chart = (() => {
     const all = [...tracks.values()].map(({ showSet, monthSet, ...m }) => ({ ...m, shows: showSet.size, showSet, months: monthSet.size }))
       .filter((m) => m.episodes >= 2)
       .sort((a, b) => b.shows - a.shows || b.episodes - a.episodes);
-    all.forEach((m) => { m.latest.title = (names[m.latest.show] || [])[0] || showName(m.latest.show); });
+    all.forEach((m) => {
+      m.latest.title = (names[m.latest.show] || [])[0] || showName(m.latest.show);
+      m.tags = Object.entries(m.genres || {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => g);
+    });
+    // number ones get their tags too
+    const byKey = new Map(all.map((m) => [`${n(m.artist)}|${n(m.title)}`, m]));
+    numberOnes.forEach((t) => { t.tags = byKey.get(`${n(t.artist)}|${n(t.title)}`)?.tags || []; });
     // artists: across their tracks (split "A, B & C" into each artist)
     const artists = new Map();
     for (const m of all) {

@@ -111,9 +111,11 @@ const YearPlay = (() => {
   // Lines of type sized to fill their box's width, each sliding up out of a mask in turn.
   // lines: strings, or [text, 'outline'] for an outlined line. max: the tallest a line may get
   // (as a share of the window height), so a short word doesn't fill the whole screen.
-  function poster(lines, { d = 0, step = 0.14, max = 0.34, cls = '' } = {}) {
+  // even: every line the same size (one title over several lines), else each line fills the width
+  function poster(lines, { d = 0, step = 0.14, max = 0.34, cls = '', even = false } = {}) {
     const box = el('div', `yp-poster ${cls}`);
     box.dataset.max = max;
+    if (even) box.dataset.even = '1';
     lines.forEach((ln, i) => {
       const [text, style] = Array.isArray(ln) ? ln : [ln];
       const mask = el('span', `yp-poster__line${style ? ' is-' + style : ''}`);
@@ -130,11 +132,14 @@ const YearPlay = (() => {
       const W = box.clientWidth;
       if (!W) return;
       const cap = Number(box.dataset.max || 0.34) * window.innerHeight;
-      box.querySelectorAll('.yp-poster__line').forEach((line) => {
+      const lines = [...box.querySelectorAll('.yp-poster__line')];
+      const sizes = lines.map((line) => {
         line.style.fontSize = '100px';
         const w = line.querySelector('.yp-poster__inner').getBoundingClientRect().width || 1;
-        line.style.fontSize = `${Math.min(cap, (100 * W) / w)}px`;
+        return Math.min(cap, (100 * W) / w);
       });
+      const even = box.dataset.even ? Math.min(...sizes) : 0;
+      lines.forEach((line, i) => { line.style.fontSize = `${even || sizes[i]}px`; });
     });
   }
   // a numeral so big it runs off the edge of the screen, behind everything
@@ -179,9 +184,9 @@ const YearPlay = (() => {
       box.append(rise(tape('Of every 100 tracks played', 'yp-label'), 0));
       const g = el('div', 'yp-waffle yp-panel');
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
-      box.append(g, poster([`${once} played once.`], { d: 2.3, max: 0.16, cls: 'yp-poster--center' }),
+      box.append(g, poster([[`${once} of 100`, 'outline'], 'played once'], { d: 2.2, max: 0.2, cls: 'yp-poster--center yp-poster--narrow' }),
         rise(tape(`Only ${100 - once} came back, on any show.`, 'yp-tape--sub'), 2.9));
-      return [backdrop(null, 'don-t-assume'), giant(String(once), 'is-outline yp-giant-bg--center'), box];
+      return [backdrop(null, 'don-t-assume'), box];
     } });
 
     // 3. the countdown, 5 to 2: the number runs off the edge, the title stacks beside the cover
@@ -192,7 +197,7 @@ const YearPlay = (() => {
         const row = el('div', 'yp-split');
         row.append(rise(coverImg(t, 'yp-cover yp-cover--split'), 0.1));
         const tx = el('div', 'yp-splittext');
-        tx.append(poster(splitLines(t.title, t.title.length > 14 ? 3 : 2), { d: 0.25, max: 0.2 }),
+        tx.append(poster(splitLines(t.title, t.title.length > 14 ? 3 : 2), { even: true, d: 0.25, max: 0.2 }),
           rise(tape(`${t.artist}`, 'yp-tape--sub'), 0.6), rise(tape(`${fmt(t.shows)} shows`, 'yp-tape--sub'), 0.7));
         row.append(tx);
         box.append(row);
@@ -205,7 +210,7 @@ const YearPlay = (() => {
     if (t1) out.push({ dur: 11, track: t1, cls: 'yp-hero', build() {
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(coverImg(t1, 'yp-cover yp-cover--hero'), 0.3), rise(tape('Track of the year', 'yp-label'), 0.6),
-        poster(splitLines(t1.title, t1.title.length > 12 ? 2 : 1), { d: 0.9, max: 0.3 }));
+        poster(splitLines(t1.title, t1.title.length > 8 ? 2 : 1), { even: true, d: 0.9, max: 0.3, cls: 'yp-poster--beside' }));
       const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist} · played by `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' shows');
       box.append(rise(n, 1.4));
       return [backdrop(t1), el('div', 'yp-side', `Track of the year · ${year} · Track of the year · ${year}`), box];
@@ -227,7 +232,7 @@ const YearPlay = (() => {
     // 6. number one, month by month
     if ((s.numberOnes || []).length > 2) out.push({ dur: 9, build() {
       const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['Number one', 'outline'], 'month by month'], { d: 0, max: 0.13, cls: 'yp-poster--center yp-poster--narrow' }));
+      box.append(poster([['Number one', 'outline'], 'month by month'], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
       const g = el('div', 'yp-ones yp-panel');
       s.numberOnes.forEach((t, i) => {
         const c = el('div', 'yp-one');
@@ -245,7 +250,7 @@ const YearPlay = (() => {
       const t = leap.viz.t;
       const num = el('span'); num.append(counter(leap.viz.to, { from: leap.viz.from, prefix: '#', d: 0.6, ms: 2200 }));
       const box = el('div', 'yp-frame yp-frame--right');
-      box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { d: 2.3, max: 0.16 }),
+      box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
         rise(tape(`${t.artist} · #${leap.viz.from} → #${leap.viz.to} in a month`, 'yp-tape--sub'), 2.7));
       return [backdrop(t), giant(num, 'is-outline yp-giant-bg--left'), box];
     } });
@@ -255,7 +260,7 @@ const YearPlay = (() => {
     if (first) out.push({ dur: 9, track: first.viz.t, build() {
       const v = first.viz;
       const box = el('div', 'yp-frame yp-frame--bottom');
-      box.append(rise(tape('Who heard it first', 'yp-label'), 0), poster(splitLines(v.firsts[0].show, 2), { d: 0.2, max: 0.24 }),
+      box.append(rise(tape('Who heard it first', 'yp-label'), 0), poster(splitLines(v.firsts[0].show, 2), { even: true, d: 0.2, max: 0.24 }),
         rise(tape(`played ${v.t.title} (${v.t.artist}) before anyone else`, 'yp-tape--sub'), 0.7));
       const line = el('div', 'yp-strip yp-panel');
       const y0 = Date.UTC(v.year, 0, 1), y1 = Date.UTC(v.year + 1, 0, 1);
@@ -274,7 +279,7 @@ const YearPlay = (() => {
     if ((s.breakouts || []).length >= 3) out.push({ dur: 8, track: s.breakouts[0], build() {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
       const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['New since', 'outline'], since], { d: 0, max: 0.15, cls: 'yp-poster--center yp-poster--narrow' }));
+      box.append(poster([['New since', 'outline'], since], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
       const list = el('div', 'yp-list yp-panel');
       s.breakouts.forEach((t, i) => {
         const r = el('div', 'yp-list__row');
@@ -290,7 +295,7 @@ const YearPlay = (() => {
     const lr = s.evergreen?.[0];
     if (lr) out.push({ dur: 8, track: lr, build() {
       const box = el('div', 'yp-frame yp-frame--right');
-      box.append(rise(tape('The long runner', 'yp-label'), 0), poster(splitLines(lr.title, lr.title.length > 14 ? 3 : 2), { d: 0.2, max: 0.18 }),
+      box.append(rise(tape('The long runner', 'yp-label'), 0), poster(splitLines(lr.title, lr.title.length > 14 ? 3 : 2), { even: true, d: 0.2, max: 0.1 }),
         rise(tape(lr.artist, 'yp-tape--sub'), 0.6));
       const months = el('div', 'yp-months yp-panel');
       (s.monthList || []).forEach((m, i) => {
@@ -313,7 +318,7 @@ const YearPlay = (() => {
         .sort((a, b) => b.share - a.share).slice(0, 6);
       const max = list[0]?.share || 1;
       const box = el('div', 'yp-frame yp-frame--center');
-      box.append(poster([['The sound', 'outline'], 'of the year'], { d: 0, max: 0.13, cls: 'yp-poster--center yp-poster--narrow' }));
+      box.append(poster([['The sound', 'outline'], 'of the year'], { d: 0, max: 0.09, cls: 'yp-poster--center yp-poster--narrow' }));
       const chart = el('div', 'yp-genres yp-panel');
       list.forEach((g, i) => {
         const row = el('div', 'yp-genre');
@@ -335,7 +340,7 @@ const YearPlay = (() => {
     const taste = story(s, 'tastemaker');
     if (taste) out.push({ dur: 8, track: taste.viz.rows[0], build() {
       const box = el('div', 'yp-frame yp-frame--bottom');
-      box.append(rise(tape('Tastemaker of the year', 'yp-label'), 0), poster(splitLines(taste.headline, taste.headline.length > 16 ? 3 : 2), { d: 0.2, max: 0.15 }),
+      box.append(rise(tape('Tastemaker of the year', 'yp-label'), 0), poster(splitLines(taste.headline, taste.headline.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.15 }),
         rise(tape(taste.body, 'yp-tape--sub'), 0.8));
       const covers = el('div', 'yp-fan');
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));

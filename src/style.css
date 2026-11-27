@@ -1824,3 +1824,18 @@ body.playing .channel .track__time { color: var(--grey-3); }
   .yp-countdown .yp-giant-bg { color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,.7); }
   .yp-frame--center { padding-top: 92px; }
 }
+/* hierarchy: one lead per scene; supporting lines a clear step down but readable; labels small */
+.yp-tape--sub { font-size: clamp(22px, 2.7vw, 36px); padding: 5px 11px 3px; margin-top: 10px; }
+.yp-label { font-size: clamp(17px, 1.9vw, 24px); margin-bottom: 1.8vh; }
+.yp-poster--narrow.yp-poster--center { width: min(60vw, 640px); margin-bottom: 2vh; }
+.yp-poster--beside { width: 58%; }
+.yp-hero .yp-cover--hero { width: min(52vh, 34vw); top: 14vh; }
+.yp-waffle { width: min(52vw, 440px); }
+.yp-frame--center .yp-panel + .yp-poster { margin-top: 3vh; }
+.yp-tapenum .yp-count { font-size: clamp(34px, 5vw, 72px); }
+@media (max-width: 559px) {
+  .yp-tape--sub { font-size: 19px; }
+  .yp-poster--beside { width: 100%; }
+  .yp-hero .yp-cover--hero { width: 46vw; }
+  .yp-poster--narrow.yp-poster--center { width: 86vw; }
+}

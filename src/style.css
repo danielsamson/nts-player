@@ -2044,3 +2044,16 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-fan { gap: 14px; margin-top: 22px; }
 .yp-fan .yp-cover { width: clamp(90px, 15vh, 150px); margin: 0; transform: none !important; }
 @media (max-width: 559px) { .yp-countdown .yp-giant-bg--left { left: -2vw; top: 9vh; bottom: auto; font-size: 50vh; } .yp-strip { width: 100%; } }
+/* long runner: the cover as a small chip by the label */
+.yp-cover--chip { width: clamp(56px, 9vh, 90px); margin-bottom: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+/* the leap's rank: solid, counting */
+.yp-giant-bg--count { font-size: 62vh; bottom: 6vh; left: 3vw; letter-spacing: -.06em; color: rgba(255,255,255,.92); }
+/* the beat before number one */
+.yp-beat { background: #000; }
+/* the ending: the logo alone on black, then the tape and the words */
+.yp-endlogo { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; background: #000; pointer-events: none; animation: ypEndLogo 2.1s ease forwards; }
+.yp-endlogo img { width: clamp(70px, 12vh, 120px); filter: invert(1); }
+@keyframes ypEndLogo { 0% { opacity: 0; } 15% { opacity: 1; } 72% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+.yp.is-paused .yp-endlogo { animation-play-state: paused; }
+@media (max-width: 559px) { .yp-giant-bg--count { font-size: 30vh; top: 9vh; bottom: auto; } }
+@media (prefers-reduced-motion: reduce) { .yp-endlogo { display: none; } }

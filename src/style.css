@@ -2133,3 +2133,20 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-waffle { width: min(62vw, 560px); }
 .yp-waffle span { background: rgba(255,255,255,.22); }
 .yp-waffle span.is-again { background: var(--white); box-shadow: 0 0 18px 4px rgba(255,255,255,.75); }
+/* artist of the year: their covers along the top right */
+.yp-artistcovers { position: absolute; z-index: 2; top: 72px; right: 5vw; width: min(52vw, 640px); gap: 10px; }
+.yp-artistcovers figcaption { font-size: clamp(10px, 1vw, 13px); }
+/* countdown: bigger covers */
+.yp-cover--split { width: clamp(150px, 38vh, 400px); }
+@media (max-width: 559px) { .yp-artistcovers { top: 70px; left: 18px; right: 18px; width: auto; } .yp-artistcovers figcaption { display: none; } .yp-cover--split { width: 150px; } }
+.yp-artistcovers { display: none; }
+.yp-artistrec { position: absolute; z-index: 2; top: 76px; right: 5vw; width: min(30vw, 46vh); }
+.yp-artistrec .yp-cover { width: 100%; }
+.yp-tracklist { list-style: none; margin: 8px 0 0; padding: 0; background: #000; }
+.yp-tracklist li { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 8px; padding: 6px 10px; border-top: 1px solid rgba(255,255,255,.2); font: 700 clamp(11px, 1.1vw, 14px)/1.2 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.yp-tracklist li:first-child { border-top: 0; }
+.yp-tracklist li span:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yp-tracklist li span:nth-child(1), .yp-tracklist li span:nth-child(3) { font-weight: 400; color: rgba(255,255,255,.7); }
+@media (max-width: 559px) { .yp-artistrec { top: 70px; left: 18px; right: auto; width: 44vw; } .yp-tracklist { display: none; } }
+.yp-poster--artist { width: calc(100% - min(30vw, 46vh) - 4vw); }
+@media (max-width: 559px) { .yp-poster--artist { width: 100%; } }

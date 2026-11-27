@@ -420,10 +420,16 @@ const YearPlay = (() => {
       const runs = kinetic(a1.artist, { rows: 6, angle: -4, size: '13vw', solid: [2], opacity: 0.6 });
       const box = el('div', 'yp-frame yp-frame--bottom');
       const parts = splitLines(a1.artist, a1.artist.length > 10 ? 2 : 1);
-      box.append(rise(tape('Artist of the year', 'yp-label'), 0.1), poster(parts.map((p, i) => (i % 2 ? [p, 'outline'] : p)), { d: 0.3, max: 0.32 }));
+      box.append(rise(tape('Artist of the year', 'yp-label'), 0.1), poster(parts.map((p, i) => (i % 2 ? [p, 'outline'] : p)), { d: 0.3, max: 0.32, cls: 'yp-poster--artist' }));
       const n = tape('', 'yp-tape--sub'); n.append('Played by ', counter(a1.shows, { d: 0.9 }), ` shows · ${a1.tracks} different tracks`);
       box.append(rise(n, 0.9));
-      return [backdrop(a1.top, null, runs), box];
+      // the record, and their tracks NTS played, as a tracklist
+      const side = el('div', 'yp-artistrec');
+      side.append(rise(coverImg(a1.top, 'yp-cover'), 0.6));
+      const tl = el('ol', 'yp-tracklist');
+      (a1.list || [a1.top]).slice(0, 5).forEach((t, i) => { const li = el('li'); li.append(el('span', null, String(i + 1).padStart(2, '0')), el('span', null, t.title), el('span', null, `${t.shows} shows`)); tl.append(rise(li, 1 + i * 0.15)); });
+      side.append(tl);
+      return [backdrop(a1.top, null, runs), side, box];
     } });
 
     // 6. number one, month by month: a white panel of archive tiles

@@ -195,12 +195,13 @@ const Chart = (() => {
         const k = n(a);
         if (!k) continue;
         let r = artists.get(k);
-        if (!r) { r = { artist: a, showSet: new Set(), tracks: 0, top: m }; artists.set(k, r); }
+        if (!r) { r = { artist: a, showSet: new Set(), tracks: 0, top: m, list: [] }; artists.set(k, r); }
+        if (r.list.length < 6) r.list.push(m);
         m.showSet.forEach((s) => r.showSet.add(s));
         r.tracks++;
       }
     }
-    const topArtists = [...artists.values()].map((r) => ({ artist: r.artist, shows: r.showSet.size, tracks: r.tracks, top: r.top }))
+    const topArtists = [...artists.values()].map((r) => ({ artist: r.artist, shows: r.showSet.size, tracks: r.tracks, top: r.top, list: r.list }))
       .sort((a, b) => b.shows - a.shows || b.tracks - a.tracks).slice(0, 10);
     // rising: first played in the last three months, most shows first (the top 10 already has
     // the year's big ones, so these are the ones still on the way up)

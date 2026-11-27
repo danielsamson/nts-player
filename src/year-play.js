@@ -901,6 +901,52 @@ const YearPlay = (() => {
       return [backdrop(ho[0].tracks[0], null, null, true), box];
     } });
 
+    // great minds: same track, same day, different shows
+    const gm = s.greatMinds;
+    if (gm && gm.picks.length >= 2) out.push({ ch: 3.35, dur: 10, track: gm.picks[0].t, build() {
+      const box = el('div', 'yp-frame yp-minds');
+      box.append(rise(tape('Great minds', 'yp-label'), 0), poster([['Same track,', 'outline'], 'same day'], { d: 0.15, max: 0.11, cls: 'yp-deep__title' }));
+      const list = el('div', 'yp-minds__list');
+      gm.picks.forEach((x, i) => {
+        const row = el('div', 'yp-minds__row');
+        const day = new Date(x.day).toLocaleDateString(undefined, { day: 'numeric', month: 'long', timeZone: 'UTC' });
+        const tx = el('div', 'yp-minds__text');
+        tx.append(el('span', 'yp-minds__day', day), el('span', 'yp-minds__t', `${x.t.title} · ${x.t.artist}`), el('span', 'yp-minds__who', x.shows.join(' & ')));
+        row.append(coverImg(x.t, 'yp-cover'), tx);
+        list.append(rise(row, 0.6 + i * 0.25));
+      });
+      box.append(list, rise(tape(`It happened ${gm.count} times this year. Mostly by chance.`, 'yp-tape--sub'), 1.8));
+      return [backdrop(gm.picks[0].t), box];
+    } });
+
+    // pull one out: a record from the crate, at random; another every time you pull
+    const pool = s.lucky || [];
+    if (pool.length >= 10) out.push({ ch: 4.5, dur: 10, build() {
+      const box = el('div', 'yp-frame yp-pull');
+      box.append(rise(tape('Pull one out', 'yp-label'), 0), poster([['Somewhere', 'outline'], 'in the crate'], { d: 0.15, max: 0.1, cls: 'yp-deep__title' }));
+      const slot = el('div', 'yp-pull__slot');
+      const sleeve = el('button', 'yp-pull__sleeve');
+      sleeve.innerHTML = '<span>Pull a record</span>';
+      const info = el('div', 'yp-pull__info');
+      info.append(el('p', 'yp-tape yp-tape--sub', `${pool.length} records only one show played this year. Take your chances.`));
+      let left = pool.slice();
+      const pull = () => {
+        if (!left.length) left = pool.slice();
+        const t = left.splice(Math.floor(Math.random() * left.length), 1)[0];
+        const cov = coverImg(t, 'yp-cover yp-pull__cover');
+        slot.replaceChildren(cov, sleeve);
+        sleeve.querySelector('span').textContent = 'Another';
+        slot.classList.remove('is-out'); void slot.offsetWidth; slot.classList.add('is-out');
+        info.replaceChildren(el('span', 'yp-dive__title', t.title),
+          el('span', 'yp-dive__meta', `${t.artist}${t.released ? `, ${t.released}` : ''}. Only ${t.by} played it, ${t.episodes} times.`));
+        if (music) { playingKey = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`; crossTo(t); }
+      };
+      sleeve.addEventListener('click', (e) => { e.stopPropagation(); pull(); });
+      slot.append(sleeve);
+      box.append(rise(slot, 0.5), rise(info, 0.8));
+      return [backdrop(null, 'audio-research', null, true), box];
+    } });
+
     // your crate: what you kept, to play now (built when you get here)
     out.push({ ch: 5, dur: 8, cls: 'yp-cratescene', build() {
       const box = el('div', 'yp-frame yp-crate');

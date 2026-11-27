@@ -2341,3 +2341,32 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-dive__chip:hover { background: rgba(255,255,255,.12); color: var(--white); }
 .yp-dive__chip[aria-pressed="true"] { background: var(--white); color: #000; }
 .yp-dive__chips { background: rgba(0,0,0,.72); }
+
+/* great minds */
+.yp-minds { justify-content: center; padding-top: 96px; }
+.yp-minds__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 3vw; width: min(94vw, 980px); }
+.yp-minds__row { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.yp-minds__row .yp-cover { width: clamp(64px, 9vw, 110px); flex: 0 0 auto; }
+.yp-minds__text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.yp-minds__day { background: var(--white); color: #000; padding: 3px 7px 2px; font: 700 12px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.yp-minds__t { background: #000; padding: 3px 7px 2px; font: 700 clamp(13px, 1.4vw, 17px)/1.2 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.yp-minds__who { background: #000; padding: 3px 7px 2px; font: 400 clamp(12px, 1.3vw, 15px)/1.25 "NTS Condensed", "Arial Narrow", Arial, sans-serif; max-width: 100%; }
+/* pull one out */
+.yp-pull { justify-content: center; padding-top: 96px; flex-direction: column; }
+.yp-pull__slot { position: relative; width: min(36vh, 30vw); aspect-ratio: 1; margin: 6px 0 14px; }
+.yp-pull__sleeve { position: absolute; inset: 0; z-index: 2; background: #111 repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 2px, transparent 2px 9px); border: 1px solid rgba(255,255,255,.6);
+  display: grid; place-items: center; font: 700 clamp(14px, 1.6vw, 20px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; transition: transform .6s cubic-bezier(.2, .8, .2, 1), background .2s; }
+.yp-pull__sleeve:hover { background-color: #222; }
+.yp-pull__sleeve span { background: var(--white); color: #000; padding: 6px 10px 5px; }
+.yp-pull__slot .yp-pull__cover { position: absolute; inset: 0; width: 100%; z-index: 1; }
+/* pulled: the sleeve slides down out of the way, leaving the record with a strip of sleeve showing */
+.yp-pull__slot.is-out .yp-pull__sleeve { transform: translateY(84%); }
+.yp-pull__slot.is-out .yp-pull__cover { animation: ypPullUp .6s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes ypPullUp { from { transform: translateY(30%); } to { transform: none; } }
+.yp-pull__info { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 80px; max-width: min(90vw, 700px); }
+@media (max-width: 559px) { .yp-minds__list { grid-template-columns: 1fr; } .yp-pull__slot { width: 52vw; } }
+.yp-pull__slot.is-out .yp-pull__sleeve { transform: translateX(58%) rotate(2.5deg); z-index: 0; }
+.yp-pull__slot .yp-pull__cover { z-index: 1; box-shadow: 0 18px 50px rgba(0,0,0,.6); }
+.yp-pull__slot { margin-right: 20vh; }
+.yp-pull__slot.is-out .yp-pull__sleeve { place-items: center end; padding-right: 8px; }
+.yp-pull__slot.is-out .yp-pull__sleeve span { writing-mode: vertical-rl; padding: 10px 5px; }

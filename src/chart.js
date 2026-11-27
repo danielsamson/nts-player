@@ -335,6 +335,21 @@ const Chart = (() => {
     }
     const handoffs = [...pairsH.values()].filter((r) => r.tracks.length >= 3).sort((x, y) => y.tracks.length - x.tracks.length).slice(0, 5)
       .map((r) => ({ a: r.a, b: r.b, an: label(r.a), bn: label(r.b), count: r.tracks.length, days: Math.round(r.gaps.reduce((x, y) => x + y, 0) / r.gaps.length), tracks: r.tracks.slice(0, 3) }));
+    // great minds: two shows that had nothing to do with each other played the same track on the same day
+    const DAYMS = 864e5;
+    const sameDay = [];
+    for (const m of all) {
+      const byDay = new Map();
+      for (const [sh, d] of m.firstBy) { if (catchAll(sh, names) || SERIES.test(sh)) continue; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(sh); }
+      for (const [d, ss] of byDay) if (ss.length >= 2 && !ss.some((x) => m.theme === x)) sameDay.push({ t: m, day: d * DAYMS, shows: ss.slice(0, 3).map(label) });
+    }
+    // the most surprising first: tracks few shows played at all
+    sameDay.sort((a, b) => a.t.shows - b.t.shows || b.shows.length - a.shows.length);
+    const usedT = new Set();
+    const greatMinds = { count: sameDay.length, picks: sameDay.filter((x) => { const k = `${x.t.artist}|${x.t.title}`; if (usedT.has(k)) return false; usedT.add(k); return true; }).slice(0, 4) };
+    // a crate to pull from: tracks only one show played this year (and more than once), at random
+    const lucky = all.filter((m) => m.shows === 1 && m.latest && !m.theme && !catchAll(m.latest.show, names)).sort(() => Math.random() - 0.5).slice(0, 120)
+      .map((m) => ({ artist: m.artist, title: m.title, released: m.released, episodes: m.episodes, latest: m.latest, by: (names[m.latest.show] || [])[0] || showName(m.latest.show) }));
     // the show most in tune with NTS: it played the most of the year's top 100
     const tune = new Map();
     all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
@@ -349,7 +364,7 @@ const Chart = (() => {
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
-      inTune, deepCuts, characters, moments, handoffs,
+      inTune, deepCuts, characters, moments, handoffs, greatMinds, lucky,
       // comebacks: old records (10+ years) that suddenly spread to many shows in one month
       comebacks: all.slice(0, 400).filter((m) => m.released && m.released <= y - 10).map((m) => {
         const vals = list.map((mm) => m.perMonth[mm] || 0);

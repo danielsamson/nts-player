@@ -224,7 +224,8 @@ const Chart = (() => {
     breakouts.since = riseFrom;
     // long runners: played in most of the months (not just the busiest weeks)
     const minMonths = Math.max(4, Math.ceil(files.length * 0.4));     // NTS rarely repeats: 5 of 11 months is a long run
-    const evergreen = files.length >= 4 ? all.filter((m) => m.months >= minMonths && !m.theme).sort((a, b) => b.months - a.months || b.shows - a.shows).slice(0, 5) : [];
+    const top5 = new Set(all.slice(0, 5));                 // (already told in the countdown)
+    const evergreen = files.length >= 4 ? all.filter((m) => m.months >= minMonths && !m.theme && !top5.has(m)).sort((a, b) => b.months - a.months || b.shows - a.shows).slice(0, 5) : [];
     if (evergreen.length < 3) evergreen.length = 0;     // one or two isn't a story
     // shows that shared the most tracks
     const pairs = new Map();

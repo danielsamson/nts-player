@@ -11,7 +11,7 @@ const YearPlay = (() => {
   const monthShort = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
   const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let root = null, scenes = [], at = 0, paused = false, music = false, playingKey = null, opts = {};
+  let root = null, scenes = [], at = 0, paused = false, music = false, playingKey = null, opts = {}, auto = false, nudgeTimer = null;
   // NTS's own mood footage (the stills on its Explore page), for the scenes without a cover
   const moods = {};
   let moodsP = null;
@@ -28,7 +28,75 @@ const YearPlay = (() => {
       if (src) { img.src = src; wrap.classList.add('has-img'); }
     }).catch(() => {});
     wrap.append(img);
+    if (t.latest && Number.isFinite(t.latest.offset) && !/yp-bg|yp-wall|yp-ht/.test(cls)) {
+      wrap.classList.add('yp-hot', 'yp-playable');
+      wrap.dataset.tip = `${t.title} · ${t.artist}`;
+      wrap.addEventListener('click', (e) => {
+        e.stopPropagation();
+        playingKey = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
+        crossTo(t);
+        toast(`Playing ${t.title} where ${t.latest.title || 'a show'} played it`);
+      });
+    }
     return wrap;
+  }
+  // The mini player: what's playing, the track and the show it's from, at what point in the mix.
+  // Pause, and dig in (open the episode).
+  let unPlayer = null;
+  function miniPlayer() {
+    const p = el('div', 'yp-mini');
+    const art = el('div', 'yp-mini__art'); const im = el('img'); im.alt = ''; art.append(im);
+    const txt = el('div', 'yp-mini__text');
+    const trk = el('span', 'yp-mini__track'), from = el('span', 'yp-mini__from');
+    txt.append(trk, from);
+    const play = el('button', 'yp-mini__btn', '❚❚'); play.setAttribute('aria-label', 'Pause');
+    const dig = el('button', 'yp-mini__btn yp-mini__dig', 'Episode ›'); dig.title = 'Open the episode this is playing from';
+    p.append(art, txt, play, dig);
+    const fmt2 = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+    let artKey = '';
+    const paint = (st) => {
+      const ep = st.episode;
+      p.classList.toggle('is-on', !!(ep && (st.playing || st.loading || st.position)));
+      if (!ep) return;
+      const pos = st.position / 1000;
+      let cur = null;
+      for (const t of ep.tracks || []) { const o = t.offset ?? t.offset_estimate; if (o != null && o <= pos) cur = t; }
+      trk.textContent = cur ? `${cur.title} · ${cur.artist}` : (st.loading ? 'Loading…' : ep.title);
+      from.textContent = `${ep.title}${ep.date ? ' · ' + ep.date : ''} · ${fmt2(st.position)}`;
+      const k = cur ? `${cur.artist}|${cur.title}` : ep.img;
+      if (k !== artKey) {
+        artKey = k;
+        if (cur) Art.get({ artist: cur.artist, title: cur.title }, 'small').then((a) => { if (artKey === k) im.src = a?.small || a?.large || ep.img || ''; }).catch(() => { im.src = ep.img || ''; });
+        else im.src = ep.img || '';
+      }
+      play.textContent = st.playing ? '❚❚' : '▶';
+      play.setAttribute('aria-label', st.playing ? 'Pause' : 'Play');
+    };
+    play.addEventListener('click', (e) => { e.stopPropagation(); ArchivePlayer.toggle(); });
+    dig.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const ep = ArchivePlayer.state.episode; if (!ep) return;
+      opts.onClose?.(); Archive.showEpisode(ep.show, ep.episode);
+    });
+    unPlayer?.(); unPlayer = ArchivePlayer.onChange(paint); paint(ArchivePlayer.state);
+    return p;
+  }
+  // a short note at the bottom of the screen
+  let toastTimer = null;
+  function toast(text) {
+    let n = root?.querySelector('.yp-toast');
+    if (!root) return;
+    if (!n) { n = el('p', 'yp-toast'); root.append(n); }
+    n.textContent = text; n.classList.add('is-on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => n.classList.remove('is-on'), 3200);
+  }
+  // a show you can open: hover lifts it, click goes to its page (closing the year)
+  function showLink(node, alias) {
+    if (!alias) return node;
+    node.classList.add('yp-hot', 'yp-showlink');
+    node.dataset.tip = 'Open the show';
+    node.addEventListener('click', (e) => { e.stopPropagation(); opts.onClose?.(); Archive.showShow(alias); });
+    return node;
   }
   // the scene's backdrop, treated like a tape still: the cover (or NTS mood footage) full-bleed,
   // a colour cast, a ghost of itself slightly off to the side, drifting slowly
@@ -464,7 +532,8 @@ const YearPlay = (() => {
         const dot = el('span', i === 0 ? 'yp-strip__dot is-first' : 'yp-strip__dot');
         dot.style.left = `${((f.d - y0) / (y1 - y0)) * 100}%`;
         dot.style.setProperty('--d', `${1.1 + i * 0.12}s`);
-        dot.title = f.show;
+        dot.dataset.tip = `${f.show} · ${new Date(f.d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+        dot.classList.add('yp-hot');
         line.append(dot);
       });
       box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
@@ -565,6 +634,7 @@ const YearPlay = (() => {
         const c = el('div', 'yp-showtile');
         if (d.img) { const im = el('img'); im.alt = ''; im.src = bigPic(d.img); im.addEventListener('error', () => im.remove()); c.append(im); }
         c.append(el('span', null, d.name));
+        showLink(c, d.show);
         const size = 6 + Math.random() * 8;                        // vw
         c.style.cssText = `--x:${-8 + Math.random() * 108}%;--y:${-12 + Math.random() * 112}%;--w:${size}vw;--r:${(Math.random() - 0.5) * 16}deg;--z:${Math.round(size)};--d:${0.2 + i * 0.05}s;--dr:${(Math.random() - 0.5) * 6}vw;--bg:${TINTS[i % TINTS.length]}`;
         field.append(c);
@@ -579,7 +649,7 @@ const YearPlay = (() => {
     if (tuneS && tuneS.count >= 5) out.push({ dur: 8, track: tuneS.tracks[0], build() {
       const box = el('div', 'yp-frame yp-artsplit');
       const l = el('div', 'yp-artsplit__text');
-      l.append(rise(tape('In tune with NTS', 'yp-label'), 0), poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }));
+      l.append(rise(tape('In tune with NTS', 'yp-label'), 0), showLink(poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }), tuneS.show));
       const n = tape('', 'yp-tape--sub'); const ahead = (s.inTune || []).filter((x) => x.count > tuneS.count);
       n.append('Played ', counter(tuneS.count, { d: 0.8, ms: 1100 }), ` of the year’s top 100 tracks. ${!ahead.length ? 'More than any other show.' : ahead.length === 1 ? `Second only to ${ahead[0].name}.` : `Only ${ahead.length} shows played more.`}`);
       l.append(rise(n, 0.7));
@@ -591,8 +661,8 @@ const YearPlay = (() => {
     if (pr && pr.count >= 3) out.push({ dur: 8, track: pr.tracks?.[0], build() {
       const amp = el('div', 'yp-amp', '&');
       const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ' tracks in common, among them:');
-      const box = artSplit([rise(tape('Shared taste', 'yp-label'), 0), poster(splitLines(nm(pr.a), 2), { even: true, d: 0.2, max: 0.15 }), rise(amp, 0.45),
-        poster(splitLines(nm(pr.b), 2), { even: true, d: 0.6, max: 0.15 }), rise(n, 1)],
+      const box = artSplit([rise(tape('Shared taste', 'yp-label'), 0), showLink(poster(splitLines(nm(pr.a), 2), { even: true, d: 0.2, max: 0.15 }), pr.a), rise(amp, 0.45),
+        showLink(poster(splitLines(nm(pr.b), 2), { even: true, d: 0.6, max: 0.15 }), pr.b), rise(n, 1)],
         coverGrid((pr.tracks || []).slice(0, 4), { cols: 2, d: 1.1, cls: 'yp-artsplit__art' }));
       return [backdrop(pr.tracks?.[0], 'the-healing-place'), box];
     } });
@@ -634,16 +704,20 @@ const YearPlay = (() => {
     corrupt(bg, true);
     if (!reduced()) hiss();
     clearTimeout(glitchTimer);
-    const again = () => { glitchTimer = setTimeout(() => { if (!paused) corrupt(bg); if (bg?.isConnected) again(); }, 1400 + Math.random() * 3600); };
+    const again = () => { glitchTimer = setTimeout(() => { if (!paused) corrupt(bg); if (bg?.isConnected) again(); }, 3200 + Math.random() * 6000); };   // now and then, not constantly
     again();
     root.querySelectorAll('.yp-bar').forEach((b, j) => {
       b.classList.toggle('is-done', j < at);
       b.classList.toggle('is-on', j === at);
       const fill = b.firstChild;
       fill.style.animation = 'none'; void fill.offsetWidth; fill.style.animation = '';
-      fill.style.animationDuration = `${scenes[j].dur || 1}s`;
+      fill.style.animationDuration = `${(scenes[j].dur || 1) * 1.6}s`;     // auto runs slower than the old reel
     });
     if (play) setPaused(false);
+    root.classList.toggle('is-manual', !auto);
+    clearTimeout(nudgeTimer);
+    root.querySelector('.yp-nudge')?.classList.remove('is-on');
+    if (!auto && at < scenes.length - 1) nudgeTimer = setTimeout(() => root?.querySelector('.yp-nudge')?.classList.add('is-on'), 6000);
     if (music && sc.track && playable(sc.track)) {
       const t = sc.track, k = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
       if (k !== playingKey) { playingKey = k; crossTo(t); }
@@ -713,22 +787,41 @@ const YearPlay = (() => {
   // start: the first screen asks with or without music, then plays
   function start(container, s, o = {}) {
     stop();
-    opts = o; music = false; playingKey = null;
+    opts = o; music = false; playingKey = null; auto = false;
     scenes = build(s);
     root = el('div', 'yp');
     const bars = el('div', 'yp-bars');
     scenes.forEach((sc) => { const b = el('span', 'yp-bar'); b.append(el('i')); if (!sc.dur) b.classList.add('is-last'); bars.append(b); });
     const top = el('div', 'yp-top');
+    // Auto: plays itself (slower); otherwise it waits for you
+    const autoBtn = el('button', 'yp-topbtn', 'Auto');
+    autoBtn.setAttribute('aria-pressed', 'false');
+    autoBtn.title = 'Play through by itself';
+    autoBtn.addEventListener('click', (e) => { e.stopPropagation(); auto = !auto; autoBtn.setAttribute('aria-pressed', String(auto)); show(at, true); });
     const browse = el('button', 'yp-topbtn', 'Cards');
     browse.title = 'Browse the year as cards';
     browse.addEventListener('click', (e) => { e.stopPropagation(); opts.onBrowse?.(); });
     const close = el('button', 'yp-topbtn yp-close', '×');
     close.setAttribute('aria-label', 'Close');
     close.addEventListener('click', (e) => { e.stopPropagation(); opts.onClose?.(); });
-    top.append(bars, browse, close);
+    top.append(bars, autoBtn, browse, close);
     const stage = el('div', 'yp-stage');
-    const hint = el('p', 'yp-hint', 'Click for the next one · hold to pause');
-    root.append(stage, osd(s.year), top, hint, outlineFilters());
+    const hint = el('p', 'yp-hint', 'Take your time · click or → for the next · hover and click things to explore');
+    const nudge = el('p', 'yp-nudge', 'Click to continue ›');
+    root.append(stage, osd(s.year), top, hint, nudge, miniPlayer(), outlineFilters());
+    // a label that follows the cursor over anything with a tip
+    const tip = el('p', 'yp-tip'); root.append(tip);
+    root.addEventListener('pointermove', (e) => {
+      const h = e.target.closest?.('[data-tip]');
+      tip.classList.toggle('is-on', !!h);
+      if (h) { tip.textContent = h.dataset.tip; tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 18}px`; }
+    });
+    // the cursor: the picture drifts against it, the giant numbers the other way
+    root.addEventListener('pointermove', (e) => {
+      const r = root.getBoundingClientRect();
+      root.style.setProperty('--mx', ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+      root.style.setProperty('--my', ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+    });
     jitter();
     onResize = () => root && fitPosters(root);
     window.addEventListener('resize', onResize);
@@ -736,7 +829,7 @@ const YearPlay = (() => {
     container.append(root);
 
     // the bar filling up is the timer: when it ends, the next scene
-    bars.addEventListener('animationend', (e) => { if (e.target.parentElement === bars.children[at]) next(); });
+    bars.addEventListener('animationend', (e) => { if (auto && e.target.parentElement === bars.children[at]) next(); });
     // click: left third goes back, the rest forward; holding pauses
     let downAt = 0, holdTimer = null;
     root.addEventListener('pointerdown', (e) => {
@@ -746,7 +839,7 @@ const YearPlay = (() => {
     });
     root.addEventListener('pointerup', (e) => {
       clearTimeout(holdTimer);
-      if (e.target.closest('button') || root.querySelector('.yp-gate')) return;
+      if (e.target.closest('button, .yp-hot') || root.querySelector('.yp-gate')) return;
       if (Date.now() - downAt > 220) { setPaused(false); return; }
       if (e.clientX < root.clientWidth / 3) prev(); else next();
     });
@@ -773,7 +866,7 @@ const YearPlay = (() => {
     setTimeout(() => withMusic.focus(), 50);
   }
   let onResize = null;
-  function stop() { clearInterval(fadeTimer); stopInner(); }
+  function stop() { clearInterval(fadeTimer); unPlayer?.(); unPlayer = null; stopInner(); }
   function stopInner() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {

@@ -180,7 +180,9 @@ const Chart = (() => {
         m.monthSet.add(f.period);
         m.first = Math.min(m.first, first);
         const lat = { show: f.showList[l[0]], episode: l[1], offset: l[2], d: l[3] };
-        if (!m.latest || lat.d > m.latest.d) m.latest = lat;
+        // the episode to play it from: the latest one where we know when it was played, else the latest
+        const timed = (x) => x && Number.isFinite(x.offset);
+        if (!m.latest || (timed(lat) && !timed(m.latest)) || (lat.d > m.latest.d && (timed(lat) || !timed(m.latest)))) m.latest = lat;
       }
     }
     const all = [...tracks.values()].map(({ showSet, monthSet, ...m }) => ({ ...m, shows: showSet.size, showSet, months: monthSet.size }))

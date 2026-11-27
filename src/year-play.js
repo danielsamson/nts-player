@@ -28,7 +28,7 @@ const YearPlay = (() => {
       if (src) { img.src = src; wrap.classList.add('has-img'); }
     }).catch(() => {});
     wrap.append(img);
-    if (t.latest && Number.isFinite(t.latest.offset) && !/yp-bg|yp-wall|yp-ht/.test(cls)) {
+    if (t.latest?.episode && !/yp-bg|yp-wall|yp-ht/.test(cls)) {
       wrap.classList.add('yp-hot', 'yp-playable');
       wrap.dataset.tip = `${t.title} · ${t.artist}${t.released ? ` · ${t.released}` : ''}`;
       wrap.append(keepButton(t));
@@ -267,7 +267,26 @@ const YearPlay = (() => {
     return n;
   }
   const story = (s, id) => (s.stories || []).find((x) => x.id === id);
-  const playable = (t) => t?.latest && Number.isFinite(t.latest.offset);
+  const playable = (t) => !!t?.latest?.episode;
+  // Where in the episode the track starts: the chart's time, else NTS's tracklist (its exact or
+  // estimated time for that track), else the start of the episode
+  const offsets = new Map();
+  const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  async function offsetOf(t) {
+    if (Number.isFinite(t.latest.offset)) return t.latest.offset;
+    const k = `${t.latest.show}/${t.latest.episode}|${norm(t.title)}`;
+    if (offsets.has(k)) return offsets.get(k);
+    let o = 0;
+    try {
+      const tl = await window.nts.api(`/api/v2/shows/${t.latest.show}/episodes/${t.latest.episode}/tracklist`);
+      const want = norm(t.title);
+      const hit = (tl?.results || []).find((x) => norm(x.title) === want) || (tl?.results || []).find((x) => norm(x.title).includes(want) || want.includes(norm(x.title)));
+      const v = hit?.offset ?? hit?.offset_estimate;
+      if (Number.isFinite(v)) o = v;
+    } catch {}
+    offsets.set(k, o);
+    return o;
+  }
 
   // Outlined type: the text drawn solid, then shrunk and cut out of itself, leaving just the
   // edge of each letter's silhouette (a text stroke would also trace the overlapping pieces
@@ -484,7 +503,7 @@ const YearPlay = (() => {
     // 3. the countdown, 5 to 2: the number runs off the edge, the title stacks beside the cover
     top.slice(1, 5).reverse().forEach((t, i) => {
       const rank = 5 - i;
-      out.push({ dur: [3.2, 3.4, 3.8, 4.6][i], cls: 'yp-countdown', build() {     // no music change: four tracks in a few seconds would just stutter
+      out.push({ dur: [3.2, 3.4, 3.8, 4.6][i], track: t, cls: 'yp-countdown', build() {
         const box = el('div', 'yp-frame yp-frame--right');
         const row = el('div', 'yp-split');
         row.append(rise(coverImg(t, 'yp-cover yp-cover--split'), 0.1));
@@ -911,7 +930,6 @@ const YearPlay = (() => {
     clearTimeout(cutTimer); cutTimer = setTimeout(() => root?.classList.remove('is-cut'), 450);
     const bg = scene.querySelector('.yp-bg');
     corrupt(bg, true);
-    if (!reduced()) hiss();
     clearTimeout(glitchTimer);
     const again = () => { glitchTimer = setTimeout(() => { if (!paused) corrupt(bg); if (bg?.isConnected) again(); }, 3200 + Math.random() * 6000); };   // now and then, not constantly
     again();
@@ -948,24 +966,20 @@ const YearPlay = (() => {
       if (p >= 1) { clearInterval(fadeTimer); done?.(); }
     }, 40);
   }
+  let lastWanted = '';
   function crossTo(t) {
     const target = level();
     const playing = ArchivePlayer.state.playing;
-    const go = () => { ArchivePlayer.setVolume(0); Archive.playFrom(t.latest.show, t.latest.episode, t.latest.offset).then(() => setTimeout(() => ramp(0, target, 1100), 500)); };
+    const want = `${t.latest.show}/${t.latest.episode}|${t.title}`;
+    lastWanted = want;
+    const go = async () => {
+      const off = await offsetOf(t);
+      if (lastWanted !== want) return;                     // you've moved on already
+      ArchivePlayer.setVolume(0);
+      await Archive.playFrom(t.latest.show, t.latest.episode, off);
+      setTimeout(() => ramp(0, target, 1100), 500);
+    };
     if (playing) ramp(target, 0, 450, go); else go();
-  }
-  // tape hiss on the hard cuts: a short burst of filtered noise, quiet
-  let actx = null;
-  function hiss(ms = 260, gain = 0.05) {
-    try {
-      actx ||= new AudioContext();
-      const n = Math.floor(actx.sampleRate * ms / 1000), buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
-      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-      const src = actx.createBufferSource(); src.buffer = buf;
-      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 0.6;
-      const g = actx.createGain(); g.gain.value = gain * level() / 0.8;
-      src.connect(bp).connect(g).connect(actx.destination); src.start();
-    } catch {}
   }
   let cutTimer = null, glitchTimer = null, clock = null, t0 = 0, held = 0;
   function setPaused(p) {

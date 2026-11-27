@@ -17,7 +17,7 @@ const sitemap = require('../sitemap');
 
 const API = 'https://www.nts.live/api/v2';
 const KEEP_TRACKS = 2000;            // per file, most played first (enough to merge into a year)
-const VERSION = 4;                   // bump when files gain data: older ones are rebuilt a year at a time
+const VERSION = 5;                   // bump when files gain data: older ones are rebuilt a year at a time
 const DAY = 864e5;
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -121,7 +121,9 @@ async function build(period) {
         ar.tracks.add(t); ar.shows.add(r.show);
       }
       m.first = Math.min(m.first, r.d);
-      if (!m.latest || r.d > m.latest.d) m.latest = { s: r.show, ep: r.episode, o: x.offset ?? x.offset_estimate ?? null, d: r.d };
+      // the episode to play it from: prefer one where the tracklist says when it was played
+      const o = x.offset ?? x.offset_estimate ?? null;
+      if (!m.latest || (o != null && m.latest.o == null) || (r.d > m.latest.d && (o != null || m.latest.o == null))) m.latest = { s: r.show, ep: r.episode, o, d: r.d };
     }
   });
 

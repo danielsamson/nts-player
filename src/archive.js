@@ -388,7 +388,8 @@ const Archive = (() => {
     const title = el('h1', 'broadcast-heading', t.title);
     const artist = el('p', 'track-page__artist', t.artist);
     const album = el('p', 'detail__meta');
-    const from = el('div', 'track-page__from');
+    const playBox = el('div', 'track-page__playbox');     // Play from: first thing under the title
+    const from = el('div', 'track-page__from');           // the episodes it was played on
     const actions = el('div', 'track-page__actions');
     const save = el('button', 'mynts-btn');
     save.hidden = true;
@@ -404,8 +405,13 @@ const Archive = (() => {
     const linksLabel = el('span', 'stage__links-label', 'Find it on');
     const linksList = el('span', 'stage__links-list');
     linksNav.append(linksLabel, linksList);
-    body.append(title, artist, album, from, linksNav, actions);
-    wrap.append(picWrap, body);
+    // a compact head: small cover beside the title, so Play from and the actions are in view
+    const headText = el('div', 'track-page__headtext');
+    headText.append(title, artist, album);
+    const head = el('div', 'track-page__head');
+    head.append(picWrap, headText);
+    body.append(playBox, actions, linksNav, from);
+    wrap.append(head, body);
     root.replaceChildren(backBar(current.type === 'track' && !current.returnLive && !current.origin ? 'Saved track' : 'Track'), wrap);
 
     Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
@@ -429,7 +435,7 @@ const Archive = (() => {
         } catch { showSnack('Couldn’t load the episode'); }
         playFrom.textContent = label;
       });
-      from.append(playFrom);
+      playBox.append(playFrom);
     }
     if (info.plays.length) {
       from.append(el('p', 'track-page__played', info.plays.length > 1 ? 'Played on' : 'Played on'));
@@ -907,11 +913,13 @@ const Archive = (() => {
     }
     return null;
   }
-  function luckyButton() {
-    const b = el('button', 'lucky');
+  // On Home; and on the episode it picked, as "Try another" (again: true)
+  function luckyButton({ again = false } = {}) {
+    const b = el('button', 'lucky' + (again ? ' lucky--again' : ''));
     b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17"/><circle cx="8.5" cy="8.5" r="1.4"/><circle cx="15.5" cy="15.5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="15.5" cy="8.5" r="1.4"/><circle cx="8.5" cy="15.5" r="1.4"/></svg>';
-    const label = el('span', 'lucky__label', 'I’m feeling lucky');
-    const sub = el('span', 'lucky__sub', 'A random episode from anywhere in the archive');
+    const label = el('span', 'lucky__label', again ? 'Try another' : 'I’m feeling lucky');
+    const subText = again ? 'Not for you? Another random episode' : 'A random episode from anywhere in the archive';
+    const sub = el('span', 'lucky__sub', subText);
     b.append(label, sub);
     b.addEventListener('click', async () => {
       if (b.classList.contains('is-busy')) return;
@@ -919,9 +927,9 @@ const Archive = (() => {
       sub.textContent = 'Digging through the archive…';
       const ep = await randomEpisode();
       b.classList.remove('is-busy');
-      sub.textContent = 'A random episode from anywhere in the archive';
+      sub.textContent = subText;
       if (!ep) { showSnack('Couldn’t find one this time. Try again'); return; }
-      go({ type: 'episode', show: ep.show, episode: ep.episode });
+      go({ type: 'episode', show: ep.show, episode: ep.episode, lucky: true });
       Archive.playFrom(ep.show, ep.episode, 0);
     });
     return b;
@@ -1054,6 +1062,7 @@ const Archive = (() => {
       });
       paintAuto();
       body.append(playBtn, startOver, autoplay, mynts);
+      if (current.lucky) body.append(luckyButton({ again: true }));
       if (ep.description) body.append(el('p', 'broadcast-description detail__desc', ep.description));
       if (url) {
         const sc = el('a', 'text-link detail__source', 'Audio via SoundCloud');

@@ -277,10 +277,12 @@ function renderNowbar() {
     paintNowArt(nowArtUrl);
     document.title = `NTS Archive · ${a.episode.title}`;
   } else {
-    $('nowKind').textContent = '';
+    // like the archive: a channel badge, then the show on air (the header tabs cut it short)
+    const onAir = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
+    $('nowKind').textContent = onAir ? `NTS ${channel + 1}` : '';
     $('nowArt').hidden = false;
     paintNowArt(playing && LiveNow?.track ? liveArtUrl : '');
-    $('nowLabel').textContent = `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
+    $('nowLabel').textContent = onAir || `${playing ? 'Playing' : 'Play'} NTS ${channel + 1}`;
     const lt = LiveNow?.track;
     $('next').textContent = !navigator.onLine ? 'Offline · waiting for a connection'
       : playing && reconnecting ? 'Reconnecting…'
@@ -710,6 +712,15 @@ function renderTracks(info) {
       onClick: () => { Archive.showTrack(t.artist, t.title, { fromLive: true }); render(); }
     })));
   }
+  // A repeat (or a show with a tracklist) plays the recording from the start of its slot:
+  // mark the track that should be playing now, from the time since the slot started
+  const started = Date.parse(info.start);
+  let idx = -1;
+  if (started && tl.tracks.length) {
+    const elapsed = (Date.now() - started) / 1000;
+    tl.tracks.forEach((t, i) => { const o = t.offset ?? t.offset_estimate; if (o != null && o <= elapsed) idx = i; });
+  }
+  [...list.children].forEach((li, i) => li.classList.toggle('track--now', i === idx));
 }
 
 // ---- NTS Supporter live tracklist (NTS's own page, in your NTS session) ----

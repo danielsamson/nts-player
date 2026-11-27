@@ -705,11 +705,19 @@ body.playing .track__art { background: var(--grey-1); }
 
 /* ---- Track page ---- */
 .track-page .picture { aspect-ratio: 1 / 1; }
+/* compact head: cover beside the title */
+.track-page__head { display: flex; gap: 14px; align-items: flex-start; padding: 12px; border-bottom: var(--rule); }
+.track-page__head .picture-wrap { padding: 0; border: 0; width: 112px; flex: 0 0 112px; }
+.track-page__headtext { min-width: 0; display: flex; flex-direction: column; justify-content: center; align-self: center; }
+.track-page__headtext .broadcast-heading { font-size: 22px; line-height: 25px; overflow-wrap: anywhere; }
+.track-page__playbox:empty { display: none; }
+.track-page__playbox { margin: 4px 0 12px; }
+.track-page__playbox .episode-play { width: 100%; }
 .track-page__art--none::after {
   content: ""; position: absolute; inset: 22%; border-radius: 50%;
   border: 1px solid var(--grey-3); box-shadow: inset 0 0 0 40px var(--grey-4), inset 0 0 0 41px var(--grey-3);
 }
-.track-page__artist { font-size: 18px; line-height: 22px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+.track-page__artist { font-size: 16px; line-height: 20px; font-weight: 700; text-transform: uppercase; margin: 4px 0; }
 .track-page__from { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 .track-page__from:empty { display: none; }
 .track-page__from .detail__show { margin: 0; text-align: left; }
@@ -972,8 +980,10 @@ body.offline .nowbar__next { color: var(--live); }
 .live-list .tracks__note:empty { display: none; }
 .live-list .loader { padding: 4px 0; }
 .live-list .archive-tracks { padding: 0; }
-body.playing .live-list .track--now { background: var(--black); color: var(--white); }
-body.playing .live-list .track--now .track__time, body.playing .live-list .track--now .track__copy { color: var(--white); }
+body.playing .live-list .track--now, body.playing #episodeTracks .track--now { background: var(--black); color: var(--white); }
+body.playing .live-list .track--now .track__time, body.playing .live-list .track--now .track__copy,
+body.playing #episodeTracks .track--now .track__time, body.playing #episodeTracks .track--now .track__copy { color: var(--white); }
+body.playing #episodeTracks .track--now .track__art { outline-color: var(--white); }
 
 .settings__account { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .settings__account .settings__label { width: 100%; }
@@ -1041,7 +1051,8 @@ body.mini .volume { padding: 0; }
 .track__save--on { color: var(--white); }
 .track__save--on svg { fill: currentColor; }
 .track--now .track__save, .track--now .track__copy { color: var(--black); }
-body.playing .live-list .track--now .track__save, body.playing .live-list .track--now .track__copy { color: var(--white); }
+body.playing .live-list .track--now .track__save, body.playing .live-list .track--now .track__copy,
+body.playing #episodeTracks .track--now .track__copy { color: var(--white); }
 body:not(.mini) .mini-exit { display: none; }
 
 /* Track row: play-from and save */
@@ -1208,6 +1219,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .lucky__label { font-size: 14px; line-height: 18px; font-weight: 700; text-transform: uppercase; }
 .lucky__sub { font-size: 12px; line-height: 16px; color: var(--grey-2); }
 .lucky:hover { background: var(--white); color: var(--black); }
+.lucky--again { margin-top: 12px; border: var(--rule); }
 .lucky:hover .lucky__sub { color: var(--grey-3); }
 .lucky.is-busy svg { animation: luckyRoll .6s linear infinite; }
 @keyframes luckyRoll { to { transform: rotate(360deg); } }

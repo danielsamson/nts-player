@@ -1,16 +1,77 @@
 {
   "about": "Hand-checked context for the moments in NTS in 2026: one line per artist spike, with a source. Spikes without an entry show without a caption.",
   "moments": [
-    { "artist": "Duval Timothy", "month": "2026-02", "text": "From his score with CJ Mirra for the film My Father's Shadow, out in January.", "source": "https://crackmagazine.net/2026/01/duval-timothy-cj-mirra-for-my-fathers-shadow-film-score/" },
-    { "artist": "CJ Mirra", "month": "2026-02", "text": "From the score for the film My Father's Shadow, with Duval Timothy, out in January.", "source": "https://crackmagazine.net/2026/01/duval-timothy-cj-mirra-for-my-fathers-shadow-film-score/" },
-    { "artist": "Inrain", "month": "2026-03", "text": "A 1991 Rough Trade single, reissued by Music From Memory in April.", "source": "https://www.testpressing.org/magazine/chemical-reactions-looking-back-on-inrain-with-rudy-tambala" },
-    { "artist": "Tara Clerkin Trio", "month": "2026-06", "text": "Somewhere Good, their second album, out 5 June on World of Echo.", "source": "https://thequietus.com/news/tara-clerkin-trio-detail-new-album-somewhere-good/" },
-    { "artist": "Kelela", "month": "2026-05", "text": "The singles before new avatar, her album on Warp in July.", "source": "https://consequence.net/2026/05/kelela-album-new-avatar-linknb/" },
-    { "artist": "Boards of Canada", "month": "2026-05", "text": "Inferno, their first album in 13 years, out on Warp on 29 May.", "source": "https://mixmag.net/read/boards-of-canada-return-with-first-album-in-13-years-inferno-news" },
-    { "artist": "Miles Davis", "month": "2026-05", "text": "Born 26 May 1926: his centenary.", "source": "https://en.wikipedia.org/wiki/Miles_Davis" },
-    { "artist": "Dolly Parton", "month": "2026-09", "text": "Died 25 August, aged 80. Shows paid tribute into September.", "source": "https://www.opb.org/article/2026/08/25/dolly-parton-iconic-songwriter-singer-and-actor-has-died-at-80/" },
-    { "artist": "Stevie Wonder", "month": "2026-10", "text": "Songs in the Key of Life turned 50; the anniversary tour opened 13 October.", "source": "https://stereogum.com/2510671/stevie-wonder-announces-songs-in-the-key-of-life-tour-readies-outtakes-for-new-album/news" },
-    { "artist": "YL Hooi", "month": "2026-10", "text": "Running Around (83), a long-running live favourite, out on Efficient Space in October.", "source": "https://ylhooi.bandcamp.com/album/running-around-83" },
-    { "artist": "Model 500", "month": "2026-11", "text": "Juan Atkins, the Detroit techno pioneer behind Model 500, died at the end of October, aged 64.", "source": "https://leclaireur.fnac.com/article/cp72822-mort-de-juan-atkins-3-albums-essentiels-du-pionnier-de-la-techno/" }
+    {
+      "artist": "Duval Timothy",
+      "month": "2026-02",
+      "text": "From his score with CJ Mirra for the film My Father's Shadow, out in January.",
+      "source": "https://crackmagazine.net/2026/01/duval-timothy-cj-mirra-for-my-fathers-shadow-film-score/"
+    },
+    {
+      "artist": "CJ Mirra",
+      "month": "2026-02",
+      "text": "From the score for the film My Father's Shadow, with Duval Timothy, out in January.",
+      "source": "https://crackmagazine.net/2026/01/duval-timothy-cj-mirra-for-my-fathers-shadow-film-score/"
+    },
+    {
+      "artist": "Inrain",
+      "month": "2026-03",
+      "text": "A 1991 Rough Trade single, reissued by Music From Memory in April.",
+      "source": "https://www.testpressing.org/magazine/chemical-reactions-looking-back-on-inrain-with-rudy-tambala"
+    },
+    {
+      "artist": "Tara Clerkin Trio",
+      "month": "2026-06",
+      "text": "Somewhere Good, their second album, out 5 June on World of Echo.",
+      "source": "https://thequietus.com/news/tara-clerkin-trio-detail-new-album-somewhere-good/"
+    },
+    {
+      "artist": "Kelela",
+      "month": "2026-05",
+      "text": "The singles before new avatar, her album on Warp in July.",
+      "source": "https://consequence.net/2026/05/kelela-album-new-avatar-linknb/"
+    },
+    {
+      "artist": "Boards of Canada",
+      "month": "2026-05",
+      "text": "Inferno, their first album in 13 years, out on Warp on 29 May.",
+      "source": "https://mixmag.net/read/boards-of-canada-return-with-first-album-in-13-years-inferno-news"
+    },
+    {
+      "artist": "Miles Davis",
+      "month": "2026-05",
+      "text": "Born 26 May 1926: his centenary.",
+      "source": "https://en.wikipedia.org/wiki/Miles_Davis"
+    },
+    {
+      "artist": "William Orbit",
+      "month": "2026-08",
+      "text": "Died 23 July, aged 69; the news came on 7 August. Shows went back to his own records.",
+      "source": "https://au.variety.com/2026/music/news/william-orbit-dead-producer-madonna-blur-39238/"
+    },
+    {
+      "artist": "Dolly Parton",
+      "month": "2026-09",
+      "text": "Died 25 August, aged 80. Shows paid tribute into September.",
+      "source": "https://www.opb.org/article/2026/08/25/dolly-parton-iconic-songwriter-singer-and-actor-has-died-at-80/"
+    },
+    {
+      "artist": "Stevie Wonder",
+      "month": "2026-10",
+      "text": "Songs in the Key of Life turned 50; the anniversary tour opened 13 October.",
+      "source": "https://stereogum.com/2510671/stevie-wonder-announces-songs-in-the-key-of-life-tour-readies-outtakes-for-new-album/news"
+    },
+    {
+      "artist": "YL Hooi",
+      "month": "2026-10",
+      "text": "Running Around (83), a long-running live favourite, out on Efficient Space in October.",
+      "source": "https://ylhooi.bandcamp.com/album/running-around-83"
+    },
+    {
+      "artist": "Model 500",
+      "month": "2026-11",
+      "text": "Juan Atkins, the Detroit techno pioneer behind Model 500, died at the end of October, aged 64.",
+      "source": "https://leclaireur.fnac.com/article/cp72822-mort-de-juan-atkins-3-albums-essentiels-du-pionnier-de-la-techno/"
+    }
   ]
 }

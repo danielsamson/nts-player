@@ -382,7 +382,7 @@ const YearPlay = (() => {
         poster(splitLines(t1.title, t1.title.length > 8 ? 2 : 1), { even: true, d: 0.9, max: 0.3, cls: 'yp-poster--beside' }));
       const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist} · played by `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' shows');
       box.append(rise(n, 1.4));
-      return [backdrop(t1, null, kinetic(t1.title, { rows: 4, angle: -9, size: '17vw', speed: 40, solid: [1], opacity: 0.45 })), el('div', 'yp-side', `Track of the year · ${year} · Track of the year · ${year}`), box];
+      return [backdrop(t1), box];
     } });
 
     // 5. artist of the year: the name, as big as it goes
@@ -412,7 +412,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
         rise(tape(`${t.artist} · #${leap.viz.from} → #${leap.viz.to} in a month`, 'yp-tape--sub'), 2.7));
-      return [backdrop(t, null, kinetic(`#${leap.viz.from} → #${leap.viz.to}`, { rows: 6, angle: -14, size: '9vw', speed: 18, opacity: 0.35 })), giant(num, 'is-faint yp-giant-bg--left'), box];
+      return [backdrop(t), giant(num, 'is-faint yp-giant-bg--left'), box];
     } });
 
     // 8. who heard it first: the show's name across the frame, the shows after it along the year
@@ -422,7 +422,8 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(tape('Who heard it first', 'yp-label'), 0), poster(splitLines(v.firsts[0].show, 2), { even: true, d: 0.2, max: 0.24 }),
         rise(tape(`played ${v.t.title} (${v.t.artist}) before anyone else`, 'yp-tape--sub'), 0.7));
-      const line = el('div', 'yp-strip yp-panel');
+      const line = el('div', 'yp-strip');
+      for (let m = 0; m < 12; m++) { const tk = el('span', 'yp-strip__tick', 'JFMAMJJASOND'[m]); tk.style.left = `${((m + 0.5) / 12) * 100}%`; line.append(tk); }
       const y0 = Date.UTC(v.year, 0, 1), y1 = Date.UTC(v.year + 1, 0, 1);
       v.firsts.forEach((f, i) => {
         const dot = el('span', i === 0 ? 'yp-strip__dot is-first' : 'yp-strip__dot');
@@ -432,7 +433,7 @@ const YearPlay = (() => {
         line.append(dot);
       });
       box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
-      return [backdrop(v.t, 'audio-research', kinetic(v.firsts[0].show, { rows: 6, vertical: true, size: '15vh', speed: 30, solid: [4], opacity: 0.4 }), true), box];
+      return [backdrop(v.t, 'audio-research', null, true), box];
     } });
 
     // 9. rising: new in the last three months, as tiles
@@ -440,7 +441,7 @@ const YearPlay = (() => {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
       const g = el('div', 'yp-tiles yp-tiles--five');
       s.breakouts.forEach((t, i) => g.append(rise(tile(t, `#${i + 1}`, `${t.shows} shows`), 0.6 + i * 0.22)));
-      return [backdrop(s.breakouts[0], null, kinetic('New', { rows: 5, vertical: true, size: '22vh', speed: 14, solid: [2], opacity: 0.5 })), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
+      return [backdrop(s.breakouts[0]), whitePanel({ icon: '↗', label: 'Rising', title: [['New since', 'outline'], since], body: g,
         foot: 'First played in the last three months and already picked up by the most shows.' })];
     } });
 
@@ -450,15 +451,14 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The long runner', 'yp-label'), 0), poster(splitLines(lr.title, lr.title.length > 14 ? 3 : 2), { even: true, d: 0.2, max: 0.1 }),
         rise(tape(lr.artist, 'yp-tape--sub'), 0.6));
-      const months = el('div', 'yp-months yp-panel');
+      const months = el('div', 'yp-months');
       (s.monthList || []).forEach((m, i) => {
         const c = el('span', (lr.perMonth?.[m] || 0) > 0 ? 'is-on' : '', monthShort(m).slice(0, 1));
         c.style.setProperty('--d', `${0.9 + i * 0.14}s`);
         months.append(c);
       });
       box.append(rise(months, 0.8), rise(tape(`Played in ${lr.months} of ${s.months} months. Most tracks on NTS last a few weeks.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));
-      const ms = (s.monthList || []).map((m) => monthShort(m)).join(' ');
-      return [backdrop(lr, null, kinetic(ms, { rows: 8, angle: 0, size: '8vh', speed: 50, opacity: 0.3 })), giant(`${lr.months}/${s.months}`, 'is-outline yp-giant-bg--left'), box];
+      return [backdrop(lr), giant(`${lr.months}/${s.months}`, 'is-faint yp-giant-bg--left'), box];
     } });
 
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way
@@ -484,7 +484,7 @@ const YearPlay = (() => {
           el('span', 'yp-genre__pct', `${Math.round(g.share * 100)}%`), tag);
         chart.append(rise(row, 0.5 + i * 0.25));
       });
-      return [backdrop(null, 'lsd', kinetic(list.map((g) => g.k).join(' · '), { rows: 4, vertical: true, size: '12vh', speed: 45, solid: [0], opacity: 0.55 })), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
+      return [backdrop(null, 'lsd'), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
         foot: 'Share of the year’s episodes tagged with each genre. ▲ ▼ more or less of it by the end of the year.' })];
     } });
 
@@ -497,7 +497,7 @@ const YearPlay = (() => {
       const covers = el('div', 'yp-fan');
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));
       box.append(covers);
-      return [backdrop(taste.viz.rows[0], null, kinetic('First', { rows: 6, angle: -6, size: '20vh', speed: 16, solid: [1, 4], opacity: 0.35 }), true), box];
+      return [backdrop(taste.viz.rows[0], null, null, true), box];
     } });
 
     // 13. outro
@@ -510,7 +510,7 @@ const YearPlay = (() => {
       const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ url: 'https://www.nts.live/supporters' }); });
       acts.append(again, cards, sup);
       box.append(rise(acts, 0.9));
-      return [backdrop(t1, 'sedative', kinetic('End of tape', { rows: 6, angle: 0, size: '13vh', speed: 30, solid: [2], opacity: 0.35 }), true), box];
+      return [backdrop(t1, 'sedative', null, true), box];
     } });
     return out;
   }

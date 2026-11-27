@@ -2025,3 +2025,22 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp.is-snow .yp-bg__snow { opacity: 1; }
 /* outlined type's hidden fill must not pick up the glitch shadow (the vector outline gets its own) */
 .yp.is-glitch .yp-poster__line.is-outline .yp-poster__inner, .yp.is-glitch .yp-giant-bg.is-outline { text-shadow: none; }
+
+/* ---- creative pass ---- */
+/* countdown numerals: up and in, clear of the tape counter */
+.yp-countdown .yp-giant-bg--left { left: 3vw; bottom: 9vh; font-size: 84vh; }
+/* the faint numerals sit back */
+.yp-giant-bg.is-faint { color: rgba(255,255,255,.14); }
+/* long runner: months as a plain row */
+.yp-months { padding: 0; margin-top: 18px; gap: 6px; }
+.yp-months span { width: clamp(22px, 2.6vw, 34px); border: 1px solid rgba(255,255,255,.5); background: rgba(0,0,0,.5); color: rgba(255,255,255,.6); font-size: clamp(11px, 1.2vw, 14px); }
+.yp-months span.is-on { background: var(--white); color: #000; border-color: var(--white); }
+/* who heard it first: a bare line through the year */
+.yp-strip { height: 2px; padding: 0; margin: 34px 0 30px; width: min(80vw, 860px); background: rgba(255,255,255,.75); border: 0; position: relative; }
+.yp-strip__tick { position: absolute; top: 12px; transform: translateX(-50%); font: 700 12px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; color: rgba(255,255,255,.75); }
+.yp-strip .yp-strip__dot { bottom: -5px; width: 12px; height: 12px; margin-left: -6px; }
+.yp-strip .yp-strip__dot.is-first { bottom: -10px; width: 22px; height: 22px; margin-left: -11px; background: var(--white); border: 4px solid #000; box-shadow: 0 0 0 2px var(--white); }
+/* tastemaker: covers with air */
+.yp-fan { gap: 14px; margin-top: 22px; }
+.yp-fan .yp-cover { width: clamp(90px, 15vh, 150px); margin: 0; transform: none !important; }
+@media (max-width: 559px) { .yp-countdown .yp-giant-bg--left { left: -2vw; top: 9vh; bottom: auto; font-size: 50vh; } .yp-strip { width: 100%; } }

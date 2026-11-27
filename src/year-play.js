@@ -952,6 +952,12 @@ const YearPlay = (() => {
       const t = sc.track, k = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
       if (k !== playingKey) { playingKey = k; crossTo(t); }
     }
+    // get the next scene's track ready while you're on this one
+    if (music) {
+      const cur = sc.track && `${sc.track.latest?.show}/${sc.track.latest?.episode}`;
+      const nx = scenes.slice(at + 1).find((x) => x.track && playable(x.track) && `${x.track.latest.show}/${x.track.latest.episode}` !== cur)?.track;
+      if (nx) setTimeout(() => { if (root) offsetOf(nx).then((o) => Archive.preload(nx.latest.show, nx.latest.episode, o)); }, 2500);
+    }
     root.querySelector('.yp-hint').hidden = at !== 1;
   }
   const next = () => { if (at < scenes.length - 1) show(at + 1); };

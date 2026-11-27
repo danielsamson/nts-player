@@ -1013,7 +1013,17 @@ const Archive = (() => {
 
   // ---- Episode page ----
   // Episode details + tracklist, in the shape the player uses
-  async function fetchEpisode(show, episode) {
+  // (remembered for 10 minutes: NTS in <year> asks a scene ahead, then again on the scene)
+  const episodeCache = new Map();
+  function fetchEpisode(show, episode) {
+    const k = `${show}/${episode}`, c = episodeCache.get(k);
+    if (c && Date.now() - c.at < 600000) return c.p;
+    const p = fetchEpisodeFresh(show, episode);
+    episodeCache.set(k, { at: Date.now(), p });
+    p.catch(() => episodeCache.delete(k));
+    return p;
+  }
+  async function fetchEpisodeFresh(show, episode) {
     const [ep, tl] = await Promise.all([
       api(`/api/v2/shows/${show}/episodes/${episode}`),
       api(`/api/v2/shows/${show}/episodes/${episode}/tracklist`).catch(() => ({ results: [] }))
@@ -1253,6 +1263,10 @@ const Archive = (() => {
     trackCount: (t) => TrackInfo.count(t),
     // is a tracklist row ({ artist, title }) this track? (tolerates swapped tags)
     sameTrack: (row, t) => TrackInfo.sameTrack({ title: row.title, artists: [{ name: row.artist }] }, t),
+    // Get an episode ready to play from a position, out of sight (seconds)
+    async preload(show, episode, offsetSec = 0) {
+      try { const { info } = await fetchEpisode(show, episode); if (info.url) ArchivePlayer.preload(info, offsetSec * 1000); } catch {}
+    },
     // Play an episode from a position (seconds)
     async playFrom(show, episode, offsetSec = 0) {
       try {

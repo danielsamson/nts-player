@@ -109,6 +109,8 @@ const ArchivePlayer = (() => {
 
   // Load an episode and start playing, optionally from a position in ms
   function load(episode, startMs = 0) {
+    if (standby?.ready && standby.url === episode.url) { swapIn(episode, startMs); return; }
+    if (standby?.url === episode.url) { try { standby.widget.pause(); } catch {} standby.url = null; }   // not warm yet: load it here instead
     primed = null;
     loadedAt = Date.now();
     seekTarget = null;
@@ -141,6 +143,60 @@ const ArchivePlayer = (() => {
     }
   }
 
+  // ---- the standby player: loads the next episode out of sight, so starting it later skips the
+  // load (NTS in <year> uses it a scene ahead). It never plays while waiting: SoundCloud's players
+  // pause each other, so a warm-up would stop what you're hearing.
+  const EVENTS = () => Object.values(SC.Widget.Events);
+  let standby = null;      // { iframe, widget, url, startMs, ready }
+  function makeFrame(url) {
+    const f = document.createElement('iframe');
+    f.className = 'sc-frame';
+    f.title = 'SoundCloud player';
+    f.allow = 'autoplay; encrypted-media';
+    f.src = embedUrl(url, false);
+    document.body.appendChild(f);
+    return f;
+  }
+  function preload(episode, startMs = 0) {
+    if (!episode?.url || typeof SC === 'undefined') return;
+    if (state.episode?.url === episode.url) return;                       // already the one playing
+    if (standby?.url === episode.url && Math.abs((standby.startMs || 0) - startMs) < 4000) return;
+    const sb = standby && standby.widget ? standby : { iframe: null, widget: null };
+    sb.url = episode.url; sb.startMs = startMs; sb.ready = false;
+    const warm = (w) => {
+      EVENTS().forEach((ev) => w.unbind(ev));
+      w.bind(SC.Widget.Events.READY, () => { if (standby === sb) { w.setVolume(0); sb.ready = true; } });
+    };
+    if (!sb.widget) {
+      sb.iframe = makeFrame(episode.url);
+      sb.widget = SC.Widget(sb.iframe);
+      standby = sb;
+      warm(sb.widget);
+    } else {
+      standby = sb;
+      warm(sb.widget);
+      sb.widget.load(episode.url, { auto_play: false, visual: false, show_comments: false, show_user: false, sharing: false, download: false,
+        callback: () => { if (standby === sb) { sb.widget.setVolume(0); sb.ready = true; } } });
+    }
+  }
+  // swap the warmed standby in as the main player; the old one becomes the next standby
+  function swapIn(episode, startMs) {
+    const sb = standby;
+    const oldW = widget, oldF = iframe;
+    if (oldW) { try { oldW.pause(); } catch {} EVENTS().forEach((ev) => oldW.unbind(ev)); }
+    EVENTS().forEach((ev) => sb.widget.unbind(ev));
+    widget = sb.widget; iframe = sb.iframe;
+    standby = oldW ? { iframe: oldF, widget: oldW, url: null, ready: false } : null;
+    primed = null; loadedAt = Date.now(); seekTarget = null; guardTarget = null;
+    Object.assign(state, { finished: false, episode, playing: false, loading: true, position: startMs, duration: 0, error: null });
+    pendingSeek = startMs > 0 ? startMs : null;      // it starts from 0:00, silent until the jump lands
+    if (pendingSeek != null) jumpStart(); else jumpEnd();
+    bindEvents();
+    widget.setVolume(level());
+    widget.play();
+    emit();
+  }
+
   // Show an episode as paused at a position without loading it (resume on launch)
   function prime(episode, startMs = 0, durationMs = 0) {
     primed = { episode, startMs };
@@ -159,6 +215,7 @@ const ArchivePlayer = (() => {
     onChange: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
     load,
     prime,
+    preload,
     play: () => (primed ? startPrimed() : widget?.play()),
     pause: () => widget?.pause(),
     toggle: () => (primed ? startPrimed() : state.playing ? widget?.pause() : widget?.play()),

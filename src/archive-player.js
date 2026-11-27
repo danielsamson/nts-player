@@ -45,6 +45,12 @@ const ArchivePlayer = (() => {
   let loadedAt = 0;
 
   const emit = () => listeners.forEach((fn) => fn(state));
+  // Silent while jumping into an episode: SoundCloud starts from 0:00 before a seek lands, so the
+  // first moment of the show would play. Muted until the seek lands (or 10s, whichever first).
+  let jumping = false, jumpTimer = null;
+  const level = () => Math.round((jumping ? 0 : volume) * 100);
+  function jumpStart() { jumping = true; clearTimeout(jumpTimer); jumpTimer = setTimeout(jumpEnd, 10000); widget?.setVolume(0); }
+  function jumpEnd() { if (!jumping) return; jumping = false; clearTimeout(jumpTimer); widget?.setVolume(level()); }
 
   function embedUrl(url, autoPlay) {
     const p = new URLSearchParams({ url, auto_play: autoPlay ? 'true' : 'false', visual: 'false',
@@ -55,7 +61,7 @@ const ArchivePlayer = (() => {
   function bindEvents() {
     const E = SC.Widget.Events;
     widget.bind(E.READY, () => {
-      widget.setVolume(Math.round(volume * 100));
+      widget.setVolume(level());
       widget.getDuration((d) => { state.duration = d || 0; emit(); });
     });
     widget.bind(E.PLAY, () => {
@@ -73,8 +79,8 @@ const ArchivePlayer = (() => {
     });
     widget.bind(E.PLAY_PROGRESS, (e) => {
       if (seekTarget != null) {
-        if (Math.abs(e.currentPosition - seekTarget) < 4000) { seekTarget = null; guardUntil = Math.min(guardUntil, Date.now() + 10000); }   // seems to have landed
-        else if (Date.now() - seekStarted > 45000) { seekTarget = null; guardTarget = null; }                                                // give up
+        if (Math.abs(e.currentPosition - seekTarget) < 4000) { seekTarget = null; guardUntil = Math.min(guardUntil, Date.now() + 10000); jumpEnd(); }   // seems to have landed
+        else if (Date.now() - seekStarted > 45000) { seekTarget = null; guardTarget = null; jumpEnd(); }                                                // give up
         else {
           if (Date.now() - seekLastTry > 800) trySeek();
           state.position = seekTarget;      // show where we're going, not 0:00
@@ -85,6 +91,7 @@ const ArchivePlayer = (() => {
       // fell back to the start after "landing": ask again
       if (guardTarget != null && Date.now() < guardUntil && e.currentPosition < guardTarget - 8000) {
         seekTarget = guardTarget; seekLastTry = 0;
+        jumpStart();
         state.position = guardTarget;
         emit();
         return;
@@ -114,6 +121,7 @@ const ArchivePlayer = (() => {
     state.duration = 0;
     state.error = null;
     pendingSeek = startMs > 0 ? startMs : null;
+    if (pendingSeek != null) jumpStart(); else jumpEnd();
     emit();
 
     if (!widget) {
@@ -128,7 +136,7 @@ const ArchivePlayer = (() => {
     } else {
       widget.load(episode.url, {
         auto_play: true, visual: false, show_comments: false, show_user: false, sharing: false, download: false,
-        callback: () => widget.setVolume(Math.round(volume * 100))
+        callback: () => widget.setVolume(level())
       });
     }
   }
@@ -162,7 +170,7 @@ const ArchivePlayer = (() => {
       if (!state.playing) widget.play();
       emit();
     },
-    setVolume: (v) => { volume = v; widget?.setVolume(Math.round(v * 100)); },
+    setVolume: (v) => { volume = v; widget?.setVolume(level()); },
     isLoaded: (show, episode) => state.episode?.show === show && state.episode?.episode === episode
   };
 })();

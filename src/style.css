@@ -2333,3 +2333,11 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-dive__lead .yp-cover { width: min(28vh, 20vw); }
 .yp-dive__leadtext { max-width: 26vw; }
 @media (max-width: 559px) { .yp-dive__leadtext { max-width: none; } }
+/* genre tabs: one row of words, the chosen one on a white block */
+.yp-dive__chips { flex-wrap: nowrap; gap: 0; overflow-x: auto; scrollbar-width: none; border-top: 1px solid rgba(255,255,255,.45); border-bottom: 1px solid rgba(255,255,255,.45); width: 100%; margin: 6px 0 20px; }
+.yp-dive__chips::-webkit-scrollbar { display: none; }
+.yp-dive__chip { border: 0; background: transparent; padding: 9px 12px 8px; font-size: clamp(13px, 1.4vw, 17px); letter-spacing: .02em; white-space: nowrap; color: rgba(255,255,255,.8); }
+.yp-dive__chip + .yp-dive__chip { border-left: 1px solid rgba(255,255,255,.2); }
+.yp-dive__chip:hover { background: rgba(255,255,255,.12); color: var(--white); }
+.yp-dive__chip[aria-pressed="true"] { background: var(--white); color: #000; }
+.yp-dive__chips { background: rgba(0,0,0,.72); }

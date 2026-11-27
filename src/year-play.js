@@ -717,7 +717,11 @@ const YearPlay = (() => {
       stage.append(el('p', 'yp-tape yp-tape--sub', 'Digging…'));
       box.append(rise(chips, 0.5), rise(stage, 0.7));
       const released = new Map((s.top || []).map((t) => [`${t.artist}|${t.title}`.toLowerCase(), t.released]));
-      const label = (nm) => String(nm).replace(/\b\w/g, (c) => c.toUpperCase()).replace(/\s*\/\s*/g, ' / ').replace(/\bR'n'b\b|\bRhythm & Blues\b/gi, 'R&B').replace(/\bUk\b/g, 'UK');
+      // short names, one word where it reads (NTS's family names are long: "alternative rock / punk")
+      const SHORT = { housetechno: 'House', altrockpunk: 'Punk', rock: 'Rock', ambientnewage: 'Ambient', electronicadowntempo: 'Electronica', hiphoprandb: 'Hip-Hop', postpunkwave: 'Post-Punk',
+        soulrhythm: 'Soul', jazz: 'Jazz', newclub: 'Club', ukdance: 'UK Dance', caribbean: 'Caribbean', discoboogie: 'Disco', avantgarde: 'Avant-Garde', classicalopera: 'Classical',
+        latinbrazil: 'Latin', africanmiddleeast: 'African', asia: 'Asian', metal: 'Metal' };
+      const label = (f) => SHORT[f.id] || String(f.name).split('/')[0].trim().replace(/\b\w/g, (c) => c.toUpperCase());
       Chart.get(String(year)).then((res) => {
         const fams = res ? Chart.families(res, 8).slice(0, 9) : [];
         if (!fams.length) { stage.replaceChildren(el('p', 'yp-tape yp-tape--sub', 'No genre charts for this year yet.')); return; }
@@ -727,8 +731,8 @@ const YearPlay = (() => {
           const [one, ...rest] = rows;
           const lead = el('div', 'yp-dive__lead');
           const tx = el('div', 'yp-dive__leadtext');
-          tx.append(el('span', 'yp-dive__kicker', `#1 in ${label(f.name)}`), el('span', 'yp-dive__title', one.title),
-            el('span', 'yp-dive__meta', `${one.artist}${one.released ? `, ${one.released}` : ''}. ${one.shows} ${label(f.name)} shows played it.`));
+          tx.append(el('span', 'yp-dive__kicker', `#1 in ${label(f)}`), el('span', 'yp-dive__title', one.title),
+            el('span', 'yp-dive__meta', `${one.artist}${one.released ? `, ${one.released}` : ''}. ${one.shows} ${label(f).toLowerCase()} shows played it.`));
           lead.append(coverImg(one, 'yp-cover'), tx);
           const list = el('div', 'yp-dive__rest');
           rest.forEach((r, i) => {
@@ -740,7 +744,7 @@ const YearPlay = (() => {
           stage.classList.remove('is-in'); void stage.offsetWidth; stage.classList.add('is-in');
         };
         chips.replaceChildren(...fams.map((f, i) => {
-          const b = el('button', 'yp-dive__chip', label(f.name));
+          const b = el('button', 'yp-dive__chip', label(f));
           b.addEventListener('click', (e) => { e.stopPropagation(); pick(f, b); });
           if (i === 0) setTimeout(() => pick(f, b), 0);
           return b;
@@ -758,7 +762,7 @@ const YearPlay = (() => {
       const l = el('div', 'yp-artsplit__text'); l.append(...box.childNodes);
       box.classList.add('yp-artsplit'); box.classList.remove('yp-frame--bottom');
       box.append(l, coverGrid(taste.viz.rows.slice(0, 4), { cols: 2, d: 0.9, cls: 'yp-artsplit__art' }));
-      return [backdrop(taste.viz.rows[0], null, null, true), box];
+      return [backdrop(taste.viz.rows[0]), box];      // colour, to break the run of grey show scenes
     } });
 
     // ---- the shows ----

@@ -8,7 +8,7 @@ const Year = (() => {
   const fmt = (x) => Number(x).toLocaleString();
   const showPic = (src, cls) => {
     const wrap = el('div', cls);
-    if (src) { const im = el('img'); im.alt = ''; im.addEventListener('error', () => im.remove()); im.src = src; wrap.append(im); }
+    if (src) { const im = el('img'); im.alt = ''; im.addEventListener('error', () => im.remove()); im.src = String(src).replace(/\/\/media\d?\.ntslive\.co\.uk\/resize\/(100x100|200x200)\//, '//media.ntslive.co.uk/resize/400x400/'); wrap.append(im); }
     return wrap;
   };
   const plural = (x, word) => `${fmt(x)} ${word}${x === 1 ? '' : 's'}`;

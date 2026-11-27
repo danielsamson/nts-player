@@ -322,6 +322,23 @@ const YearPlay = (() => {
     c.title = `${t.artist} – ${t.title}`;
     return c;
   }
+  // Covers as a grid, each one rising in turn, with its title under it (captions: false for none)
+  function coverGrid(tracks, { cols = 2, d = 0.6, step = 0.14, captions = true, cls = '' } = {}) {
+    const g = el('div', `yp-covergrid ${cls}`);
+    g.style.setProperty('--cols', cols);
+    tracks.forEach((t, i) => {
+      const c = el('figure', 'yp-covergrid__item');
+      c.append(coverImg(t, 'yp-cover'));
+      if (captions) c.append(el('figcaption', null, t.title));
+      c.title = `${t.artist} – ${t.title}`;
+      g.append(rise(c, d + i * step));
+    });
+    return g;
+  }
+  // type on the left, artwork on the right
+  function artSplit(text, art) { const b = el('div', 'yp-frame yp-artsplit'); const l = el('div', 'yp-artsplit__text'); l.append(...text); b.append(l, art); return b; }
+  // NTS show pictures, the 400px version from the main image host (sharper than the 200px thumbnails)
+  const bigPic = (u) => String(u || '').replace(/\/\/media\d?\.ntslive\.co\.uk\/resize\/\d+x\d+\//, '//media.ntslive.co.uk/resize/400x400/');
   // a line of tape type (the VHS screen font): labels, counts, dates
   const tape = (text, cls = '') => el('p', `yp-tape ${cls}`, text);
 
@@ -445,6 +462,11 @@ const YearPlay = (() => {
         line.append(dot);
       });
       box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
+      const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
+      const cov = rise(coverImg(v.t, 'yp-cover yp-cover--feature'), 0.4);
+      art.append(cov, rise(el('p', 'yp-artcap', `${v.t.title} · ${v.t.artist}`), 0.7));
+      box.classList.add('yp-artsplit'); box.classList.remove('yp-frame--bottom');
+      const l = el('div', 'yp-artsplit__text'); l.append(...box.childNodes); box.append(l, art);
       return [backdrop(v.t, 'audio-research', null, true), box];
     } });
 
@@ -510,9 +532,9 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(tape('Tastemaker of the year', 'yp-label'), 0), poster(splitLines(taste.headline, taste.headline.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.15 }),
         rise(tape(taste.body, 'yp-tape--sub'), 0.8));
-      const covers = el('div', 'yp-fan');
-      taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.1 + i * 0.2)));
-      box.append(covers);
+      const l = el('div', 'yp-artsplit__text'); l.append(...box.childNodes);
+      box.classList.add('yp-artsplit'); box.classList.remove('yp-frame--bottom');
+      box.append(l, coverGrid(taste.viz.rows.slice(0, 4), { cols: 2, d: 0.9, cls: 'yp-artsplit__art' }));
       return [backdrop(taste.viz.rows[0], null, null, true), box];
     } });
 
@@ -525,35 +547,42 @@ const YearPlay = (() => {
       const big = el('div', 'yp-showcount'); big.append(counter(s.debuts.length, { d: 0.3, ms: 1300 }));
       left.append(rise(tape('New on NTS', 'yp-label'), 0), rise(big, 0.1), poster(['new shows'], { d: 0.4, max: 0.1 }),
         rise(tape(`First broadcast in ${year}${s.complete ? '' : ', so far'}.`, 'yp-tape--sub'), 0.9));
-      const grid = el('div', 'yp-showgrid');
-      s.debuts.filter((d) => d.img).slice(0, 12).forEach((d, i) => {
+      // every new show, scattered at random across and past the frame, drifting: more than fits
+      const field = el('div', 'yp-showfield');
+      const shows = s.debuts.slice().sort(() => Math.random() - 0.5);
+      shows.forEach((d, i) => {
         const c = el('div', 'yp-showtile');
-        const im = el('img'); im.alt = ''; im.src = d.img; im.addEventListener('error', () => im.remove());
-        c.append(im, el('span', null, d.name));
-        grid.append(rise(c, 0.6 + i * 0.12));
+        if (d.img) { const im = el('img'); im.alt = ''; im.src = bigPic(d.img); im.addEventListener('error', () => im.remove()); c.append(im); }
+        c.append(el('span', null, d.name));
+        const size = 6 + Math.random() * 8;                        // vw
+        c.style.cssText = `--x:${-8 + Math.random() * 108}%;--y:${-12 + Math.random() * 112}%;--w:${size}vw;--r:${(Math.random() - 0.5) * 16}deg;--z:${Math.round(size)};--d:${0.2 + i * 0.05}s;--dr:${(Math.random() - 0.5) * 6}vw;--bg:${TINTS[i % TINTS.length]}`;
+        field.append(c);
       });
-      box.append(left, grid);
-      return [backdrop(null, 'safe-for-work', null, true), box];
+      box.append(left);
+      return [backdrop(null, 'safe-for-work', null, true), field, box];
     } });
     // in tune with NTS
     const words = (x) => String(x || '').toLowerCase().replace(/\bw\/.*$/, '').replace(/[^a-z0-9 ]/g, '').trim();
     const told = words(story(s, 'tastemaker')?.headline);
     const tuneS = (s.inTune || []).find((x) => !told || (!words(x.name).startsWith(told) && !told.startsWith(words(x.name))));
     if (tuneS && tuneS.count >= 5) out.push({ dur: 8, track: tuneS.tracks[0], build() {
-      const box = el('div', 'yp-frame yp-frame--bottom');
-      box.append(rise(tape('In tune with NTS', 'yp-label'), 0), poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }));
+      const box = el('div', 'yp-frame yp-artsplit');
+      const l = el('div', 'yp-artsplit__text');
+      l.append(rise(tape('In tune with NTS', 'yp-label'), 0), poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }));
       const n = tape('', 'yp-tape--sub'); const ahead = (s.inTune || []).filter((x) => x.count > tuneS.count);
       n.append('Played ', counter(tuneS.count, { d: 0.8, ms: 1100 }), ` of the year’s top 100 tracks. ${!ahead.length ? 'More than any other show.' : ahead.length === 1 ? `Second only to ${ahead[0].name}.` : `Only ${ahead.length} shows played more.`}`);
-      box.append(rise(n, 0.7));
-      return [backdrop(tuneS.tracks[0]), giant(String(tuneS.count), 'is-faint yp-giant-bg--right'), box];
+      l.append(rise(n, 0.7));
+      box.append(l, coverGrid(tuneS.tracks.slice(0, 9), { cols: 3, d: 0.5, step: 0.09, captions: false, cls: 'yp-artsplit__art yp-mosaic' }));
+      return [backdrop(tuneS.tracks[0]), box];
     } });
     // shared taste: the two shows with the most tracks in common
     const pr = s.pair;
     if (pr && pr.count >= 3) out.push({ dur: 8, track: pr.tracks?.[0], build() {
-      const box = el('div', 'yp-frame yp-frame--bottom');
-      box.append(rise(tape('Shared taste', 'yp-label'), 0), poster([nm(pr.a), ['&', 'outline'], nm(pr.b)], { d: 0.2, step: 0.2, max: 0.14, cls: 'yp-pair' }));
-      const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ` tracks in common${pr.tracks?.length ? `, like ${pr.tracks.slice(0, 2).map((t) => t.title).join(' and ')}` : ''}.`);
-      box.append(rise(n, 1));
+      const amp = el('div', 'yp-amp', '&');
+      const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ' tracks in common, among them:');
+      const box = artSplit([rise(tape('Shared taste', 'yp-label'), 0), poster(splitLines(nm(pr.a), 2), { even: true, d: 0.2, max: 0.15 }), rise(amp, 0.45),
+        poster(splitLines(nm(pr.b), 2), { even: true, d: 0.6, max: 0.15 }), rise(n, 1)],
+        coverGrid((pr.tracks || []).slice(0, 4), { cols: 2, d: 1.1, cls: 'yp-artsplit__art' }));
       return [backdrop(pr.tracks?.[0], 'the-healing-place'), box];
     } });
 
@@ -584,7 +613,7 @@ const YearPlay = (() => {
     scene.append(...sc.build());
     inkLines(scene);
     stage.replaceChildren(scene);
-    const outlineGiants = () => scene.querySelectorAll('.yp-giant-bg.is-outline').forEach((g) => vectorOutline(g, { weight: 0.012, opacity: 0.6 }));
+    const outlineGiants = () => { scene.querySelectorAll('.yp-giant-bg.is-outline').forEach((g) => vectorOutline(g, { weight: 0.012, opacity: 0.6 })); scene.querySelectorAll('.yp-amp').forEach((g) => vectorOutline(g, { weight: 0.02 })); };
     fitPosters(scene); outlineGiants();
     document.fonts?.ready.then(() => { if (scene.isConnected) { fitPosters(scene); outlineGiants(); } });
     // a tape glitch on the cut, then now and then while it plays

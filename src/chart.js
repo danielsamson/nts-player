@@ -223,7 +223,7 @@ const Chart = (() => {
     const topPair = [...pairs].sort((a, b) => b[1] - a[1])[0];
     // the tracks those two shows both played, most shows first
     const [pa, pb] = topPair ? topPair[0].split('|') : [];
-    const pairTracks = topPair ? all.filter((m) => m.showSet.has(pa) && m.showSet.has(pb)).slice(0, 4) : [];
+    const pairTracks = topPair ? all.filter((m) => m.showSet.has(pa) && m.showSet.has(pb)).slice(0, 6) : [];
     const busiest = [...showEps].filter(([s]) => !catchAll(s, names)).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([show, count]) => ({ show, count, name: (names[show] || [])[0] || showName(show), img: (names[show] || [])[1] || '' }));
     const peak = files.slice().sort((a, b) => b.episodes - a.episodes)[0];
@@ -239,7 +239,7 @@ const Chart = (() => {
     all.slice(0, 100).forEach((m) => m.showSet.forEach((sh) => { if (!catchAll(sh, names)) tune.set(sh, (tune.get(sh) || 0) + 1); }));
     // (the top few, so the story can skip one already told, like the tastemaker)
     const inTune = [...tune].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([sh, count]) => ({ show: sh, count, name: (names[sh] || [])[0] || showName(sh),
-      tracks: all.slice(0, 100).filter((m) => m.showSet.has(sh)).slice(0, 3) }));
+      tracks: all.slice(0, 100).filter((m) => m.showSet.has(sh)).slice(0, 9) }));
     all.forEach((m) => { delete m.showSet; });
     const realDebuts = debuts.filter((d) => !catchAll(d.show, names));
     return {

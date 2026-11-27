@@ -105,7 +105,7 @@ const Archive = (() => {
     if (img) {
       const i = el('img'); i.alt = ''; i.loading = 'lazy';
       i.addEventListener('error', () => i.remove());   // leave the grey box if artwork fails
-      i.src = img; pic.append(i);
+      i.src = String(img).replace(/\/\/media\d?\.ntslive\.co\.uk\/resize\/(100x100|200x200)\//, '//media.ntslive.co.uk/resize/400x400/'); pic.append(i);
     }
     const text = el('span', 'item__text');
     const t = el('span', 'item__title', title);

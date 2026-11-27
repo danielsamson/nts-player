@@ -43,12 +43,22 @@ const Chart = (() => {
   function families(res, min = 10) {
     return (res?.data.families || []).map(([id, name]) => ({ id, name, tracks: ranks(res, id).size })).filter((f) => f.tracks >= min);
   }
+  // Months for a year: one that fails to download is asked for again (twice) before going without it,
+  // since a year missing months gives wrong numbers (a track on 19 shows showing as 9)
+  async function getMonths(list) {
+    let got = await Promise.all(list.map((m) => get(m)));
+    for (let tries = 0; tries < 2 && got.some((r) => !r); tries++) {
+      await new Promise((res) => setTimeout(res, 800));
+      got = await Promise.all(list.map((m, i) => got[i] || get(m)));
+    }
+    return got;
+  }
   const isYear = (p) => /^\d{4}$/.test(p);
   // A year's chart: its months' files merged into one, in the same shape (a show counts once
   // however many months it played the track in)
   async function mergedYear(y) {
     const list = (await months()).filter((m) => m.startsWith(`${y}-`)).sort();
-    const files = (await Promise.all(list.map((m) => get(m)))).filter(Boolean).map((r) => r.data);
+    const files = (await getMonths(list)).filter(Boolean).map((r) => r.data);
     if (!files.length) return null;
     const showList = [], si = new Map();
     const sIdx = (alias) => { if (!si.has(alias)) { si.set(alias, showList.length); showList.push(alias); } return si.get(alias); };
@@ -145,7 +155,7 @@ const Chart = (() => {
   // ---- a year: its months merged ----
   async function year(y) {
     const list = (await months()).filter((m) => m.startsWith(`${y}-`)).sort();
-    const files = (await Promise.all(list.map((m) => get(m)))).filter(Boolean).map((r) => r.data);
+    const files = (await getMonths(list)).filter(Boolean).map((r) => r.data);
     if (!files.length) return null;
     const tracks = new Map();
     const showEps = new Map();

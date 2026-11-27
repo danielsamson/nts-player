@@ -121,6 +121,19 @@ const YearPlay = (() => {
     return b;
   }
   const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.innerHTML = crate.size ? `${BOOKMARK}<span>${crate.size}</span>` : ''; c.title = 'Saved for later. Waiting at the end'; c.hidden = !crate.size; } };
+  // A machine that can't draw the full tape smoothly gets a lighter one: measure the frame rate for two
+  // seconds once the first scene is up; under 30 a second, drop the costliest moving layers
+  function checkSpeed() {
+    if (!root || root.classList.contains('is-lite')) return;
+    let n = 0; const t0 = performance.now();
+    const f = (now) => {
+      if (!root) return;
+      n++;
+      if (now - t0 < 2000) { requestAnimationFrame(f); return; }
+      if (n / ((now - t0) / 1000) < 30) root.classList.add('is-lite');
+    };
+    setTimeout(() => requestAnimationFrame(f), 1500);      // after the scene's entrance has settled
+  }
   // a short note at the bottom of the screen
   let toastTimer = null;
   function toast(text) {
@@ -162,7 +175,7 @@ const YearPlay = (() => {
     } else b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'));
     if (extra) b.append(extra);
     // torn slices for the corrupted moments: copies of the picture, a band each, shoved sideways
-    if (!halftone && (src || t)) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
+    if (!halftone && (src || t)) b._slice = () => layer('yp-bg__img yp-bg__slice');      // made only when it glitches
     b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__snow'), el('div', 'yp-bg__bars'), el('div', 'yp-bg__phos'), el('div', 'yp-bg__band'), el('div', 'yp-bg__head'));
     return b;
   }
@@ -204,13 +217,24 @@ const YearPlay = (() => {
   function jitter() {
     clearInterval(jitterTimer);
     if (reduced()) return;
+    let tick = 0;
     jitterTimer = setInterval(() => {
-      if (!root || paused) return;
-      const frames = snow();
-      snowAt = (snowAt + 1) % frames.length;
-      root.querySelectorAll('.yp-bg__snow').forEach((sn) => { sn.style.backgroundImage = frames[snowAt]; });
+      if (!root || paused || document.hidden) return;
+      tick++;
+      const glitching = root.classList.contains('is-glitch');
+      const lite = root.classList.contains('is-lite');
+      // snow flickers every other tick; the line wobble's noise changes twice a second (faster in a glitch):
+      // each change redraws the whole picture through the filter
+      if (!lite && (tick % 2 === 0 || glitching)) {
+        const frames = snow();
+        snowAt = (snowAt + 1) % frames.length;
+        root.querySelectorAll('.yp-bg__snow').forEach((sn) => { sn.style.backgroundImage = frames[snowAt]; });
+        // the grain shifts on the same tick, so the picture is redrawn once, not twice
+        const gp = `${Math.round(Math.random() * 260)}px ${Math.round(Math.random() * 260)}px`;
+        root.querySelectorAll('.yp-bg__grain').forEach((g) => { g.style.backgroundPosition = gp; });
+      }
       const turb = root.querySelector('#yp-vhs feTurbulence');
-      if (turb) turb.setAttribute('seed', String(1 + Math.floor(Math.random() * 999)));
+      if (turb && (glitching || (!lite && tick % 4 === 0))) turb.setAttribute('seed', String(1 + Math.floor(Math.random() * 999)));
       const bg = root.querySelector('.yp-scene .yp-bg, .yp-gate .yp-bg');
       if (bg && Math.random() < 0.45) {
         for (let i = 0, n = 1 + Math.floor(Math.random() * 3); i < n; i++) {
@@ -229,6 +253,13 @@ const YearPlay = (() => {
     if (!bg?.isConnected || reduced()) return;
     const disp = root?.querySelector('#yp-vhs feDisplacementMap');
     if (disp) { disp.setAttribute('scale', String(strong ? 70 : 28 + Math.random() * 30)); setTimeout(() => disp.setAttribute('scale', '9'), strong ? 380 : 200); }
+    // the torn slices exist only for the glitch (three more copies of the picture are costly to keep)
+    if (bg._slice && !bg.querySelector('.yp-bg__slice')) {
+      const at = bg.querySelector('.yp-bg__tint');
+      for (let i = 0; i < 3; i++) bg.insertBefore(bg._slice(), at);
+    }
+    clearTimeout(bg._sliceGone);
+    bg._sliceGone = setTimeout(() => bg.querySelectorAll('.yp-bg__slice').forEach((x) => x.remove()), strong ? 600 : 500);
     bg.querySelectorAll('.yp-bg__slice').forEach((sl) => {
       const top = Math.random() * 85, h = 3 + Math.random() * (strong ? 22 : 12);
       sl.style.setProperty('--t', `${top}%`);
@@ -1143,6 +1174,8 @@ const YearPlay = (() => {
       root.style.setProperty('--my', ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
     });
     jitter();
+    onVis = () => root?.classList.toggle('is-asleep', document.hidden);
+    document.addEventListener('visibilitychange', onVis);
     onResize = () => root && fitPosters(root);
     window.addEventListener('resize', onResize);
     loadMoods();
@@ -1173,7 +1206,7 @@ const YearPlay = (() => {
     const withMusic = el('button', 'yp-btn yp-btn--on', '▶ Play with music');
     withMusic.title = 'Each track plays as it comes up (this stops what you’re listening to)';
     const without = el('button', 'yp-btn', 'Without music');
-    const go = (m, from = 0) => (e) => { e.stopPropagation(); music = m; gate.remove(); show(from); };
+    const go = (m, from = 0) => (e) => { e.stopPropagation(); music = m; gate.remove(); show(from); checkSpeed(); };
     withMusic.addEventListener('click', go(true));
     without.addEventListener('click', go(false));
     acts.append(withMusic, without);
@@ -1191,9 +1224,9 @@ const YearPlay = (() => {
     setPaused(true);
     setTimeout(() => withMusic.focus(), 50);
   }
-  let onResize = null;
+  let onResize = null, onVis = null;
   function stop() { clearInterval(fadeTimer); unPlayer?.(); unPlayer = null; stopInner(); }
-  function stopInner() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); root?.remove(); root = null; }
+  function stopInner() { clearInterval(clock); clearInterval(jitterTimer); clearTimeout(glitchTimer); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', onVis); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {
     if (!root) return false;

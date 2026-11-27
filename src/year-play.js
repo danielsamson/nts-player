@@ -627,6 +627,57 @@ const YearPlay = (() => {
       return [backdrop(old[0], null, null, true), box];
     } });
 
+    // comebacks: old records that suddenly spread in one month
+    const cb = s.comebacks || [];
+    if (cb.length >= 2) out.push({ dur: 9, track: cb[0], build() {
+      const box = el('div', 'yp-frame yp-travel');
+      box.append(rise(tape('Comebacks', 'yp-label'), 0), poster([['Back', 'outline'], 'in the bag'], { d: 0.15, max: 0.11, cls: 'yp-deep__title' }));
+      const row = el('div', 'yp-travel__row');
+      cb.forEach((t, i) => {
+        const c = el('div', 'yp-travel__item');
+        const bars = el('div', 'yp-bars-mini');
+        const mx = Math.max(...t.vals, 1);
+        t.vals.forEach((v, j) => { const b = el('span', s.monthList[j] === t.peakMonth ? 'is-peak' : ''); b.style.setProperty('--h', `${Math.max(4, (v / mx) * 100)}%`); b.style.setProperty('--d', `${0.9 + i * 0.3 + j * 0.04}s`); bars.append(b); });
+        c.append(coverImg(t, 'yp-cover'), bars, el('span', 'yp-deep__t', t.title),
+          el('span', 'yp-deep__a', `${t.artist} · ${t.released}`), el('span', 'yp-deep__by', `${t.peak} shows in ${monthShort(t.peakMonth)}, out of nowhere`));
+        row.append(rise(c, 0.5 + i * 0.3));
+      });
+      box.append(row);
+      return [backdrop(cb[0]), box];
+    } });
+
+    // crossovers: one track, many genres
+    const xo = (s.crossovers || [])[0];
+    if (xo && xo.gl.length >= 4) out.push({ dur: 9, track: xo, build() {
+      const box = el('div', 'yp-frame yp-artsplit');
+      const l = el('div', 'yp-artsplit__text');
+      l.append(rise(tape('Crossover', 'yp-label'), 0), poster(splitLines(xo.title, xo.title.length > 12 ? 2 : 1), { even: true, d: 0.2, max: 0.16 }),
+        rise(tape(`${xo.artist} · played in ${xo.gl.length} different genres of show`, 'yp-tape--sub'), 0.6));
+      const tags = el('div', 'yp-xo__tags');
+      xo.gl.slice(0, 10).forEach((g, i) => tags.append(rise(el('span', null, g), 0.9 + i * 0.12)));
+      l.append(tags);
+      const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
+      art.append(rise(coverImg(xo, 'yp-cover yp-cover--feature'), 0.3));
+      box.append(l, art);
+      return [backdrop(xo), box];
+    } });
+
+    // loyalty: one show, one track, month after month
+    const ly = s.loyal;
+    if (ly) out.push({ dur: 8, track: ly, build() {
+      const box = el('div', 'yp-frame yp-artsplit');
+      const l = el('div', 'yp-artsplit__text');
+      l.append(rise(tape('Loyal', 'yp-label'), 0), poster(splitLines(ly.by, ly.by.length > 14 ? 2 : 1), { even: true, d: 0.2, max: 0.13 }),
+        rise(tape(`kept coming back to ${ly.title} (${ly.artist}). No other show played it.`, 'yp-tape--sub'), 0.6));
+      const months = el('div', 'yp-months');
+      (s.monthList || []).forEach((m, i) => { const c = el('span', (ly.perMonth?.[m] || 0) > 0 ? 'is-on' : '', monthShort(m).slice(0, 1)); c.style.setProperty('--d', `${0.9 + i * 0.12}s`); months.append(c); });
+      l.append(rise(months, 0.8), rise(tape(`${ly.months} months, ${ly.episodes} episodes`, 'yp-tape--sub'), 1.4));
+      const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
+      art.append(rise(coverImg(ly, 'yp-cover yp-cover--feature'), 0.3));
+      box.append(l, art);
+      return [backdrop(ly, null, null, true), box];
+    } });
+
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way
     // each went (the last three months against the first three)
     const gen = story(s, 'genres');

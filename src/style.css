@@ -2258,3 +2258,12 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .yp-travel__row { width: min(78vw, 46vh * 3 + 6vw); }
 .yp-travel__item .yp-cover { max-width: 30vh; }
 .yp-travel__year { font-size: clamp(36px, 5.4vw, 72px); }
+/* comebacks: a month-by-month bar under each cover */
+.yp-bars-mini { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin: 6px 0 2px; }
+.yp-bars-mini span { flex: 1; height: var(--h); background: rgba(255,255,255,.35); transform-origin: bottom; transform: scaleY(0); animation: ypBarUp .5s ease forwards; animation-delay: var(--d); }
+.yp-bars-mini span.is-peak { background: var(--white); }
+@keyframes ypBarUp { to { transform: none; } }
+.yp.is-paused .yp-bars-mini span { animation-play-state: paused; }
+/* crossover: the genres as tags */
+.yp-xo__tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; max-width: 560px; }
+.yp-xo__tags span { border: 1px solid var(--white); background: rgba(0,0,0,.6); padding: 4px 8px 3px; font: 700 clamp(11px, 1.2vw, 14px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }

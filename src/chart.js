@@ -287,6 +287,21 @@ const Chart = (() => {
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
       inTune, deepCuts, characters,
+      // comebacks: old records (10+ years) that suddenly spread to many shows in one month
+      comebacks: all.slice(0, 400).filter((m) => m.released && m.released <= y - 10).map((m) => {
+        const vals = list.map((mm) => m.perMonth[mm] || 0);
+        const peak = Math.max(...vals), at = vals.indexOf(peak), before = Math.max(0, ...vals.slice(0, at));
+        return { ...m, peak, peakMonth: list[at], before, vals };
+      }).filter((m) => m.peak >= 3 && m.before <= 1).sort((a, b) => b.peak - a.peak || a.released - b.released).slice(0, 3),
+      // crossovers: tracks played under the most different genres
+      crossovers: all.slice(0, 400).filter((m) => m.genres && m.shows >= 3)
+        .map((m) => ({ ...m, gl: Object.entries(m.genres).sort((a, b) => b[1] - a[1]).map(([g]) => g) }))
+        .sort((a, b) => b.gl.length - a.gl.length || b.shows - a.shows).slice(0, 3),
+      // loyalty: a track one show kept playing month after month
+      loyal: (() => { // (4+ months; on a tie the show that broadcasts least wins, so loyalty isn't just a daily slot)
+        const t = all.filter((m) => m.shows === 1 && m.months >= 4 && !catchAll(m.latest.show, names))
+          .sort((a, b) => b.months - a.months || (showEps.get(a.latest.show) || 0) - (showEps.get(b.latest.show) || 0))[0];
+        return t ? { ...t, by: (names[t.latest.show] || [])[0] || showName(t.latest.show) } : null; })(),
       // the oldest records among the year's 200 most played (first release year known)
       timeTravel: all.slice(0, 200).filter((m) => m.released && m.released < y - 25).sort((a, b) => a.released - b.released).slice(0, 3),
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null,

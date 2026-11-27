@@ -370,9 +370,12 @@ const Year = (() => {
     });
   }
   let opener = null;
-  let mode = 'cards', deck = { cards: [], stories: [] };
+  let mode = 'play', deck = { cards: [], stories: [] }, summary = null;
+  const startPlay = () => { if (summary) YearPlay.start(box, summary, { onBrowse: () => setMode('cards'), onClose: close }); };
   function setMode(m) {
     mode = m;
+    if (m === 'play') { startPlay(); return; }
+    YearPlay.stop();
     box.querySelectorAll('.year__mode').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
     box.classList.toggle('is-timeline', m === 'timeline');
     if (m === 'timeline') { timeline(y); return; }
@@ -391,7 +394,8 @@ const Year = (() => {
   const onKey = (e) => {
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key === 'Tab') { window.trapTab?.(box, e); e.stopPropagation(); return; }
+    if (e.key === 'Tab') { window.trapTab?.(YearPlay.active ? box.querySelector('.yp') : box, e); e.stopPropagation(); return; }
+    if (mode === 'play') { if (YearPlay.key(e)) e.preventDefault(); e.stopPropagation(); return; }
     if (mode === 'timeline') return;
     else if (e.key === 'ArrowRight') { e.preventDefault(); show(at + 1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); show(at - 1); }
@@ -401,12 +405,12 @@ const Year = (() => {
   async function open(year) {
     y = year;
     if (!box) {
-      mode = 'cards';                       // a fresh overlay starts on the cards
+      mode = 'play';                        // a fresh overlay starts by playing the year
       opener = document.activeElement;      // focus goes back here on close
       box = el('div', 'year');
       box.tabIndex = -1;
       box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', `NTS in ${year}`);
-      box.innerHTML = '<div class="year__top"><select class="year__pick" aria-label="Year"></select><div class="year__modes"><button class="year__mode active" data-mode="cards">Cards</button><button class="year__mode" data-mode="stories">Stories</button><button class="year__mode" data-mode="timeline">Timeline</button></div><span class="year__count"></span><button class="year__close" aria-label="Close">×</button></div>'
+      box.innerHTML = '<div class="year__top"><select class="year__pick" aria-label="Year"></select><div class="year__modes"><button class="year__mode" data-mode="play">▶ Play</button><button class="year__mode active" data-mode="cards">Cards</button><button class="year__mode" data-mode="stories">Stories</button><button class="year__mode" data-mode="timeline">Timeline</button></div><span class="year__count"></span><button class="year__close" aria-label="Close">×</button></div>'
         + '<button class="year__prev" aria-label="Previous">‹</button><div class="year__stage"></div><button class="year__next" aria-label="Next">›</button><span class="year__pos" aria-hidden="true"></span>';
       box.querySelector('.year__close').addEventListener('click', close);
       box.querySelectorAll('.year__mode').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
@@ -425,13 +429,17 @@ const Year = (() => {
     const s = await Chart.year(year);
     if (y !== year || !box) return;
     monthList = s?.monthList || [];
+    summary = s;
     deck.stories = s ? storyCards(s) : [];
     deck.cards = cards = s ? build(s) : [card(`NTS in ${year}`, 'Not ready yet', el('p', 'year__note', 'This year’s charts haven’t been worked out yet. They fill in a year at a time; try again tomorrow.'))];
-    if (mode === 'timeline') timeline(year); else { cards = deck[mode]?.length ? deck[mode] : deck.cards; show(0); }
+    if (mode === 'play' && s) { cards = deck.cards; show(0); startPlay(); }
+    else if (mode === 'timeline') timeline(year);
+    else { if (mode === 'play') mode = 'cards'; cards = deck[mode]?.length ? deck[mode] : deck.cards; show(0); }
   }
   function close() {
     if (!box) return;
     document.removeEventListener('keydown', onKey, true);
+    YearPlay.stop();
     box.remove();
     box = null;
     if (opener?.isConnected) opener.focus();

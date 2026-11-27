@@ -44,7 +44,11 @@ schedule, history and lists.
   shows played it each month over the past year, and its movement since last month
   (▲, ▼ or NEW). Click a track for its details or press play to hear it in the latest
   episode that played it.
-- **NTS in 2026:** the year on NTS in tracks, as full-window cards: the year in numbers,
+- **NTS in 2026** opens by playing the year: full-window scenes one after another, with
+  progress bars along the top (click or → for the next, ← to go back, hold or Space to
+  pause). The year's covers fill the screen, the numbers count up, the countdown leads to the
+  track of the year. Choose **Play with music** and each scene's track plays from where an
+  episode played it. Then browse it all as cards: the year in numbers,
   track of the year, the top 10, artist of the year, number one month by month,
   how the top 10 moved month by month, each track's lifespan, breakouts, tracks played all
   year, the busiest and new shows, and a network of shows that played the same tracks.

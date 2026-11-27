@@ -186,7 +186,18 @@ async function mockAccount() {
     expect(rows[0] === 'Sweetie / 2 shows · 3 episodes' && rows[1].startsWith('See It Thru'), `unexpected chart: ${rows.join(' | ')}`);
     // the year: See It Thru was played by 3 shows across both months, Sweetie by 3 too but fewer episodes
     await win.click('.chart-year');
-    await waitFor(() => document.querySelector('.year__card'), null, { timeout: 10000, what: 'the year cards' });
+    // it opens by playing the year: first the choice of music, then scenes one after another
+    await waitFor(() => document.querySelector('.yp-gate'), null, { timeout: 10000, what: 'the play screen' });
+    await win.evaluate(() => [...document.querySelectorAll('.yp-btn')].find((b) => /without/i.test(b.textContent)).click());
+    await waitFor(() => document.querySelector('.yp-scene.yp-intro'), null, { timeout: 5000, what: 'the first scene' });
+    await win.keyboard.press('ArrowRight');
+    expect(await win.evaluate(() => document.querySelectorAll('.yp-bar.is-done').length === 1), 'the arrow key moves to the next scene');
+    await win.keyboard.press('Space');
+    expect(await win.evaluate(() => document.querySelector('.yp').classList.contains('is-paused')), 'Space pauses');
+    expect(await win.evaluate(() => [...document.querySelectorAll('.yp-title')].some((t) => /Sweetie|See It Thru/.test(t.textContent)) || document.querySelectorAll('.yp-scene').length === 1), 'a scene is showing');
+    // then browse the cards
+    await win.evaluate(() => [...document.querySelectorAll('.yp-topbtn')].find((b) => b.textContent === 'Cards').click());
+    await waitFor(() => !document.querySelector('.yp') && document.querySelector('.year__card'), null, { timeout: 10000, what: 'the year cards' });
     expect(await win.evaluate(() => /NTS in 2026/.test(document.querySelector('.year__kicker').textContent)), 'year intro card');
     await win.keyboard.press('ArrowRight');
     const track = await win.evaluate(() => document.querySelector('.year__track')?.textContent);
@@ -200,10 +211,13 @@ async function mockAccount() {
     await win.keyboard.press('Escape');
     expect(await win.evaluate(() => !document.querySelector('.year')), 'Esc closes the year');
     expect(await win.evaluate(() => document.activeElement?.classList.contains('chart-year')), 'focus goes back to the button that opened it');
-    // closed on the timeline, it reopens on the cards (it used to show the timeline under the Cards tab)
+    // closed on the timeline, it reopens playing (it used to show the timeline under the Cards tab)
     await win.click('.chart-year');
-    await waitFor(() => document.querySelector('.year__card'), null, { timeout: 10000, what: 'the cards on reopening' });
-    expect(await win.evaluate(() => document.querySelector('.year__mode.active').dataset.mode === 'cards' && !document.querySelector('.year').classList.contains('is-timeline')), 'reopens on the cards');
+    await waitFor(() => document.querySelector('.yp-gate'), null, { timeout: 10000, what: 'the play screen on reopening' });
+    expect(await win.evaluate(() => !document.querySelector('.year').classList.contains('is-timeline')), 'reopens playing, not on the timeline');
+    await win.evaluate(() => [...document.querySelectorAll('.yp-topbtn')].find((b) => b.textContent === 'Cards').click());
+    await waitFor(() => document.querySelector('.year__card') && !document.querySelector('.yp'), null, { timeout: 10000, what: 'the cards' });
+    expect(await win.evaluate(() => document.querySelector('.year__mode.active').dataset.mode === 'cards'), 'on the cards');
     expect(await win.evaluate(() => document.querySelector('.year').contains(document.activeElement)), 'focus moves into the year');
     await win.keyboard.press('ArrowRight');
     expect(await win.evaluate(() => document.querySelector('.year__count').textContent.startsWith('2 /')), 'arrow keys move through the cards');

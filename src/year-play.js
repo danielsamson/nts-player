@@ -51,7 +51,7 @@ const YearPlay = (() => {
     const trk = el('span', 'yp-mini__track'), from = el('span', 'yp-mini__from');
     txt.append(trk, from);
     const play = el('button', 'yp-mini__btn', '❚❚'); play.setAttribute('aria-label', 'Pause');
-    const dig = el('button', 'yp-mini__btn yp-mini__dig', '+ Crate'); dig.title = 'Keep the track playing now in your crate';
+    const dig = el('button', 'yp-mini__btn yp-mini__dig'); dig.innerHTML = BOOKMARK; dig.title = 'Bookmark the track playing now';
     p.append(art, txt, play, dig);
     const fmt2 = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
     let artKey = '';
@@ -81,25 +81,28 @@ const YearPlay = (() => {
       for (const t of ep.tracks || []) { const o = t.offset ?? t.offset_estimate; if (o != null && o <= st.position / 1000) cur = t; }
       if (!cur) return;
       const t = { artist: cur.artist, title: cur.title, latest: { show: ep.show, episode: ep.episode, offset: cur.offset ?? cur.offset_estimate, title: ep.title } };
-      if (!crate.has(keyOf(t))) { crate.set(keyOf(t), t); paintCount(); toast(`In your crate: ${t.title}`); }
+      if (!crate.has(keyOf(t))) { crate.set(keyOf(t), t); paintCount(); toast(`Bookmarked ${t.title}`); }
     });
     unPlayer?.(); unPlayer = ArchivePlayer.onChange(paint); paint(ArchivePlayer.state);
     return p;
   }
   // ---- the crate: what you keep while you watch (for this viewing; saved to My NTS too when signed in) ----
   const crate = new Map();               // key -> track
+  // the same bookmark as everywhere else in the app
+  const BOOKMARK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21z"/></svg>';
   const keyOf = (t) => `${t.artist}|${t.title}`.toLowerCase();
   function keepButton(t) {
-    const b = el('button', 'yp-keep', '+');
-    const paint = () => { const on = crate.has(keyOf(t)); b.textContent = on ? '✓' : '+'; b.classList.toggle('is-on', on); b.title = on ? 'In your crate (click to take it out)' : 'Keep it in your crate'; };
+    const b = el('button', 'yp-keep');
+    b.innerHTML = BOOKMARK;
+    const paint = () => { const on = crate.has(keyOf(t)); b.classList.toggle('is-on', on); b.title = on ? 'Bookmarked (click to remove)' : 'Bookmark it to dig into later'; b.setAttribute('aria-pressed', String(on)); };
     paint();
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       const k = keyOf(t);
-      if (crate.has(k)) { crate.delete(k); toast(`Out of your crate: ${t.title}`); }
+      if (crate.has(k)) { crate.delete(k); toast(`Removed ${t.title}`); }
       else {
         crate.set(k, t);
-        toast(`In your crate: ${t.title}. It's waiting at the end`);
+        toast(`Bookmarked ${t.title}. It's waiting at the end`);
         if (typeof supporter !== 'undefined' && supporter && t.latest?.episode) {
           MyNTS.toggleTrack(t.latest.show, t.latest.episode, { artist: t.artist, title: t.title }, true,
             { show: t.latest.show, episode: t.latest.episode, title: t.latest.title, offset: t.latest.offset }).catch(() => {});
@@ -111,7 +114,7 @@ const YearPlay = (() => {
     b.addEventListener('repaint', paint);
     return b;
   }
-  const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.textContent = crate.size ? `Crate ${crate.size}` : ''; c.hidden = !crate.size; } };
+  const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.innerHTML = crate.size ? `${BOOKMARK}<span>${crate.size}</span>` : ''; c.title = 'Bookmarked, waiting at the end'; c.hidden = !crate.size; } };
   // a short note at the bottom of the screen
   let toastTimer = null;
   function toast(text) {
@@ -609,6 +612,21 @@ const YearPlay = (() => {
       return [backdrop(lr, 'lean-back'), box];
     } });
 
+    // time travellers: the oldest records among the year's most played
+    const old = s.timeTravel || [];
+    if (old.length >= 3) out.push({ dur: 9, track: old[0], build() {
+      const box = el('div', 'yp-frame yp-travel');
+      box.append(rise(tape('Time travellers', 'yp-label'), 0), poster([['Old records,', 'outline'], 'new ears'], { d: 0.15, max: 0.11, cls: 'yp-deep__title' }));
+      const row = el('div', 'yp-travel__row');
+      old.forEach((t, i) => {
+        const c = el('div', 'yp-travel__item');
+        c.append(el('span', 'yp-travel__year', String(t.released)), coverImg(t, 'yp-cover'), el('span', 'yp-deep__t', t.title), el('span', 'yp-deep__a', `${t.artist} · ${t.shows} shows in ${year}`));
+        row.append(rise(c, 0.5 + i * 0.3));
+      });
+      box.append(row, rise(tape(`${year - old[0].released} years old and still finding new shows.`, 'yp-tape--sub'), 1.8));
+      return [backdrop(old[0], null, null, true), box];
+    } });
+
     // 11. the sound of the year: the top genres by share of the year's episodes, and which way
     // each went (the last three months against the first three)
     const gen = story(s, 'genres');
@@ -732,7 +750,7 @@ const YearPlay = (() => {
       box.append(rise(tape('Your crate', 'yp-label'), 0));
       if (!items.length) {
         box.append(poster([['Nothing', 'outline'], 'kept yet'], { d: 0.15, max: 0.14 }),
-          rise(tape('Go back (←) and press + on any cover to keep it here.', 'yp-tape--sub'), 0.6));
+          rise(tape('Go back (←) and bookmark any cover to keep it here.', 'yp-tape--sub'), 0.6));
         return [backdrop(t1, null, null, true), box];
       }
       box.append(poster([`${items.length} to dig into`], { d: 0.15, max: 0.11 }));

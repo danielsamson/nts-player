@@ -179,11 +179,12 @@ const UA = { 'User-Agent': 'nts-player-charts/1.0', Accept: 'application/json' }
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const words = (x) => new Set(n(x).split(' ').filter((w) => w.length > 1 && !['the', 'and', 'feat', 'ft'].includes(w)));
 const plain = (x) => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+(feat|ft)\.?\s.*$/i, '').replace(/["“”]/g, '').trim();
-// is a result this track? same title (ignoring brackets, feat.) and an overlapping artist
+// is a result this track? same title (ignoring brackets, feat.) and every word of the main artist
+// (one shared word let Michael Jackson match a Jackson 5 recording)
 function same(artist, title, rArtist, rTitle) {
   if (n(plain(rTitle)) !== n(plain(title))) return false;
-  const a = words(artist), b = words(rArtist);
-  return !a.size || [...a].some((w) => b.has(w));
+  const a = words(splitArtists(artist)[0] || artist), b = words(rArtist);
+  return !a.size || [...a].every((w) => b.has(w));
 }
 async function getJson(url, tries = 7) {
   for (let i = 0; i < tries; i++) {
@@ -222,7 +223,8 @@ async function releaseYear(artist, title) {
   } catch {}
   return found.length ? Math.min(...found) : 0;
 }
-const yearsFile = () => path.join(OUT, 'charts', 'years-v2.json');     // v2: looser search, retries, Deezer/iTunes fallback
+const YEARS_V = 3;                     // v3: the whole main artist must match
+const yearsFile = () => path.join(OUT, 'charts', `years-v${YEARS_V}.json`);
 const keyOf = (t) => `${n(t[0])}|${n(t[1])}`;
 // A freshly built month gets every release year already looked up, so a rebuild never loses
 // them; it's only marked done (yearsV) if none of its top tracks are left to look up
@@ -232,7 +234,7 @@ function cachedYears(d) {
   const top = d.tracks.filter((t) => t[2] >= 2).slice(0, YEAR_TOP);
   d.years = {};
   top.forEach((t, i) => { if (cache[keyOf(t)]) d.years[i] = cache[keyOf(t)]; });
-  if (top.every((t) => keyOf(t) in cache)) d.yearsV = 2;
+  if (top.every((t) => keyOf(t) in cache)) d.yearsV = YEARS_V;
 }
 async function fillYears() {
   const dir = path.join(OUT, 'charts');
@@ -240,7 +242,7 @@ async function fillYears() {
   let cache = {};
   try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch {}
   const todo = fs.readdirSync(dir).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).sort().reverse()
-    .filter((f) => { try { const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); return d.v >= VERSION && d.yearsV !== 2; } catch { return false; } })
+    .filter((f) => { try { const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); return d.v >= VERSION && d.yearsV !== YEARS_V; } catch { return false; } })
     .slice(0, YEARS_PER_RUN);
   for (const f of todo) {
     const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
@@ -259,7 +261,7 @@ async function fillYears() {
     fs.writeFileSync(cacheFile, JSON.stringify(cache));
     if (failed) return;
     d.years = years;                    // chart row index -> first release year
-    d.yearsV = 2;
+    d.yearsV = YEARS_V;
     fs.writeFileSync(path.join(dir, f), JSON.stringify(d));
     console.log(`years: ${f} (${Object.keys(years).length} of ${i})`);
   }

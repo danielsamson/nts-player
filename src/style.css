@@ -2242,3 +2242,19 @@ body.playing .channel .track__time { color: var(--grey-3); }
 }
 .yp-crate__grid { scrollbar-width: none; }
 .yp-crate__grid::-webkit-scrollbar { display: none; }
+/* bookmark, as in the rest of the app */
+.yp-keep svg, .yp-cratecount svg, .yp-mini__dig svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+.yp-keep.is-on svg { fill: currentColor; }
+.yp-cratecount { gap: 6px; }
+.yp-cratecount svg { fill: currentColor; }
+/* time travellers */
+.yp-travel { justify-content: center; padding-top: 96px; }
+.yp-travel__row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vw; width: min(90vw, 900px); }
+.yp-travel__item { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.yp-travel__item .yp-cover { width: 100%; }
+.yp-travel__year { font-size: clamp(44px, 7vw, 96px); line-height: .85; font-weight: 700; letter-spacing: -.02em; margin-bottom: 6px; }
+@media (max-width: 559px) { .yp-travel__row { grid-template-columns: repeat(3, 1fr); gap: 8px; } .yp-travel__year { font-size: 30px; } }
+.yp-travel { padding-top: 100px; padding-bottom: 70px; }
+.yp-travel__row { width: min(78vw, 46vh * 3 + 6vw); }
+.yp-travel__item .yp-cover { max-width: 30vh; }
+.yp-travel__year { font-size: clamp(36px, 5.4vw, 72px); }

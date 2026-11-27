@@ -287,6 +287,8 @@ const Chart = (() => {
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
       pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
       inTune, deepCuts, characters,
+      // the oldest records among the year's 200 most played (first release year known)
+      timeTravel: all.slice(0, 200).filter((m) => m.released && m.released < y - 25).sort((a, b) => a.released - b.released).slice(0, 3),
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null,
       stories: stories(y, files, all, monthFiles, names),
       monthList: list, monthRanks, links, names,

@@ -36,7 +36,7 @@ const YearPlay = (() => {
         e.stopPropagation();
         playingKey = `${t.latest.show}/${t.latest.episode}/${t.latest.offset}`;
         crossTo(t);
-        toast(`Playing ${t.title} where ${t.latest.title || 'a show'} played it`);
+        toast(`Playing ${t.title}, the way ${t.latest.title || 'a show'} played it`);
       });
     }
     return wrap;
@@ -51,7 +51,7 @@ const YearPlay = (() => {
     const trk = el('span', 'yp-mini__track'), from = el('span', 'yp-mini__from');
     txt.append(trk, from);
     const play = el('button', 'yp-mini__btn', '❚❚'); play.setAttribute('aria-label', 'Pause');
-    const dig = el('button', 'yp-mini__btn yp-mini__dig'); dig.innerHTML = BOOKMARK; dig.title = 'Bookmark the track playing now';
+    const dig = el('button', 'yp-mini__btn yp-mini__dig'); dig.innerHTML = BOOKMARK; dig.title = 'Save this one for later';
     p.append(art, txt, play, dig);
     const fmt2 = (ms) => { const t = Math.floor(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
     let artKey = '';
@@ -81,7 +81,7 @@ const YearPlay = (() => {
       for (const t of ep.tracks || []) { const o = t.offset ?? t.offset_estimate; if (o != null && o <= st.position / 1000) cur = t; }
       if (!cur) return;
       const t = { artist: cur.artist, title: cur.title, latest: { show: ep.show, episode: ep.episode, offset: cur.offset ?? cur.offset_estimate, title: ep.title } };
-      if (!crate.has(keyOf(t))) { crate.set(keyOf(t), t); paintCount(); toast(`Bookmarked ${t.title}`); }
+      if (!crate.has(keyOf(t))) { crate.set(keyOf(t), t); paintCount(); toast(`${t.title}, saved`); }
     });
     unPlayer?.(); unPlayer = ArchivePlayer.onChange(paint); paint(ArchivePlayer.state);
     return p;
@@ -94,15 +94,15 @@ const YearPlay = (() => {
   function keepButton(t) {
     const b = el('button', 'yp-keep');
     b.innerHTML = BOOKMARK;
-    const paint = () => { const on = crate.has(keyOf(t)); b.classList.toggle('is-on', on); b.title = on ? 'Bookmarked (click to remove)' : 'Bookmark it to dig into later'; b.setAttribute('aria-pressed', String(on)); };
+    const paint = () => { const on = crate.has(keyOf(t)); b.classList.toggle('is-on', on); b.title = on ? 'Saved. Click to let it go' : 'Save it for later'; b.setAttribute('aria-pressed', String(on)); };
     paint();
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       const k = keyOf(t);
-      if (crate.has(k)) { crate.delete(k); toast(`Removed ${t.title}`); }
+      if (crate.has(k)) { crate.delete(k); toast(`${t.title}, let go`); }
       else {
         crate.set(k, t);
-        toast(`Bookmarked ${t.title}. It's waiting at the end`);
+        toast(`${t.title}, saved. It'll be waiting at the end`);
         if (typeof supporter !== 'undefined' && supporter && t.latest?.episode) {
           MyNTS.toggleTrack(t.latest.show, t.latest.episode, { artist: t.artist, title: t.title }, true,
             { show: t.latest.show, episode: t.latest.episode, title: t.latest.title, offset: t.latest.offset }).catch(() => {});
@@ -114,7 +114,7 @@ const YearPlay = (() => {
     b.addEventListener('repaint', paint);
     return b;
   }
-  const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.innerHTML = crate.size ? `${BOOKMARK}<span>${crate.size}</span>` : ''; c.title = 'Bookmarked, waiting at the end'; c.hidden = !crate.size; } };
+  const paintCount = () => { const c = root?.querySelector('.yp-cratecount'); if (c) { c.innerHTML = crate.size ? `${BOOKMARK}<span>${crate.size}</span>` : ''; c.title = 'Saved for later. Waiting at the end'; c.hidden = !crate.size; } };
   // a short note at the bottom of the screen
   let toastTimer = null;
   function toast(text) {
@@ -473,11 +473,11 @@ const YearPlay = (() => {
     if (rep) out.push({ dur: 8, build() {
       const once = rep.viz.value;
       const box = el('div', 'yp-frame yp-frame--center');
-      box.append(rise(tape('Of every 100 tracks played', 'yp-label'), 0));
+      box.append(rise(tape('For every 100 tracks', 'yp-label'), 0));
       const g = el('div', 'yp-waffle yp-panel');
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
       box.append(g, poster([[`${once} of 100`, 'outline'], 'played once'], { d: 2.2, max: 0.2, cls: 'yp-poster--center yp-poster--narrow' }),
-        rise(tape(`Only ${100 - once} came back, on any show.`, 'yp-tape--sub'), 2.9));
+        rise(tape(`${['None', 'One', 'Two', 'Three', 'Four', 'Five'][100 - once] || 100 - once} came back. The rest were played once and put back in the bag.`, 'yp-tape--sub'), 2.9));
       return [backdrop(null, 'don-t-assume', kinetic('Played once', { rows: 7, angle: 0, size: '11vh', speed: 26, solid: [3], opacity: 0.35 }), true), box];
     } });
 
@@ -501,7 +501,7 @@ const YearPlay = (() => {
     const t1 = top[0];
     if (t1) out.push({ dur: 2.4, cls: 'yp-beat', build() {
       const box = el('div', 'yp-frame yp-frame--center');
-      box.append(rise(tape('And the track of the year', 'yp-label'), 0.2), poster([['Number one', 'outline']], { d: 0.5, max: 0.24, cls: 'yp-poster--center yp-poster--narrow' }));
+      box.append(rise(tape('And finally', 'yp-label'), 0.2), poster([['Number one', 'outline']], { d: 0.5, max: 0.24, cls: 'yp-poster--center yp-poster--narrow' }));
       return [box];
     } });
 
@@ -510,7 +510,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(coverImg(t1, 'yp-cover yp-cover--hero'), 0.3), rise(tape('Track of the year', 'yp-label'), 0.6),
         poster(splitLines(t1.title, t1.title.length > 8 ? 2 : 1), { even: true, d: 0.9, max: 0.3, cls: 'yp-poster--beside' }));
-      const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist} · played by `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' shows');
+      const n = tape('', 'yp-tape--sub'); n.append(`${t1.artist}. `, counter(t1.shows, { d: 1.6, ms: 1200 }), ' different shows reached for it.');
       box.append(rise(n, 1.4));
       return [backdrop(t1), box];
     } });
@@ -522,7 +522,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-frame--bottom');
       const parts = splitLines(a1.artist, a1.artist.length > 10 ? 2 : 1);
       box.append(rise(tape('Artist of the year', 'yp-label'), 0.1), poster(parts.map((p, i) => (i % 2 ? [p, 'outline'] : p)), { d: 0.3, max: 0.32, cls: 'yp-poster--artist' }));
-      const n = tape('', 'yp-tape--sub'); n.append('Played by ', counter(a1.shows, { d: 0.9 }), ` shows · ${a1.tracks} different tracks`);
+      const n = tape('', 'yp-tape--sub'); n.append(`${a1.tracks} tracks, on `, counter(a1.shows, { d: 0.9 }), ' different shows.');
       box.append(rise(n, 0.9));
       // the record, and their tracks NTS played, as a tracklist
       const side = el('div', 'yp-artistrec');
@@ -547,7 +547,7 @@ const YearPlay = (() => {
       const num = el('span'); num.append(counter(leap.viz.to, { from: leap.viz.from, prefix: '#', d: 0.6, ms: 2200 }));
       const box = el('div', 'yp-frame yp-frame--right');
       box.append(rise(tape('The biggest leap', 'yp-label'), 0), poster(splitLines(t.title, 2), { even: true, d: 2.3, max: 0.12 }),
-        rise(tape(`${t.artist} · #${leap.viz.from} → #${leap.viz.to} in a month`, 'yp-tape--sub'), 2.7));
+        rise(tape(`${t.artist}. From #${leap.viz.from} to #${leap.viz.to} in a single month.`, 'yp-tape--sub'), 2.7));
       return [backdrop(t), giant(num, 'yp-giant-bg--left yp-giant-bg--count'), box];
     } });
 
@@ -557,7 +557,7 @@ const YearPlay = (() => {
       const v = first.viz;
       const box = el('div', 'yp-frame yp-frame--bottom');
       box.append(rise(tape('Who heard it first', 'yp-label'), 0), poster(splitLines(v.firsts[0].show, 2), { even: true, d: 0.2, max: 0.24 }),
-        rise(tape(`played ${v.t.title} (${v.t.artist}) before anyone else`, 'yp-tape--sub'), 0.7));
+        rise(tape(`had ${v.t.title} (${v.t.artist}) before anyone else.`, 'yp-tape--sub'), 0.7));
       const line = el('div', 'yp-strip');
       for (let m = 0; m < 12; m++) { const tk = el('span', 'yp-strip__tick', 'JFMAMJJASOND'[m]); tk.style.left = `${((m + 0.5) / 12) * 100}%`; line.append(tk); }
       const y0 = Date.UTC(v.year, 0, 1), y1 = Date.UTC(v.year + 1, 0, 1);
@@ -569,7 +569,7 @@ const YearPlay = (() => {
         dot.classList.add('yp-hot');
         line.append(dot);
       });
-      box.append(rise(line, 1), rise(tape(`then ${v.firsts.length - 1} more shows`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
+      box.append(rise(line, 1), rise(tape(`Then ${v.firsts.length - 1} more shows caught on.`, 'yp-tape--sub'), 1.3 + v.firsts.length * 0.12));
       const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
       const cov = rise(coverImg(v.t, 'yp-cover yp-cover--feature'), 0.4);
       art.append(cov, rise(el('p', 'yp-artcap', `${v.t.title} · ${v.t.artist}`), 0.7));
@@ -587,7 +587,7 @@ const YearPlay = (() => {
       const from = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' });
       const to = monthShort(s.monthList[s.monthList.length - 1]);
       box.append(rise(tape(`Rising · ${from}–${to}`, 'yp-label'), 0), poster([['Breaking', 'outline'], 'through'], { d: 0.15, max: 0.14, cls: 'yp-rise__title' }), g,
-        rise(tape(`New in the last three months (${since} on) and already picked up by the most shows.`, 'yp-tape--sub'), 1.9));
+        rise(tape(`New since ${since}, and already doing the rounds.`, 'yp-tape--sub'), 1.9));
       return [backdrop(s.breakouts[0], null, null, true), box];
     } });
 
@@ -603,7 +603,7 @@ const YearPlay = (() => {
         c.style.setProperty('--d', `${0.9 + i * 0.14}s`);
         months.append(c);
       });
-      box.append(rise(months, 0.8), rise(tape(`Played in ${lr.months} of ${s.months} months. Most tracks on NTS last a few weeks.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));
+      box.append(rise(months, 0.8), rise(tape(`On in ${lr.months} of ${s.months} months. Most tracks here last a few weeks. This one kept coming back.`, 'yp-tape--sub'), 1.2 + (s.monthList || []).length * 0.14));
       const l = el('div', 'yp-artsplit__text'); l.append(...box.childNodes);
       box.classList.add('yp-artsplit');
       const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
@@ -623,7 +623,7 @@ const YearPlay = (() => {
         c.append(el('span', 'yp-travel__year', String(t.released)), coverImg(t, 'yp-cover'), el('span', 'yp-deep__t', t.title), el('span', 'yp-deep__a', `${t.artist} · ${t.shows} shows in ${year}`));
         row.append(rise(c, 0.5 + i * 0.3));
       });
-      box.append(row, rise(tape(`${year - old[0].released} years old and still finding new shows.`, 'yp-tape--sub'), 1.8));
+      box.append(row, rise(tape(`${year - old[0].released} years old, and still finding new homes.`, 'yp-tape--sub'), 1.8));
       return [backdrop(old[0], null, null, true), box];
     } });
 
@@ -639,7 +639,7 @@ const YearPlay = (() => {
         const mx = Math.max(...t.vals, 1);
         t.vals.forEach((v, j) => { const b = el('span', s.monthList[j] === t.peakMonth ? 'is-peak' : ''); b.style.setProperty('--h', `${Math.max(4, (v / mx) * 100)}%`); b.style.setProperty('--d', `${0.9 + i * 0.3 + j * 0.04}s`); bars.append(b); });
         c.append(coverImg(t, 'yp-cover'), bars, el('span', 'yp-deep__t', t.title),
-          el('span', 'yp-deep__a', `${t.artist} · ${t.released}`), el('span', 'yp-deep__by', `${t.peak} shows in ${monthShort(t.peakMonth)}, out of nowhere`));
+          el('span', 'yp-deep__a', `${t.artist} · ${t.released}`), el('span', 'yp-deep__by', `${t.peak} shows in ${monthShort(t.peakMonth)}, after years of quiet`));
         row.append(rise(c, 0.5 + i * 0.3));
       });
       box.append(row);
@@ -652,7 +652,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-artsplit');
       const l = el('div', 'yp-artsplit__text');
       l.append(rise(tape('Crossover', 'yp-label'), 0), poster(splitLines(xo.title, xo.title.length > 12 ? 2 : 1), { even: true, d: 0.2, max: 0.16 }),
-        rise(tape(`${xo.artist} · played in ${xo.gl.length} different genres of show`, 'yp-tape--sub'), 0.6));
+        rise(tape(`${xo.artist}. Turned up on ${xo.gl.length} kinds of show, from ${xo.gl[0]} to ${xo.gl[xo.gl.length - 1]}.`, 'yp-tape--sub'), 0.6));
       const tags = el('div', 'yp-xo__tags');
       xo.gl.slice(0, 10).forEach((g, i) => tags.append(rise(el('span', null, g), 0.9 + i * 0.12)));
       l.append(tags);
@@ -668,10 +668,10 @@ const YearPlay = (() => {
       const box = el('div', 'yp-frame yp-artsplit');
       const l = el('div', 'yp-artsplit__text');
       l.append(rise(tape('Loyal', 'yp-label'), 0), poster(splitLines(ly.by, ly.by.length > 14 ? 2 : 1), { even: true, d: 0.2, max: 0.13 }),
-        rise(tape(`kept coming back to ${ly.title} (${ly.artist}). No other show played it.`, 'yp-tape--sub'), 0.6));
+        rise(tape(`couldn't let ${ly.title} (${ly.artist}) go. Nobody else touched it.`, 'yp-tape--sub'), 0.6));
       const months = el('div', 'yp-months');
       (s.monthList || []).forEach((m, i) => { const c = el('span', (ly.perMonth?.[m] || 0) > 0 ? 'is-on' : '', monthShort(m).slice(0, 1)); c.style.setProperty('--d', `${0.9 + i * 0.12}s`); months.append(c); });
-      l.append(rise(months, 0.8), rise(tape(`${ly.months} months, ${ly.episodes} episodes`, 'yp-tape--sub'), 1.4));
+      l.append(rise(months, 0.8), rise(tape(`${ly.months} months, ${ly.episodes} episodes.`, 'yp-tape--sub'), 1.4));
       const art = el('div', 'yp-artsplit__art yp-artsplit__art--one');
       art.append(rise(coverImg(ly, 'yp-cover yp-cover--feature'), 0.3));
       box.append(l, art);
@@ -702,7 +702,7 @@ const YearPlay = (() => {
         chart.append(rise(row, 0.5 + i * 0.25));
       });
       return [backdrop(null, 'lsd'), whitePanel({ icon: '◉', label: 'The sound of the year', title: [['The sound', 'outline'], 'of the year'], body: chart,
-        foot: 'Share of the year’s episodes tagged with each genre. ▲ ▼ more or less of it by the end of the year.' })];
+        foot: 'How much of the year each sound took up, by episode. The arrows show where it was heading by the end.' })];
     } });
 
     // 12. tastemaker of the year
@@ -725,7 +725,7 @@ const YearPlay = (() => {
       const left = el('div', 'yp-showsplit__text');
       const big = el('div', 'yp-showcount'); big.append(counter(s.debuts.length, { d: 0.3, ms: 1300 }));
       left.append(rise(tape('New on NTS', 'yp-label'), 0), rise(big, 0.1), poster(['new shows'], { d: 0.4, max: 0.1 }),
-        rise(tape(`First broadcast in ${year}${s.complete ? '' : ', so far'}.`, 'yp-tape--sub'), 0.9));
+        rise(tape(s.complete ? `On air for the first time in ${year}.` : `On air for the first time this year, and counting.`, 'yp-tape--sub'), 0.9));
       // every new show, scattered at random across and past the frame, drifting: more than fits
       const field = el('div', 'yp-showfield');
       const shows = s.debuts.slice().sort(() => Math.random() - 0.5);
@@ -750,7 +750,7 @@ const YearPlay = (() => {
       const l = el('div', 'yp-artsplit__text');
       l.append(rise(tape('In tune with NTS', 'yp-label'), 0), showLink(poster(splitLines(tuneS.name, tuneS.name.length > 16 ? 3 : 2), { even: true, d: 0.2, max: 0.2 }), tuneS.show));
       const n = tape('', 'yp-tape--sub'); const ahead = (s.inTune || []).filter((x) => x.count > tuneS.count);
-      n.append('Played ', counter(tuneS.count, { d: 0.8, ms: 1100 }), ` of the year’s top 100 tracks. ${!ahead.length ? 'More than any other show.' : ahead.length === 1 ? `Second only to ${ahead[0].name}.` : `Only ${ahead.length} shows played more.`}`);
+      n.append('Had ', counter(tuneS.count, { d: 0.8, ms: 1100 }), ` of the year’s top 100. ${!ahead.length ? 'Nobody had more.' : ahead.length === 1 ? `Only ${ahead[0].name} had more.` : `Only ${ahead.length} shows had more.`}`);
       l.append(rise(n, 0.7));
       box.append(l, coverGrid(tuneS.tracks.slice(0, 9), { cols: 3, d: 0.5, step: 0.09, captions: false, cls: 'yp-artsplit__art yp-mosaic' }));
       return [backdrop(tuneS.tracks[0]), box];
@@ -759,7 +759,7 @@ const YearPlay = (() => {
     const pr = s.pair;
     if (pr && pr.count >= 3) out.push({ dur: 8, track: pr.tracks?.[0], build() {
       const amp = el('div', 'yp-amp', '&');
-      const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ' tracks in common, among them:');
+      const n = tape('', 'yp-tape--sub'); n.append(counter(pr.count, { d: 1, ms: 1000 }), ' tracks in common. A few of them:');
       const box = artSplit([rise(tape('Shared taste', 'yp-label'), 0), showLink(poster(splitLines(nm(pr.a), 2), { even: true, d: 0.2, max: 0.15 }), pr.a), rise(amp, 0.45),
         showLink(poster(splitLines(nm(pr.b), 2), { even: true, d: 0.6, max: 0.15 }), pr.b), rise(n, 1)],
         coverGrid((pr.tracks || []).slice(0, 4), { cols: 2, d: 1.1, cls: 'yp-artsplit__art' }));
@@ -778,7 +778,7 @@ const YearPlay = (() => {
         li.append(coverImg(t, 'yp-cover'), tx);
         list.append(rise(li, 0.6 + i * 0.18));
       });
-      box.append(list, rise(tape('Played again and again by one show, and by no one else.', 'yp-tape--sub'), 1.8));
+      box.append(list, rise(tape('Loved hard by one show. Nobody else went near them.', 'yp-tape--sub'), 1.8));
       return [backdrop(s.deepCuts[0], null, null, true), box];
     } });
     // the year it happened: the months, a moment pinned where an artist suddenly spread; hover one
@@ -787,7 +787,7 @@ const YearPlay = (() => {
     const mo = (s.moments || []).filter((x) => x.t && x.text);
     if (mo.length >= 3) out.push({ dur: 12, track: mo[0].t, cls: 'yp-happened', build() {
       const box = el('div', 'yp-frame yp-happen');
-      box.append(rise(tape('The year it happened', 'yp-label'), 0), poster([['What the world', 'outline'], 'did to NTS'], { d: 0.15, max: 0.1, cls: 'yp-deep__title' }));
+      box.append(rise(tape('The year it happened', 'yp-label'), 0), poster([['The world', 'outline'], 'came through'], { d: 0.15, max: 0.1, cls: 'yp-deep__title' }));
       const line = el('div', 'yp-happen__line');
       const months = s.monthList || [];
       months.forEach((m, i) => { const tk = el('span', 'yp-happen__month', monthShort(m)); tk.style.left = `${((i + 0.5) / months.length) * 100}%`; line.append(tk); });
@@ -795,10 +795,10 @@ const YearPlay = (() => {
       const pick = (x, pin) => {
         line.querySelectorAll('.yp-happen__pin').forEach((p) => p.classList.toggle('is-on', p === pin));
         const u = Math.round(x.usual);
-        const usual = x.usual < 1 ? 'barely played' : `about ${u} show${u === 1 ? '' : 's'} a month`;
+        const usual = x.usual < 1 ? 'Barely played' : `Usually ${u} show${u === 1 ? '' : 's'} a month`;
         const month = new Date(Date.UTC(+x.month.slice(0, 4), +x.month.slice(5) - 1, 15)).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
         detail.replaceChildren(el('span', 'yp-happen__artist', x.artist),
-          el('span', 'yp-happen__jump', `${usual} → ${x.peak} shows in ${month}`),
+          el('span', 'yp-happen__jump', `${usual}, then ${x.peak} in ${month}`),
           x.text ? el('span', 'yp-happen__text', x.text) : el('span', 'yp-happen__text is-quiet', `Played most: ${x.t.title}`));
       };
       const used = new Map();
@@ -847,7 +847,7 @@ const YearPlay = (() => {
         row.append(names, el('span', 'yp-ho__n', `${h.count} tracks, about ${h.days} days later`), covers);
         list.append(rise(row, 0.6 + i * 0.25));
       });
-      box.append(list, rise(tape('One show plays it, the other picks it up within three weeks. Again and again.', 'yp-tape--sub'), 2));
+      box.append(list, rise(tape('One plays it, the other picks it up a few weeks on. It keeps happening.', 'yp-tape--sub'), 2));
       return [backdrop(ho[0].tracks[0], null, null, true), box];
     } });
 
@@ -858,7 +858,7 @@ const YearPlay = (() => {
       box.append(rise(tape('Your crate', 'yp-label'), 0));
       if (!items.length) {
         box.append(poster([['Nothing', 'outline'], 'kept yet'], { d: 0.15, max: 0.14 }),
-          rise(tape('Go back (←) and bookmark any cover to keep it here.', 'yp-tape--sub'), 0.6));
+          rise(tape('Go back and save anything that catches you. It waits here.', 'yp-tape--sub'), 0.6));
         return [backdrop(t1, null, null, true), box];
       }
       box.append(poster([`${items.length} to dig into`], { d: 0.15, max: 0.11 }));
@@ -872,7 +872,7 @@ const YearPlay = (() => {
         grid.append(rise(c, 0.4 + i * 0.1));
       });
       box.append(grid);
-      if (typeof supporter !== 'undefined' && supporter) box.append(rise(tape('Saved to your tracks in My NTS too.', 'yp-tape--sub'), 1));
+      if (typeof supporter !== 'undefined' && supporter) box.append(rise(tape('Also saved to My NTS.', 'yp-tape--sub'), 1));
       return [backdrop(items[0], null, null, true), box];
     } });
 
@@ -1005,7 +1005,7 @@ const YearPlay = (() => {
     // Auto: plays itself (slower); otherwise it waits for you
     const autoBtn = el('button', 'yp-topbtn', 'Auto');
     autoBtn.setAttribute('aria-pressed', 'false');
-    autoBtn.title = 'Play through by itself';
+    autoBtn.title = 'Let it play through';
     autoBtn.addEventListener('click', (e) => { e.stopPropagation(); auto = !auto; autoBtn.setAttribute('aria-pressed', String(auto)); show(at, true); });
     const browse = el('button', 'yp-topbtn', 'Cards');
     browse.title = 'Browse the year as cards';
@@ -1016,7 +1016,7 @@ const YearPlay = (() => {
     const count = el('span', 'yp-cratecount'); count.hidden = true;
     top.append(bars, count, autoBtn, browse, close);
     const stage = el('div', 'yp-stage');
-    const hint = el('p', 'yp-hint', 'Take your time · click or → for the next · hover and click things to explore');
+    const hint = el('p', 'yp-hint', 'No rush. Click or → to move on. Most things play if you click them.');
     const nudge = el('p', 'yp-nudge', 'Click to continue ›');
     root.append(stage, osd(s.year), top, hint, nudge, miniPlayer(), outlineFilters());
     // a label that follows the cursor over anything with a tip
@@ -1058,7 +1058,7 @@ const YearPlay = (() => {
     const gate = el('div', 'yp-gate');
     const gt = el('div', 'yp-frame yp-frame--bottom');
     gt.append(rise(tape('▶ NTS in', 'yp-label'), 0), poster([String(s.year)], { d: 0.1, max: 0.5 }),
-      rise(tape('The year on NTS, told through its tracklists.', 'yp-tape--sub'), 0.4));
+      rise(tape('A year of NTS, read back from the tracklists.', 'yp-tape--sub'), 0.4));
     const acts = el('div', 'yp-actions');
     const withMusic = el('button', 'yp-btn yp-btn--on', '▶ Play with music');
     withMusic.title = 'Each track plays as it comes up (this stops what you’re listening to)';

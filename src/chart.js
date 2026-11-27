@@ -268,9 +268,9 @@ const Chart = (() => {
     const oldest = best([...perShow].filter(([, r]) => r.dated.length >= 5).map(([sh, r]) => [sh, r, median(r.dated)]), (a, b) => a[2] - b[2]);
     const widest = best([...perShow].map(([sh, r]) => [sh, r, showFams.get(sh)?.size || 0]).filter((x) => x[2] >= 6), (a, b) => b[2] - a[2]);
     const characters = [
-      solo && { kind: 'Deepest crate', show: solo[0], name: label(solo[0]), text: `${solo[1].solo} tracks no other show played, in ${eps(solo[0])} episodes`, t: solo[1].soloTracks[0] || solo[1].tracks[0] },
-      oldest && { kind: 'Oldest record box', show: oldest[0], name: label(oldest[0]), text: `half its charted tracks came out before ${oldest[2] + 1}`, t: oldest[1].datedTracks.sort((a, b) => a.released - b.released)[0] || oldest[1].tracks[0] },
-      widest && { kind: 'Widest range', show: widest[0], name: label(widest[0]), text: `played across ${widest[2]} genres`, t: widest[1].tracks[widest[1].tracks.length - 1] }
+      solo && { kind: 'Deepest crate', show: solo[0], name: label(solo[0]), text: `${solo[1].solo} tracks nobody else played, in ${eps(solo[0])} episodes`, t: solo[1].soloTracks[0] || solo[1].tracks[0] },
+      oldest && { kind: 'Oldest record box', show: oldest[0], name: label(oldest[0]), text: `Half the records predate ${oldest[2] + 1}`, t: oldest[1].datedTracks.sort((a, b) => a.released - b.released)[0] || oldest[1].tracks[0] },
+      widest && { kind: 'Widest range', show: widest[0], name: label(widest[0]), text: `${widest[2]} genres, no fixed address`, t: widest[1].tracks[widest[1].tracks.length - 1] }
     ].filter((c) => c && c.t);
     // the year it happened: artists whose plays jumped in one month (news: a death, a return,
     // an anniversary). Shows per month per artist; a spike is a month with 7+ shows and at least
@@ -403,7 +403,7 @@ const Chart = (() => {
     if (rates.length) {
       const r = rates.reduce((a, b) => a + b, 0) / rates.length;
       out.push({ id: 'repeats', kicker: 'Never the same twice', headline: r > 0.9 ? 'NTS almost never repeats itself' : 'How often tracks come back',
-        body: `${pct(r)}% of tracks were played just once in their month. Only ${100 - pct(r)} in every 100 got a second play, on any show. Most radio runs on playlists; NTS runs on record bags.`,
+        body: `${pct(r)}% of tracks got one play in their month, and that was it. Only ${100 - pct(r)} in every 100 came round again, on any show. Most radio runs on playlists. NTS runs on record bags.`,
         viz: { type: 'waffle', value: pct(r) } });
     }
 
@@ -436,7 +436,7 @@ const Chart = (() => {
     if (leap && leap.by >= 20) {
       const t = monthFiles.find((f) => f.period === leap.month).rows.find((r) => key(r.artist, r.title) === leap.k);
       if (t) out.push({ id: 'leap', kicker: 'The biggest leap', headline: `From #${leap.from} to #${leap.to}`,
-        body: `${q(t.title)} by ${t.artist} jumped ${leap.by} places in ${mName(leap.month)}, the biggest climb into a monthly top 10 all year.`,
+        body: `${q(t.title)} by ${t.artist} climbed ${leap.by} places in ${mName(leap.month)}. Nothing else made a jump like it all year.`,
         viz: { type: 'leap', t, from: leap.from, to: leap.to } });
     }
 
@@ -468,7 +468,7 @@ const Chart = (() => {
       const peakM = eps.slice().sort((a, b) => b.v - a.v)[0];
       const avg = eps.reduce((a, b) => a + b.v, 0) / eps.length;
       out.push({ id: 'busiest', kicker: 'The busiest month', headline: `${mName(peakM.m)}: ${peakM.v.toLocaleString()} episodes`,
-        body: `${Math.round((peakM.v / avg - 1) * 100)}% more than an average month this year (${Math.round(avg).toLocaleString()} episodes).`,
+        body: `${Math.round((peakM.v / avg - 1) * 100)}% busier than usual (${Math.round(avg).toLocaleString()} episodes in a normal month). Listener takeovers did a lot of the lifting.`,
         viz: { type: 'bars', rows: eps, peak: peakM.m } });
     }
 
@@ -476,7 +476,7 @@ const Chart = (() => {
     let repeat = null;
     for (const f of files) for (const t of f.tracks) if (t[3].length === 1 && !catchAll(f.showList[t[3][0]], names) && t[2] > (repeat?.times || 0)) repeat = { times: t[2], artist: t[0], title: t[1], show: f.showList[t[3][0]], month: f.period };
     if (repeat && repeat.times >= 3) out.push({ id: 'repeat', kicker: 'On repeat', headline: `${repeat.times} plays, one show`,
-      body: `The most any show played one track in a month: ${nm(repeat.show)} played ${q(repeat.title)} by ${repeat.artist} ${repeat.times} times in ${mName(repeat.month)}.`,
+      body: `${nm(repeat.show)} played ${q(repeat.title)} by ${repeat.artist} ${repeat.times} times in ${mName(repeat.month)}. Nobody leaned on one record harder.`,
       viz: { type: 'cover', t: { artist: repeat.artist, title: repeat.title } } });
 
     // 7. who heard it first
@@ -497,7 +497,7 @@ const Chart = (() => {
     for (const t of big) { const l = lead(t); if (!l || CATCH_ALL.test(l.first[0])) continue; const s = l.first[0]; if (!credit.has(s)) credit.set(s, []); credit.get(s).push(t); }
     const taste = [...credit].sort((a, b) => b[1].length - a[1].length)[0];
     if (taste && taste[1].length >= 2) out.push({ id: 'tastemaker', kicker: 'Tastemaker of the year', headline: nm(taste[0]),
-      body: `First to play ${taste[1].length} tracks that at least five shows went on to play this year.`,
+      body: `Got there first on ${taste[1].length} tracks that five or more shows went on to play.`,
       viz: { type: 'tracks', rows: taste[1].sort((a, b) => b.shows - a.shows).slice(0, 4) } });
 
     // 9. old and new: when the year's top 100 first came out

@@ -12,6 +12,12 @@ const YearPlay = (() => {
   const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let root = null, scenes = [], at = 0, paused = false, music = false, playingKey = null, opts = {};
+  // NTS's own mood footage (the stills on its Explore page), for the scenes without a cover
+  const moods = {};
+  let moodsP = null;
+  const loadMoods = () => (moodsP ||= window.nts.api('/api/v2/moods').then((r) => (r.results || []).forEach((m) => { moods[m.id] = m.image?.medium_large || m.image?.large || ''; })).catch(() => { moodsP = null; }));
+  // colour casts like NTS's moods: blue, magenta, red, yellow, cyan, orange
+  const TINTS = ['#4b3cff', '#d42bd8', '#ff2a1a', '#ffd000', '#00b8c4', '#ff7a00'];
 
   // a cover image that fills its box once found
   function coverImg(t, cls = 'yp-cover') {
@@ -24,10 +30,16 @@ const YearPlay = (() => {
     wrap.append(img);
     return wrap;
   }
-  // the scene's backdrop: the cover, huge and blurred, drifting slowly
-  function backdrop(t) {
+  // the scene's backdrop, treated like a tape still: the cover (or NTS mood footage) full-bleed,
+  // a colour cast, a ghost of itself slightly off to the side, drifting slowly
+  function backdrop(t, mood) {
     const b = el('div', 'yp-bg');
-    if (t) b.append(coverImg(t, 'yp-bg__img'));
+    const src = mood && moods[mood];
+    const layer = (cls) => {
+      if (src) { const w = el('div', `${cls} has-img`); const im = el('img'); im.alt = ''; im.src = src; w.append(im); return w; }
+      return t ? coverImg(t, cls) : el('div', cls);
+    };
+    b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'), el('div', 'yp-bg__tint'));
     return b;
   }
   // text that rises in, after `d` seconds
@@ -85,7 +97,7 @@ const YearPlay = (() => {
       const g = el('div', 'yp-waffle');
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
       box.append(g, rise(el('h2', 'yp-head', `${once} were played once.`), 2.4), rise(el('p', 'yp-sub', `Only ${100 - once} came back, on any show. NTS runs on record bags, not playlists.`), 3));
-      return [box];
+      return [backdrop(null, 'don-t-assume'), box];
     } });
 
     // 3. the countdown to the track of the year: 5 to 2
@@ -140,14 +152,14 @@ const YearPlay = (() => {
         g.append(rise(c, 0.4 + i * 0.32));
       });
       box.append(g);
-      return [box];
+      return [backdrop(null, 'music-to-dance-to'), box];
     } });
 
     // 7. the biggest leap: the rank counting down
     const leap = story(s, 'leap');
     if (leap) out.push({ dur: 8, track: leap.viz.t, build() {
       const t = leap.viz.t;
-      const box = el('div', 'yp-center');
+      const box = el('div', 'yp-center yp-corner');
       box.append(rise(el('p', 'yp-kicker', 'The biggest leap'), 0));
       const n = el('h2', 'yp-giant'); n.append(counter(leap.viz.to, { from: leap.viz.from, prefix: '#', d: 0.8, ms: 2200 }));
       box.append(rise(n, 0.3), rise(el('p', 'yp-title', t.title), 2.4), rise(el('p', 'yp-artist', t.artist), 2.5),
@@ -172,7 +184,7 @@ const YearPlay = (() => {
         line.append(dot);
       });
       box.append(rise(line, 0.9), rise(el('p', 'yp-sub', `then ${v.firsts.length - 1} more shows`), 1.2 + v.firsts.length * 0.12));
-      return [backdrop(v.t), box];
+      return [backdrop(v.t, 'audio-research'), box];
     } });
 
     // 9. rising: new in the last three months
@@ -230,13 +242,13 @@ const YearPlay = (() => {
       v.rows.forEach((r) => svg.append('text').attr('class', 'yp-stream__axis').attr('x', x(r.m)).attr('y', H + 24).attr('text-anchor', 'middle').text(monthShort(r.m).slice(0, 1)));
       const wrap = el('div', 'yp-stream-wrap'); wrap.append(svg.node());
       box.append(wrap);
-      return [box];
+      return [backdrop(null, 'lsd'), box];
     } });
 
     // 12. tastemaker of the year
     const taste = story(s, 'tastemaker');
     if (taste) out.push({ dur: 8, track: taste.viz.rows[0], build() {
-      const box = el('div', 'yp-center yp-center--wide');
+      const box = el('div', 'yp-center yp-corner');
       box.append(rise(el('p', 'yp-kicker', 'Tastemaker of the year'), 0), rise(el('h2', 'yp-head yp-head--big', taste.headline), 0.3), rise(el('p', 'yp-sub', taste.body), 0.8));
       const covers = el('div', 'yp-fan');
       taste.viz.rows.forEach((t, i) => covers.append(rise(coverImg(t, 'yp-cover'), 1.2 + i * 0.2)));
@@ -246,7 +258,7 @@ const YearPlay = (() => {
 
     // 13. outro
     out.push({ dur: 0, cls: 'yp-outro', build() {
-      const box = el('div', 'yp-center');
+      const box = el('div', 'yp-center yp-corner');
       box.append(rise(el('p', 'yp-kicker', `NTS in ${year}`), 0), rise(el('h1', 'yp-year yp-year--outro', 'That was the year'), 0.2));
       const acts = el('div', 'yp-actions');
       const again = el('button', 'yp-btn', 'Watch again'); again.addEventListener('click', (e) => { e.stopPropagation(); show(0, true); });
@@ -254,7 +266,7 @@ const YearPlay = (() => {
       const sup = el('button', 'yp-btn yp-btn--on', 'Support NTS'); sup.addEventListener('click', (e) => { e.stopPropagation(); window.nts.openLink({ url: 'https://www.nts.live/supporters' }); });
       acts.append(again, cards, sup);
       box.append(rise(acts, 0.8));
-      return [backdrop(t1), box];
+      return [backdrop(t1, 'sedative'), box];
     } });
     return out;
   }
@@ -265,8 +277,12 @@ const YearPlay = (() => {
     const sc = scenes[at];
     const stage = root.querySelector('.yp-stage');
     const scene = el('section', `yp-scene ${sc.cls || ''}`);
+    scene.style.setProperty('--tint', TINTS[at % TINTS.length]);
     scene.append(...sc.build());
     stage.replaceChildren(scene);
+    // a tape glitch on the cut
+    root.classList.remove('is-cut'); void root.offsetWidth; root.classList.add('is-cut');
+    clearTimeout(cutTimer); cutTimer = setTimeout(() => root?.classList.remove('is-cut'), 450);
     root.querySelectorAll('.yp-bar').forEach((b, j) => {
       b.classList.toggle('is-done', j < at);
       b.classList.toggle('is-on', j === at);
@@ -283,9 +299,30 @@ const YearPlay = (() => {
   }
   const next = () => { if (at < scenes.length - 1) show(at + 1); };
   const prev = () => show(at - 1);
+  let cutTimer = null, clock = null, t0 = 0, held = 0;
   function setPaused(p) {
     paused = p;
     root.classList.toggle('is-paused', p);
+    const osd = root.querySelector('.yp-osd__mode');
+    if (osd) osd.textContent = p ? '❚❚ PAUSE' : '▶ PLAY';
+  }
+  // the camcorder overlay: PLAY / PAUSE, a tape counter, the date
+  function osd(year) {
+    const o = el('div', 'yp-osd');
+    const mode = el('span', 'yp-osd__mode', '▶ PLAY');
+    const counter = el('span', 'yp-osd__counter', 'SP 0:00:00');
+    const date = el('span', 'yp-osd__date', `DEC 31 ${year}`);
+    o.append(mode, counter, date);
+    t0 = Date.now(); held = 0;
+    let last = Date.now();
+    clock = setInterval(() => {
+      const now = Date.now();
+      if (!paused) held += now - last;
+      last = now;
+      const sec = Math.floor(held / 1000);
+      counter.textContent = `SP ${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+    }, 250);
+    return o;
   }
 
   // start: the first screen asks with or without music, then plays
@@ -306,7 +343,9 @@ const YearPlay = (() => {
     top.append(bars, browse, close);
     const stage = el('div', 'yp-stage');
     const hint = el('p', 'yp-hint', 'Click for the next one · hold to pause');
-    root.append(stage, top, hint);
+    const tape = el('div', 'yp-vhs'); tape.append(el('div', 'yp-vhs__band'));
+    root.append(stage, tape, osd(s.year), top, hint);
+    loadMoods();
     container.append(root);
 
     // the bar filling up is the timer: when it ends, the next scene
@@ -340,11 +379,12 @@ const YearPlay = (() => {
     acts.append(withMusic, without);
     gt.append(rise(acts, 0.5));
     gate.append(backdrop(s.top?.[0]), gt);
+    gt.classList.add('yp-corner');
     stage.append(gate);
     setPaused(true);
     setTimeout(() => withMusic.focus(), 50);
   }
-  function stop() { root?.remove(); root = null; }
+  function stop() { clearInterval(clock); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {
     if (!root) return false;

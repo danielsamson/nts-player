@@ -245,7 +245,7 @@ const Archive = (() => {
         const p = parsePath(t.path);
         const li = trackRow({ artist: t.artist, title: t.title }, {
           title: 'Open track', deferArt: true,
-          onClick: () => go({ type: 'track', artist: t.artist, title: t.title })
+          onClick: () => go({ type: 'track', artist: t.artist, title: t.title, saved: true })
         });
         // look up the track's IDs first, so its cover is the exact one
         TrackInfo.find(t).then((info) => Art.attach(li._artBox, { artist: t.artist, title: t.title,
@@ -412,7 +412,7 @@ const Archive = (() => {
     head.append(picWrap, headText);
     body.append(playBox, actions, linksNav, from);
     wrap.append(head, body);
-    root.replaceChildren(backBar(current.type === 'track' && !current.returnLive && !current.origin ? 'Saved track' : 'Track'), wrap);
+    root.replaceChildren(backBar(current.saved ? 'Saved track' : 'Track'), wrap);
 
     Stage.paintLinks(Stage.links(t, null), linksList, linksLabel);
     from.append(loader('Finding where it was played'));
@@ -671,14 +671,36 @@ const Archive = (() => {
           onClick: () => go(isShow ? { type: 'show', show: p.show } : { type: 'episode', show: p.show, episode: p.episode })
         });
       }).filter(Boolean);
-      if (!rows.length && offset === 20) list.append(el('p', 'archive__status', `Nothing found for “${q}”.`));
+      if (!rows.length && offset === 20) list.append(el("p", "archive__status", `No shows or episodes for “${q}”.`));
       list.append(...rows);
       btn?.remove();
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
+    // Tracks first (what crate diggers type), grouped: each track once, with how many episodes played it
+    const tracksBox = el('div');
+    const tracks = async () => {
+      const res = await api(`/api/v2/search?q=${enc(q)}&version=2&offset=0&limit=40&types[]=track`).catch(() => null);
+      const seen = new Map();
+      (res?.results || []).forEach((x) => {
+        const artist = (x.artists || []).map((a) => a.name).join(', ');
+        if (!artist || !x.title) return;
+        const k = Chart.key(artist, x.title);
+        if (!seen.has(k)) seen.set(k, { artist, title: x.title, plays: 0 });
+        seen.get(k).plays++;
+      });
+      const found = [...seen.values()].slice(0, 8);
+      if (!found.length) { tracksBox.remove(); return; }
+      const ol = el('ol', 'tracks archive-tracks search-tracks');
+      found.forEach((t) => {
+        const li = trackRow({ artist: t.artist, title: t.title }, { title: 'Open track', onClick: () => go({ type: 'track', artist: t.artist, title: t.title }) });
+        li.querySelector('.track__text').append(el('span', 'chart-row__count', `${t.plays}${t.plays >= 40 ? '+' : ''} episode${t.plays === 1 ? '' : 's'}`));
+        ol.append(li);
+      });
+      tracksBox.replaceChildren(sectionTitle('Tracks'), ol, sectionTitle('Shows and episodes'));
+    };
     try {
-      root.replaceChildren(backBar(`Search: ${q}`), list);
-      await more();
+      root.replaceChildren(backBar(`Search: ${q}`), tracksBox, list);
+      await Promise.all([tracks(), more()]);
     } catch { root.replaceChildren(backBar(), failed('Search didn’t work.')); }
   }
 

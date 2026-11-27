@@ -202,11 +202,14 @@ const TrackWeb = (() => {
     zoom = d3.zoom().scaleExtent([0.25, 3]).on('zoom', (e) => {
       gZoom.attr('transform', e.transform);
       if (e.sourceEvent && follow) follow.userZoomed = true;      // you zoomed: stop zooming for you
+      if (e.sourceEvent) autoFit = false;
       zoomed = e.transform.k > 1.3;
       // names stay close to the same size on screen, so zooming in makes room for more of them
       // (in the timeline, also when zoomed out to fit the whole episode)
-      const fs = 9 / Math.pow(timelineOn() ? Math.max(.45, e.transform.k) : Math.max(1, e.transform.k), .8);
+      // (in the timeline: about 10px on screen however far out it zooms to fit a whole episode)
+      const fs = timelineOn() ? 10.5 / Math.max(.3, e.transform.k) : 9 / Math.pow(Math.max(1, e.transform.k), .8);
       svg.node().style.setProperty('--tw-fs', `${fs}px`);
+      svg.node().style.setProperty('--tw-axis-fs', `${10 / e.transform.k}px`);
       svg.node().style.setProperty('--tw-sw', `${fs * .55}px`);
       cullLabelsSoon();
     });
@@ -219,12 +222,15 @@ const TrackWeb = (() => {
       .force('x', d3.forceX(0).strength(.03))
       .force('y', d3.forceY(0).strength(.03))
       .velocityDecay(.6)           // more damping: drift, don't jump
-      .on('tick', ticked)
-      .on('end', cullLabels);
-    new ResizeObserver(center).observe(host);
+      // while it settles, keep the web filling the view (every 15 ticks, a short glide)
+      .on('tick', () => { ticked(); if (autoFit && ++fitTicks % 15 === 0) fitWeb(250); })
+      .on('end', () => { cullLabels(); fitWeb(); });
+    new ResizeObserver(center).observe(host.querySelector('.trackweb__svg'));
   }
   function center() {
-    const r = host.getBoundingClientRect();
+    // the drawing area itself (not the whole panel, which includes the search bar and info),
+    // so one unit is one pixel at zoom 1
+    const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
     if (!r.width) return;
     svg.attr('viewBox', [-r.width / 2, -r.height / 2, r.width, r.height]);
   }
@@ -474,6 +480,7 @@ const TrackWeb = (() => {
   // ---------- interaction ----------
   function expand(d) {
     if (d.expanded || d.loading) return;
+    if (!follow) { autoFit = autoFit || !zoomed; }     // grow into view unless you've zoomed in on something
     if (d.type === 'track') expandTrack(d);
     else if (d.type === 'episode') expandEpisode(d);
     else addShowEpisodes(d);
@@ -633,7 +640,24 @@ const TrackWeb = (() => {
       box.append(list);
     } else if (eps.size) box.append(el('p', 'trackweb__hint', `No tracks shared between these ${eps.size} episodes yet. Add more episodes.`));
   }
+  // Zoom so the whole web fills the view once it settles (a small web shouldn't sit tiny in
+  // the middle); only until you zoom or pan yourself, and not while following along
+  let autoFit = false, fitTicks = 0;
+  function fitWeb(ms = 600) {
+    if (!autoFit || follow || timelineOn() || !nodes.length) return;
+    const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
+    const vb = svg.node().viewBox.baseVal;
+    if (!r.width || !r.height || !vb?.width) return;
+    // the viewBox (sized to the whole panel) is scaled to fit the drawing area: work in its units
+    const s0 = Math.min(r.width / vb.width, r.height / vb.height);
+    const vw = r.width / s0, vh = r.height / s0;
+    const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+    const x0 = Math.min(...xs) - 70, x1 = Math.max(...xs) + 70, y0 = Math.min(...ys) - 50, y1 = Math.max(...ys) + 70;   // room for names
+    const k = Math.max(0.4, Math.min(2.2, Math.min(vw / (x1 - x0), vh / (y1 - y0))));
+    svg.transition('fit').duration(ms).call(zoom.transform, d3.zoomIdentity.scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2));
+  }
   function focusOn(n) {
+    autoFit = false;
     const r = host.querySelector('.trackweb__svg').getBoundingClientRect();
     svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.scale(1.4).translate(-n.x, -n.y));
   }
@@ -652,6 +676,7 @@ const TrackWeb = (() => {
   function start(t, origin) {
     stopFollow();
     build(); center(); clear();
+    autoFit = true;
     const n = addNode({ id: trackId(t), type: 'track', artist: t.artist, title: t.title, isrc_id: t.isrc_id, deezer_track_id: t.deezer_track_id });
     rootId = n.id;
     if (origin?.show && origin?.episode) {
@@ -668,6 +693,7 @@ const TrackWeb = (() => {
   function startShow(alias, name) {
     stopFollow();
     build(); center(); clear();
+    autoFit = true;
     const s = addNode({ id: showId(alias), type: 'show', show: alias, title: name });
     rootId = s.id;
     update();

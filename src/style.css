@@ -1250,7 +1250,7 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .tw-node.is-off { display: none; }
 .tw-axis__line { stroke: var(--grey-3); stroke-width: 1; }
 .tw-tick line { stroke: var(--grey-3); }
-.tw-tick text { font: 400 9px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); text-anchor: middle; }
+.tw-tick text { font: 400 var(--tw-axis-fs, 9px)/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; fill: var(--grey-2); text-anchor: middle; }
 .tw-stem { stroke: var(--grey-4); stroke-width: 1; stroke-dasharray: 2 3; }
 .tw-playhead { stroke: var(--live); stroke-width: 1.5; transition: transform .45s linear; }
 

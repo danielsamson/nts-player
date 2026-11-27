@@ -235,9 +235,13 @@ async function mockAccount() {
     await waitFor(() => document.querySelectorAll('.schedule__item').length > 5, null, { timeout: 30000 });
   });
 
-  await test('Search finds shows and episodes', async () => {
+  await test('Search finds tracks, shows and episodes', async () => {
     await win.fill('#archiveSearch', 'floating points');
     await waitFor(() => /Search/.test(document.querySelector('.archive__crumb')?.textContent || '') && document.querySelectorAll('#archiveContent .item').length > 0, null, { timeout: 30000 });
+    // tracks first, each once, opening the track page
+    await waitFor(() => document.querySelectorAll('#archiveContent .search-tracks .track').length > 0, null, { timeout: 30000, what: 'track results' });
+    await win.evaluate(() => document.querySelector('#archiveContent .search-tracks .track .track__text').click());
+    await waitFor(() => /Track/.test(document.querySelector('.archive__crumb')?.textContent || '') && document.querySelector('.track-page__head'), null, { timeout: 15000, what: 'the track page' });
     await win.fill('#archiveSearch', '');
   });
 

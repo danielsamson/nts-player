@@ -194,11 +194,17 @@ const Chart = (() => {
     }
     const topArtists = [...artists.values()].map((r) => ({ artist: r.artist, shows: r.showSet.size, tracks: r.tracks, top: r.top }))
       .sort((a, b) => b.shows - a.shows || b.tracks - a.tracks).slice(0, 10);
-    // tracks first played this year that the most shows picked up
-    const yearStart = Date.UTC(y, 0, 1);
-    const breakouts = all.filter((m) => m.first >= yearStart + 14 * 864e5).slice(0, 5);
-    // played in every month so far
-    const evergreen = all.filter((m) => m.months === files.length && files.length >= 3).slice(0, 5);
+    // rising: first played in the last three months, most shows first (the top 10 already has
+    // the year's big ones, so these are the ones still on the way up)
+    const top10 = new Set(all.slice(0, 10));
+    const lastMonth = list[list.length - 1];
+    const riseFrom = Date.UTC(+lastMonth.slice(0, 4), +lastMonth.slice(5) - 3, 1);
+    const breakouts = files.length >= 4 ? all.filter((m) => m.first >= riseFrom && !top10.has(m)).slice(0, 5) : [];
+    breakouts.since = riseFrom;
+    // long runners: played in most of the months (not just the busiest weeks)
+    const minMonths = Math.max(4, Math.ceil(files.length * 0.4));     // NTS rarely repeats: 5 of 11 months is a long run
+    const evergreen = files.length >= 4 ? all.filter((m) => m.months >= minMonths).sort((a, b) => b.months - a.months || b.shows - a.shows).slice(0, 5) : [];
+    if (evergreen.length < 3) evergreen.length = 0;     // one or two isn't a story
     // shows that shared the most tracks
     const pairs = new Map();
     for (const m of all.slice(0, 3000)) {
@@ -207,6 +213,9 @@ const Chart = (() => {
       for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) { const k = `${s[i]}|${s[j]}`; pairs.set(k, (pairs.get(k) || 0) + 1); }
     }
     const topPair = [...pairs].sort((a, b) => b[1] - a[1])[0];
+    // the tracks those two shows both played, most shows first
+    const [pa, pb] = topPair ? topPair[0].split('|') : [];
+    const pairTracks = topPair ? all.filter((m) => m.showSet.has(pa) && m.showSet.has(pb)).slice(0, 4) : [];
     const busiest = [...showEps].filter(([s]) => !catchAll(s, names)).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([show, count]) => ({ show, count, name: (names[show] || [])[0] || showName(show), img: (names[show] || [])[1] || '' }));
     const peak = files.slice().sort((a, b) => b.episodes - a.episodes)[0];
@@ -224,7 +233,7 @@ const Chart = (() => {
       episodes, plays, shows: showEps.size, uniqueTracks: files.reduce((s, f) => s + f.uniqueTracks, 0),
       top: all.slice(0, 100), topArtists, numberOnes, breakouts, evergreen, busiest,
       debuts: realDebuts.map((d) => ({ ...d, name: (names[d.show] || [])[0] || showName(d.show), img: (names[d.show] || [])[1] || '' })),
-      pair: topPair ? { a: topPair[0].split('|')[0], b: topPair[0].split('|')[1], count: topPair[1], names } : null,
+      pair: topPair ? { a: pa, b: pb, count: topPair[1], names, tracks: pairTracks } : null,
       peak: peak ? { month: peak.period, episodes: peak.episodes } : null,
       stories: stories(y, files, all, monthFiles, names),
       monthList: list, monthRanks, links, names,

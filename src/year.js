@@ -80,15 +80,18 @@ const Year = (() => {
       out.push(card('Number one, month by month', null, g));
     }
     // 6: breakouts
-    if (s.breakouts.length) { const l = el('div', 'year__list'); s.breakouts.forEach((t, i) => l.append(trackLine(t, i))); out.push(card('Breakouts', 'First played this year', l)); }
-    // 7: evergreen
-    if (s.evergreen.length) { const l = el('div', 'year__list'); s.evergreen.forEach((t, i) => l.append(trackLine(t, i))); out.push(card('All year long', `Played every month${soFar ? ' so far' : ''}`, l)); }
-    // 8: busiest shows
-    if (s.busiest.length) {
-      const l = el('div', 'year__list');
-      s.busiest.forEach((b, i) => { const r = el('div', 'year__row'); const c = showPic(b.img, 'year__cover year__cover--small has-img'); const tx = el('div', 'year__rowtext'); tx.append(el('span', 'year__rowtitle', b.name), el('span', 'year__rowsub', plural(b.count, 'episode'))); r.append(el('span', 'year__rank', String(i + 1)), c, tx); r.addEventListener('click', () => { close(); Archive.showShow(b.show); }); l.append(r); });
-      out.push(card('Busiest shows', 'Most episodes', l));
+    if (s.breakouts.length >= 3) {
+      const l = el('div', 'year__list'); s.breakouts.forEach((t, i) => l.append(trackLine(t, i)));
+      const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
+      out.push(card('Rising', `New since ${since}`, l, el('p', 'year__note', `First played in the last three months and already picked up by the most shows (beyond the top 10).`)));
     }
+    // 7: long runners
+    if (s.evergreen.length) {
+      const l = el('div', 'year__list');
+      s.evergreen.forEach((t, i) => { const r = trackLine(t, i); const sub = r.querySelector('.year__rowsub'); if (sub) sub.textContent = `${t.artist} · ${t.months} of ${s.months} months`; l.append(r); });
+      out.push(card('Long runners', 'Played month after month', l, el('p', 'year__note', 'Most tracks on NTS come and go within weeks. These kept coming back.')));
+    }
+    // (busiest shows by episodes left out: it's just the daily slots)
     // 9: new shows
     if (s.debuts.length) {
       const g = el('div', 'year__shows');
@@ -101,7 +104,9 @@ const Year = (() => {
     // 10: shared taste
     if (s.pair && s.pair.count >= 3) {
       const nm = (a) => (s.pair.names[a] || [])[0] || Chart.showName(a);
-      out.push(card('Shared taste', `${nm(s.pair.a)} & ${nm(s.pair.b)}`, el('p', 'year__note', `The two shows that played the most of the same tracks: ${plural(s.pair.count, 'track')} in common.`)));
+      const l = el('div', 'year__list');
+      (s.pair.tracks || []).forEach((t, i) => l.append(trackLine(t, i)));
+      out.push(card('Shared taste', `${nm(s.pair.a)} & ${nm(s.pair.b)}`, el('p', 'year__note', `The two shows that played the most of the same tracks: ${plural(s.pair.count, 'track')} in common. Among them:`), l));
     }
     // 11: outro
     const sup = el('button', 'year__link', 'Support NTS');
@@ -186,7 +191,7 @@ const Year = (() => {
     const nodes = [...deg].filter(([id]) => keep(id)).map(([id, d]) => ({ id, d }));
     const links = s.links.filter((l) => keep(l.a)).map((l) => ({ source: l.a, target: l.b, count: l.count }));
     const sim = d3.forceSimulation(nodes).force('link', d3.forceLink(links).id((d) => d.id).distance(50).strength(0.4))
-      .force('charge', d3.forceManyBody().strength(-120)).force('x', d3.forceX(W / 2).strength(0.08)).force('y', d3.forceY(H / 2).strength(0.12))
+      .force('charge', d3.forceManyBody().strength(-170)).force('x', d3.forceX(W / 2).strength(0.08)).force('y', d3.forceY(H / 2).strength(0.12))
       .force('collide', d3.forceCollide((d) => 6 + Math.sqrt(d.d) * 2)).stop();
     for (let i = 0; i < 320; i++) sim.tick();
     nodes.forEach((d) => { d.x = Math.max(10, Math.min(W - 10, d.x)); d.y = Math.max(10, Math.min(H - 10, d.y)); });
@@ -199,7 +204,17 @@ const Year = (() => {
     const ng = svg.append('g').selectAll('g').data(nodes).join('g').attr('class', 'year__netnode').attr('transform', (d) => `translate(${d.x},${d.y})`);
     ng.append('circle').attr('r', (d) => 3 + Math.sqrt(d.d) * 2);
     ng.append('title').text((d) => `${nm(d.id)}: shares with ${plural(d.d, 'show')}`);
-    const labelled = new Set(nodes.slice().sort((a, b) => b.d - a.d).slice(0, 8).map((d) => d.id));
+    // names for the best-connected shows, only where they don't overlap one already placed
+    // (the rest show on hover)
+    const placed = [];
+    const labelled = new Set();
+    for (const d of nodes.slice().sort((a, b) => b.d - a.d)) {
+      if (labelled.size >= 10) break;
+      const w = Math.min(22, nm(d.id).length) * 5.4, h = 11, y = d.y - (6 + Math.sqrt(d.d) * 2) - h;
+      const box = { x0: d.x - w / 2 - 3, x1: d.x + w / 2 + 3, y0: y, y1: y + h };
+      if (box.x0 < 0 || box.x1 > W || placed.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
+      placed.push(box); labelled.add(d.id);
+    }
     ng.filter((d) => labelled.has(d.id)).append('text').attr('y', (d) => -(6 + Math.sqrt(d.d) * 2)).attr('text-anchor', 'middle').text((d) => nm(d.id).slice(0, 22));
     ng.on('mouseenter', (e, d) => { lg.classed('is-on', (l) => l.source === d || l.target === d); svg.classed('has-hover', true); })
       .on('mouseleave', () => { lg.classed('is-on', false); svg.classed('has-hover', false); })

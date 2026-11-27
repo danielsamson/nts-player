@@ -51,7 +51,7 @@ const YearPlay = (() => {
     if (extra) b.append(extra);
     // torn slices for the corrupted moments: copies of the picture, a band each, shoved sideways
     if (!halftone && (src || t)) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
-    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__snow'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'), el('div', 'yp-bg__head'));
+    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__snow'), el('div', 'yp-bg__bars'), el('div', 'yp-bg__phos'), el('div', 'yp-bg__band'), el('div', 'yp-bg__head'));
     return b;
   }
   // running lines of type behind a scene: rows of the words sliding past, alternating direction,
@@ -72,11 +72,31 @@ const YearPlay = (() => {
   // the tape never sits still: the wobble's noise changes several times a second, and white
   // drop-out streaks flick across
   let jitterTimer = null;
+  // snow: a few frames of coloured speckle, drawn once; each speck a short sideways streak
+  let snowFrames = null;
+  function snow() {
+    if (snowFrames) return snowFrames;
+    const cols = ['255,255,255', '255,90,200', '255,60,90', '255,220,120', '120,230,255', '200,120,255'];
+    snowFrames = Array.from({ length: 5 }, () => {
+      const c = document.createElement('canvas'); c.width = 240; c.height = 180;
+      const g = c.getContext('2d');
+      for (let i = 0; i < 2600; i++) {
+        g.fillStyle = `rgba(${cols[Math.floor(Math.random() * cols.length)]},${0.35 + Math.random() * 0.65})`;
+        g.fillRect(Math.random() * 240, Math.floor(Math.random() * 180), 1 + Math.random() * 5, 1);
+      }
+      return `url(${c.toDataURL()})`;
+    });
+    return snowFrames;
+  }
+  let snowAt = 0;
   function jitter() {
     clearInterval(jitterTimer);
     if (reduced()) return;
     jitterTimer = setInterval(() => {
       if (!root || paused) return;
+      const frames = snow();
+      snowAt = (snowAt + 1) % frames.length;
+      root.querySelectorAll('.yp-bg__snow').forEach((sn) => { sn.style.backgroundImage = frames[snowAt]; });
       const turb = root.querySelector('#yp-vhs feTurbulence');
       if (turb) turb.setAttribute('seed', String(1 + Math.floor(Math.random() * 999)));
       const bg = root.querySelector('.yp-scene .yp-bg, .yp-gate .yp-bg');
@@ -104,7 +124,12 @@ const YearPlay = (() => {
       sl.style.setProperty('--dx', `${(Math.random() - 0.5) * (strong ? 22 : 12)}%`);
     });
     bg.style.setProperty('--hue', `${Math.round((Math.random() - 0.5) * 160)}deg`);
+    bg.style.setProperty('--bt', `${Math.random() * 80}%`);
+    bg.style.setProperty('--bh', `${6 + Math.random() * (strong ? 30 : 14)}%`);
     bg.classList.add('is-corrupt');
+    root?.classList.add('is-glitch');
+    if (strong) root?.classList.add('is-snow');
+    setTimeout(() => root?.classList.remove('is-glitch', 'is-snow'), strong ? 320 : 150);
     setTimeout(() => bg.classList.remove('is-corrupt'), strong ? 420 : 90 + Math.random() * 260);
   }
   // caption text gets its own inline layer, so each line's black block hugs its words (ragged,
@@ -153,10 +178,10 @@ const YearPlay = (() => {
           <feColorMatrix in="n" type="matrix" values="1 0 0 0 0  0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 1" result="nx"/>
           <feDisplacementMap in="SourceGraphic" in2="nx" scale="9" xChannelSelector="R" yChannelSelector="G" result="d"/>
           <feColorMatrix in="d" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
-          <feOffset in="r" dx="5" result="ro"/><feGaussianBlur in="ro" stdDeviation="2.5 0" result="rb"/>
+          <feOffset in="r" dx="7" result="ro"/><feGaussianBlur in="ro" stdDeviation="9 0.4" result="rb"/>
           <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
           <feColorMatrix in="d" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
-          <feOffset in="b" dx="-5" result="bo"/><feGaussianBlur in="bo" stdDeviation="2.5 0" result="bb"/>
+          <feOffset in="b" dx="-7" result="bo"/><feGaussianBlur in="bo" stdDeviation="9 0.4" result="bb"/>
           <feBlend in="rb" in2="g" mode="screen" result="rg"/><feBlend in="rg" in2="bb" mode="screen"/>
         </filter>`;
     return svg;

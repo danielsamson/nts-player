@@ -32,15 +32,33 @@ const YearPlay = (() => {
   }
   // the scene's backdrop, treated like a tape still: the cover (or NTS mood footage) full-bleed,
   // a colour cast, a ghost of itself slightly off to the side, drifting slowly
-  function backdrop(t, mood) {
+  // (extra: something else to show on the tape, like the wall of covers)
+  function backdrop(t, mood, extra) {
     const b = el('div', 'yp-bg');
     const src = mood && moods[mood];
     const layer = (cls) => {
       if (src) { const w = el('div', `${cls} has-img`); const im = el('img'); im.alt = ''; im.src = src; w.append(im); return w; }
       return t ? coverImg(t, cls) : el('div', cls);
     };
-    b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'), el('div', 'yp-bg__tint'));
+    b.append(layer('yp-bg__img'), layer('yp-bg__img yp-bg__ghost'));
+    if (extra) b.append(extra);
+    // torn slices for the corrupted moments: copies of the picture, a band each, shoved sideways
+    if (src || t) for (let i = 0; i < 3; i++) b.append(layer('yp-bg__img yp-bg__slice'));
+    b.append(el('div', 'yp-bg__tint'), el('div', 'yp-bg__grain'), el('div', 'yp-bg__scan'), el('div', 'yp-bg__band'));
     return b;
+  }
+  // now and then the tape corrupts: slices jump, colours bleed, the noise flares
+  function corrupt(bg, strong = false) {
+    if (!bg?.isConnected || reduced()) return;
+    bg.querySelectorAll('.yp-bg__slice').forEach((sl) => {
+      const top = Math.random() * 85, h = 3 + Math.random() * (strong ? 22 : 12);
+      sl.style.setProperty('--t', `${top}%`);
+      sl.style.setProperty('--b', `${Math.max(0, 100 - top - h)}%`);
+      sl.style.setProperty('--dx', `${(Math.random() - 0.5) * (strong ? 22 : 12)}%`);
+    });
+    bg.style.setProperty('--hue', `${Math.round((Math.random() - 0.5) * 160)}deg`);
+    bg.classList.add('is-corrupt');
+    setTimeout(() => bg.classList.remove('is-corrupt'), strong ? 420 : 90 + Math.random() * 260);
   }
   // text that rises in, after `d` seconds
   const rise = (node, d = 0) => { node.classList.add('yp-rise'); node.style.setProperty('--d', `${d}s`); return node; };
@@ -85,7 +103,7 @@ const YearPlay = (() => {
         const d = el('div', 'yp-num'); d.append(counter(v, { d: 0.9 + i * 0.35 }), el('span', 'yp-num__label', l)); nums.append(rise(d, 0.8 + i * 0.35));
       });
       box.append(nums, rise(el('p', 'yp-sub', s.complete ? 'The year in tracks' : `The year in tracks, ${s.months} months so far`), 2.2));
-      return [wall, box];
+      return [backdrop(null, null, wall), box];
     } });
 
     // 2. how rarely NTS repeats itself: 100 squares, almost all played once
@@ -94,7 +112,7 @@ const YearPlay = (() => {
       const once = rep.viz.value;
       const box = el('div', 'yp-center');
       box.append(rise(el('p', 'yp-kicker', 'Of every 100 tracks played'), 0));
-      const g = el('div', 'yp-waffle');
+      const g = el('div', 'yp-waffle yp-panel');
       for (let i = 0; i < 100; i++) { const c = el('span', i >= once ? 'is-again' : ''); c.style.setProperty('--d', `${0.4 + i * 0.018}s`); g.append(c); }
       box.append(g, rise(el('h2', 'yp-head', `${once} were played once.`), 2.4), rise(el('p', 'yp-sub', `Only ${100 - once} came back, on any show. NTS runs on record bags, not playlists.`), 3));
       return [backdrop(null, 'don-t-assume'), box];
@@ -106,7 +124,7 @@ const YearPlay = (() => {
       out.push({ dur: 3.6, cls: 'yp-countdown', build() {     // no music change: four tracks in a few seconds would just stutter
         const box = el('div', 'yp-row');
         box.append(rise(el('span', 'yp-rank', String(rank)), 0), rise(coverImg(t, 'yp-cover yp-cover--mid'), 0.15));
-        const tx = el('div', 'yp-rowtext');
+        const tx = el('div', 'yp-rowtext yp-caps');
         tx.append(rise(el('p', 'yp-title', t.title), 0.3), rise(el('p', 'yp-artist', t.artist), 0.4), rise(el('p', 'yp-sub', `${fmt(t.shows)} shows`), 0.55));
         box.append(tx);
         return [backdrop(t), box];
@@ -128,26 +146,26 @@ const YearPlay = (() => {
     const a1 = s.topArtists?.[0];
     if (a1) out.push({ dur: 8, track: a1.top, cls: 'yp-artist-scene', build() {
       const runs = el('div', 'yp-marquee');
-      for (let r = 0; r < 5; r++) {
-        const row = el('div', `yp-marquee__row${r % 2 ? ' is-back' : ''}${r === 2 ? ' is-solid' : ''}`);
+      for (let r = 0; r < 6; r++) {
+        const row = el('div', `yp-marquee__row${r % 2 ? ' is-back' : ''}`);
         row.textContent = `${a1.artist} · `.repeat(8);
         runs.append(row);
       }
-      const box = el('div', 'yp-center yp-center--low');
-      box.append(rise(el('p', 'yp-kicker', 'Artist of the year'), 0.3));
+      const box = el('div', 'yp-center yp-corner');
+      box.append(rise(el('p', 'yp-kicker', 'Artist of the year'), 0.2), rise(el('h2', 'yp-head yp-head--big', a1.artist), 0.4));
       const n = el('p', 'yp-sub'); n.append('Played by ', counter(a1.shows, { d: 0.9 }), ` shows, ${a1.tracks} different tracks`);
       box.append(rise(n, 0.7));
-      return [backdrop(a1.top), runs, box];
+      return [backdrop(a1.top, null, runs), box];
     } });
 
     // 6. number one, month by month: the covers arriving one after another
     if ((s.numberOnes || []).length > 2) out.push({ dur: 9, build() {
       const box = el('div', 'yp-center yp-center--wide');
       box.append(rise(el('p', 'yp-kicker', 'Number one, month by month'), 0));
-      const g = el('div', 'yp-ones');
+      const g = el('div', 'yp-ones yp-panel');
       s.numberOnes.forEach((t, i) => {
         const c = el('div', 'yp-one');
-        c.append(coverImg(t, 'yp-cover'), el('span', 'yp-one__month', monthShort(t.month)), el('span', 'yp-one__title', t.title));
+        c.append(coverImg(t, 'yp-cover'), el('span', 'yp-one__month', monthShort(t.month)), el('span', 'yp-one__title', t.title), el('span', 'yp-one__artist', t.artist));
         c.title = `${t.artist} – ${t.title}`;
         g.append(rise(c, 0.4 + i * 0.32));
       });
@@ -174,7 +192,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-center yp-center--wide');
       box.append(rise(el('p', 'yp-kicker', 'Who heard it first'), 0), rise(el('h2', 'yp-head', v.firsts[0].show), 0.3),
         rise(el('p', 'yp-sub', `played ${v.t.title} (${v.t.artist}) before anyone else`), 0.6));
-      const line = el('div', 'yp-strip');
+      const line = el('div', 'yp-strip yp-panel');
       const y0 = Date.UTC(v.year, 0, 1), y1 = Date.UTC(v.year + 1, 0, 1);
       v.firsts.forEach((f, i) => {
         const dot = el('span', i === 0 ? 'yp-strip__dot is-first' : 'yp-strip__dot');
@@ -192,7 +210,7 @@ const YearPlay = (() => {
       const since = new Date(s.breakouts.since).toLocaleDateString(undefined, { month: 'long', timeZone: 'UTC' });
       const box = el('div', 'yp-center yp-center--wide');
       box.append(rise(el('p', 'yp-kicker', 'Rising'), 0), rise(el('h2', 'yp-head', `New since ${since}`), 0.2));
-      const list = el('div', 'yp-list');
+      const list = el('div', 'yp-list yp-panel');
       s.breakouts.forEach((t, i) => {
         const r = el('div', 'yp-list__row');
         const tx = el('div', 'yp-rowtext'); tx.append(el('span', 'yp-list__title', t.title), el('span', 'yp-list__artist', `${t.artist} · ${t.shows} shows`));
@@ -209,7 +227,7 @@ const YearPlay = (() => {
       const box = el('div', 'yp-center');
       box.append(rise(el('p', 'yp-kicker', 'The long runner'), 0), rise(coverImg(lr, 'yp-cover yp-cover--mid'), 0.2),
         rise(el('p', 'yp-title', lr.title), 0.5), rise(el('p', 'yp-artist', lr.artist), 0.6));
-      const months = el('div', 'yp-months');
+      const months = el('div', 'yp-months yp-panel');
       (s.monthList || []).forEach((m, i) => {
         const c = el('span', (lr.perMonth?.[m] || 0) > 0 ? 'is-on' : '', monthShort(m).slice(0, 1));
         c.style.setProperty('--d', `${1 + i * 0.16}s`);
@@ -219,29 +237,32 @@ const YearPlay = (() => {
       return [backdrop(lr), box];
     } });
 
-    // 11. the sound of the year: genres as a stream, drawn left to right
+    // 11. the sound of the year: the top genres, by their share of the year's episodes, and
+    // which way each went (the last three months against the first three)
     const gen = story(s, 'genres');
-    if (gen) out.push({ dur: 9, cls: 'yp-genres', build() {
+    if (gen) out.push({ dur: 9, build() {
       const v = gen.viz;
+      const avg = (rows, k) => rows.reduce((a, r) => a + (r[k] || 0), 0) / Math.max(1, rows.length);
+      const n3 = Math.min(3, Math.floor(v.rows.length / 2));
+      const list = v.keys.map((k) => ({ k, share: avg(v.rows, k), move: avg(v.rows.slice(-n3), k) - avg(v.rows.slice(0, n3), k) }))
+        .sort((a, b) => b.share - a.share).slice(0, 6);
+      const max = list[0]?.share || 1;
       const box = el('div', 'yp-center yp-center--wide');
-      box.append(rise(el('p', 'yp-kicker', 'The sound of the year'), 0), rise(el('h2', 'yp-head', gen.headline), 0.3));
-      const W = 1000, H = 360;
-      const stack = d3.stack().keys(v.keys).offset(d3.stackOffsetWiggle).order(d3.stackOrderInsideOut)(v.rows);
-      const x = d3.scalePoint().domain(v.rows.map((r) => r.m)).range([0, W]);
-      const yy = d3.scaleLinear().domain([d3.min(stack, (l) => d3.min(l, (p) => p[0])), d3.max(stack, (l) => d3.max(l, (p) => p[1]))]).range([H, 0]);
-      const area = d3.area().x((p) => x(p.data.m)).y0((p) => yy(p[0])).y1((p) => yy(p[1])).curve(d3.curveBasis);
-      const svg = d3.create('svg').attr('class', 'yp-stream').attr('viewBox', `0 0 ${W} ${H + 30}`).attr('preserveAspectRatio', 'none');
-      const shade = d3.scaleLinear().domain([0, v.keys.length - 1]).range([0.95, 0.2]);
-      svg.selectAll('path').data(stack).join('path').attr('d', area).attr('fill', (l, i) => `rgba(255,255,255,${shade(i)})`).append('title').text((l) => l.key);
-      stack.forEach((l, i) => {
-        const p = l.reduce((b, q) => (q[1] - q[0] > b[1] - b[0] ? q : b), l[0]);
-        if (yy(p[0]) - yy(p[1]) < 22) return;
-        svg.append('text').attr('class', 'yp-stream__label').attr('x', Math.min(W - 80, Math.max(80, x(p.data.m)))).attr('y', (yy(p[0]) + yy(p[1])) / 2 + 6)
-          .attr('text-anchor', 'middle').attr('fill', shade(i) > 0.55 ? '#000' : '#fff').text(l.key);
+      box.append(rise(el('p', 'yp-kicker', 'The sound of the year'), 0), rise(el('h2', 'yp-head', 'Top genres'), 0.2));
+      const chart = el('div', 'yp-genres yp-panel');
+      list.forEach((g, i) => {
+        const row = el('div', 'yp-genre');
+        const bar = el('span', 'yp-genre__bar');
+        bar.style.setProperty('--w', `${(g.share / max) * 100}%`);
+        bar.style.setProperty('--d', `${0.7 + i * 0.25}s`);
+        const mv = Math.abs(g.move) >= 0.01 ? (g.move > 0 ? '▲' : '▼') : '–';
+        const tag = el('span', `yp-genre__move${g.move >= 0.01 ? ' is-up' : g.move <= -0.01 ? ' is-down' : ''}`, mv);
+        tag.title = g.move >= 0.01 ? 'More of it as the year went on' : g.move <= -0.01 ? 'Less of it as the year went on' : 'Steady all year';
+        row.append(el('span', 'yp-genre__rank', String(i + 1)), el('span', 'yp-genre__name', g.k), bar,
+          el('span', 'yp-genre__pct', `${Math.round(g.share * 100)}%`), tag);
+        chart.append(rise(row, 0.5 + i * 0.25));
       });
-      v.rows.forEach((r) => svg.append('text').attr('class', 'yp-stream__axis').attr('x', x(r.m)).attr('y', H + 24).attr('text-anchor', 'middle').text(monthShort(r.m).slice(0, 1)));
-      const wrap = el('div', 'yp-stream-wrap'); wrap.append(svg.node());
-      box.append(wrap);
+      box.append(chart, rise(el('p', 'yp-sub', 'Share of the year’s episodes tagged with each genre. ▲ ▼ more or less of it by the end of the year.'), 2.2));
       return [backdrop(null, 'lsd'), box];
     } });
 
@@ -280,9 +301,14 @@ const YearPlay = (() => {
     scene.style.setProperty('--tint', TINTS[at % TINTS.length]);
     scene.append(...sc.build());
     stage.replaceChildren(scene);
-    // a tape glitch on the cut
+    // a tape glitch on the cut, then now and then while it plays
     root.classList.remove('is-cut'); void root.offsetWidth; root.classList.add('is-cut');
     clearTimeout(cutTimer); cutTimer = setTimeout(() => root?.classList.remove('is-cut'), 450);
+    const bg = scene.querySelector('.yp-bg');
+    corrupt(bg, true);
+    clearTimeout(glitchTimer);
+    const again = () => { glitchTimer = setTimeout(() => { if (!paused) corrupt(bg); if (bg?.isConnected) again(); }, 1400 + Math.random() * 3600); };
+    again();
     root.querySelectorAll('.yp-bar').forEach((b, j) => {
       b.classList.toggle('is-done', j < at);
       b.classList.toggle('is-on', j === at);
@@ -299,7 +325,7 @@ const YearPlay = (() => {
   }
   const next = () => { if (at < scenes.length - 1) show(at + 1); };
   const prev = () => show(at - 1);
-  let cutTimer = null, clock = null, t0 = 0, held = 0;
+  let cutTimer = null, glitchTimer = null, clock = null, t0 = 0, held = 0;
   function setPaused(p) {
     paused = p;
     root.classList.toggle('is-paused', p);
@@ -343,8 +369,7 @@ const YearPlay = (() => {
     top.append(bars, browse, close);
     const stage = el('div', 'yp-stage');
     const hint = el('p', 'yp-hint', 'Click for the next one · hold to pause');
-    const tape = el('div', 'yp-vhs'); tape.append(el('div', 'yp-vhs__band'));
-    root.append(stage, tape, osd(s.year), top, hint);
+    root.append(stage, osd(s.year), top, hint);
     loadMoods();
     container.append(root);
 
@@ -384,7 +409,7 @@ const YearPlay = (() => {
     setPaused(true);
     setTimeout(() => withMusic.focus(), 50);
   }
-  function stop() { clearInterval(clock); root?.remove(); root = null; }
+  function stop() { clearInterval(clock); clearTimeout(glitchTimer); root?.remove(); root = null; }
   // keys from the overlay: ← → move, Space pauses
   function key(e) {
     if (!root) return false;

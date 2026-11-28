@@ -601,9 +601,12 @@ const Archive = (() => {
       const o = current.origin || MyNTS.originOf(t);
       openTrackWeb({ artist: t.artist, title: t.title, isrc_id: o?.isrc_id, deezer_track_id: o?.deezer_track_id }, o);
     });
+    const onMap = el('button', 'mynts-btn', 'On the NTS map');
+    onMap.title = 'Where the artist lives on the map, and the shows that play them';
+    onMap.addEventListener('click', () => NtsMap.open({ artist: Artists.split(t.artist)[0] || t.artist }));
     const copy = el('button', 'mynts-btn', 'Copy artist & title');
     copy.addEventListener('click', () => copyTrack(`${t.artist} - ${t.title}`));
-    actions.append(save, web, copy);
+    actions.append(save, web, onMap, copy);
     const linksNav = el('nav', 'track-page__links');
     const linksLabel = el('span', 'stage__links-label', 'Find it on');
     const linksList = el('span', 'stage__links-list');
@@ -1551,6 +1554,50 @@ const Archive = (() => {
     },
     showShow(show) { started = true; go({ type: 'show', show }); },
     artist: (name) => Artists.get(name),
+    // Where an artist was played: NTS track search, grouped by show (newest first)
+    //   show -> [{ episode, title (the episode's), date, uid, track }]
+    artistPlays: (() => {
+      const cache = new Map();
+      return (name) => {
+        const want = Chart.norm(name);
+        if (cache.has(want)) return cache.get(want);
+        const p = (async () => {
+          const out = new Map();
+          for (const offset of [0, 50]) {
+            const res = await api(`/api/v2/search?q=${enc(name)}&version=2&offset=${offset}&limit=50&types[]=track`).catch(() => null);
+            for (const x of res?.results || []) {
+              const credit = (x.artists || []).map((a) => a.name).join(', ');
+              if (!Artists.split(credit).some((a) => Chart.norm(a) === want)) continue;
+              const ep = parsePath(x.article?.path);
+              if (!ep?.episode) continue;
+              const l = out.get(ep.show) || [];
+              if (!l.some((y) => y.episode === ep.episode && y.track === x.title)) l.push({ episode: ep.episode, title: x.article?.title, date: x.local_date, uid: x.track_uid, track: x.title });
+              out.set(ep.show, l);
+            }
+            if ((res?.results || []).length < 50) break;
+          }
+          return out;
+        })().catch(() => new Map());
+        cache.set(want, p);
+        return p;
+      };
+    })(),
+    // Play an episode from the point a track was played in it (by its uid, else its title)
+    async playTrackIn(show, episode, { uid, title } = {}) {
+      const tl = (await api(`/api/v2/shows/${show}/episodes/${episode}/tracklist`).catch(() => null))?.results || [];
+      const t = tl.find((r) => uid && r.uid === uid) || tl.find((r) => title && Chart.norm(r.title) === Chart.norm(title));
+      const off = t ? (t.offset ?? t.offset_estimate) : null;
+      await this.playFrom(show, episode, Number.isFinite(off) ? off : 0);
+      return Number.isFinite(off);
+    },
+    // Play a track from an episode that played it (NTS track search)
+    async playTrack(t) {
+      const info = await TrackInfo.find(t).catch(() => null);
+      const m = info?.match;
+      if (!m) { showSnack('Couldn’t find an episode with this track'); return false; }
+      await this.playFrom(m.show, m.episode, Number.isFinite(m.offset) ? m.offset : 0);
+      return true;
+    },
     showArtist(name) { started = true; go({ type: 'artist', name }); },
     showTrack(artist, title, { fromLive } = {}) {
       started = true;

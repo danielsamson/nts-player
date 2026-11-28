@@ -13,7 +13,9 @@ const NtsMap = (() => {
   let raf = 0, t0 = 0, dirty = true, nowShow = -1;
   let onAir = [], follows = new Set();
   let showsIn = { zone: [], sub: [] }, artistsIn = { zone: [], sub: [] };
-  let yi = -1, playTimer = 0;                                // the year you're looking at (-1: all of them)
+  let yi = -1, playTimer = 0;
+  let nowArtists = [], nowSig = '', nowIndex = null;           // the artist(s) of the track playing, on the map
+  const visited = new Set();                                   // neighbourhoods Drift has taken you to                                // the year you're looking at (-1: all of them)
   // activity in the year you're looking at: episodes for a show, shows for an artist
   const eps = (i) => (yi < 0 ? 1 : data.showYear?.[i]?.[yi] || 0);
   const aShows = (a) => (yi < 0 ? A(a)[5] : data.artistYear?.[a]?.[yi] || 0);
@@ -166,8 +168,16 @@ const NtsMap = (() => {
       artistLabel(sx + r + 5, sy, name, strong);
     });
 
-    // you're listening here; live now; shows you follow
+    // you're listening here (the show, and the artist of the track playing); live now; shows you follow
     if (nowShow >= 0) { const [sx, sy] = toScreen(S(nowShow)[1], S(nowShow)[2]); tag(sx, sy - Math.max(tile, 8) / 2 - 16, 'YOU’RE LISTENING'); }
+    nowArtists.forEach((ai) => {
+      const [sx, sy] = toScreen(A(ai)[1], A(ai)[2]);
+      if (nowShow >= 0) { const p = toScreen(S(nowShow)[1], S(nowShow)[2]); ctx.setLineDash([2, 3]); line(p, [sx, sy], 0.7); ctx.setLineDash([]); }
+      const pr = 9 + ((time % 1800) / 1800) * 14;
+      ctx.strokeStyle = `rgba(255,255,255,${1 - (time % 1800) / 1800})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, pr, 0, 7); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, 7); ctx.fill();
+      tag(sx, sy - 22, `NOW: ${A(ai)[0].toUpperCase()}`);
+    });
     const pulse = (time % 2400) / 2400;
     onAir.forEach(({ i, ch }) => {
       const [sx, sy] = toScreen(S(i)[1], S(i)[2]);
@@ -267,7 +277,7 @@ const NtsMap = (() => {
       if (Math.abs(target.x - view.x) < 1e-4 && Math.abs(target.y - view.y) < 1e-4 && Math.abs(target.z / view.z - 1) < 1e-3) target = null;
       dirty = true;
     }
-    if (!dirty && time - t0 < (onAir.length ? 33 : 120)) return;
+    if (!dirty && time - t0 < (onAir.length || nowArtists.length ? 33 : 120)) return;
     t0 = time; dirty = false;
     draw(time);
   }
@@ -303,6 +313,22 @@ const NtsMap = (() => {
     return r;
   }
   const h = (text) => el('h3', 'ntsmap__h', text);
+  // "Now: artist – title": where the artist lives, and what's next door
+  function nowBox(onShow) {
+    if (nowShow < 0 && !nowArtists.length) return [];
+    const wrap = el('div', 'ntsmap__now');
+    wrap.append(el('p', 'ntsmap__kind', 'You’re listening'));
+    if (nowTrackInfo) wrap.append(el('p', 'ntsmap__nowtrack', `${nowTrackInfo.artist} – ${nowTrackInfo.title}`));
+    if (nowShow >= 0 && !onShow) wrap.append(el('p', 'ntsmap__meta', `on ${showName(nowShow)}, in ${subName(S(nowShow)[4])}`));
+    const acts = el('div', 'ntsmap__actions');
+    if (nowArtists.length) acts.append(button(`Where ${A(nowArtists[0])[0]} lives ›`, 'ntsmap__btn', () => goArtist(nowArtists[0])));
+    if (nowShow >= 0 && !onShow) acts.append(button('The show ›', 'ntsmap__btn', () => goShow(nowShow)));
+    const d = button('Drift next door', 'ntsmap__btn', (e) => drift(e.currentTarget));
+    d.title = 'Somewhere next to here you haven’t been, playing';
+    acts.append(d);
+    wrap.append(acts);
+    return [wrap];
+  }
   // "41 shows on air in 2019 (up 6 on 2018)"
   function yearCount(list) {
     if (yi < 0) return `${list.length} shows`;
@@ -335,6 +361,7 @@ const NtsMap = (() => {
       const acts = el('div', 'ntsmap__actions');
       acts.append(button('▶ Play the latest', 'ntsmap__btn ntsmap__btn--main', (e) => playLatest(slug, e.currentTarget)), button('Open show', 'ntsmap__btn', () => { close(); Archive.showShow(slug); }));
       body.push(acts);
+      if (i === nowShow) body.push(...nowBox(true));
       if (S(i)[6].length) body.push(h('Plays most'), artistChips(S(i)[6]));
       const near = data.links.filter(([a, b]) => a === i || b === i).map(([a, b]) => (a === i ? b : a)).slice(0, 6);
       if (near.length) { body.push(h('Shows nearby')); near.forEach((j) => body.push(showRow(j))); }
@@ -344,9 +371,43 @@ const NtsMap = (() => {
         el('p', 'ntsmap__meta', `Played on ${a[5]} shows${yi >= 0 ? ` (${aShows(at.artist)} in ${yearName()})` : ''}. Lives in ${subName(a[4])}, where they’re played most.`));
       if (data.artistYear?.[at.artist] && data.years.length > 1) body.push(yearBars(data.artistYear[at.artist], 'shows'));
       const acts = el('div', 'ntsmap__actions');
-      acts.append(button('Artist page', 'ntsmap__btn', () => { close(); Archive.showArtist(a[0]); }));
-      body.push(acts, h('Shows that play them'));
-      a[6].forEach((i) => body.push(showRow(i)));
+      const hearBtn = button('▶ Hear them', 'ntsmap__btn ntsmap__btn--main', () => hearArtist(at.artist, hearBtn));
+      hearBtn.title = 'Play a show that played them, from that point in the mix';
+      acts.append(hearBtn, button('Artist page', 'ntsmap__btn', () => { close(); Archive.showArtist(a[0]); }));
+      body.push(acts);
+      if (nowArtists.includes(at.artist)) body.push(...nowBox(true));
+      // their most played tracks, each heard where a show played it
+      const tracksBox = el('div'); body.push(tracksBox);
+      Archive.artist(a[0]).then((res) => {
+        const ts = res?.x?.tracks || [];
+        if (!ts.length || !tracksBox.isConnected) return;
+        tracksBox.append(h('Most played'));
+        ts.slice(0, 5).forEach(([artist, title, n]) => {
+          const r = button('', 'ntsmap__row ntsmap__row--track', async () => { r.classList.add('is-busy'); await Archive.playTrack({ artist, title }); r.classList.remove('is-busy'); });
+          r.title = `Play ${title} where a show played it`;
+          const text = el('span', 'ntsmap__rowtext');
+          text.append(el('span', 'ntsmap__rowname', title), el('span', 'ntsmap__rownote', `${n} show${n === 1 ? '' : 's'}`));
+          r.append(el('span', 'ntsmap__playmark', '▶'), text);
+          tracksBox.append(r);
+        });
+      }).catch(() => {});
+      body.push(h('Shows that play them'));
+      const rows = a[6].map((i) => { const r = showRow(i); body.push(r); return [i, r]; });
+      // where each show played them: a play button into that moment
+      Archive.artistPlays(a[0]).then((plays) => {
+        rows.forEach(([i, r]) => {
+          const p = plays.get(S(i)[0])?.[0];
+          if (!p || !r.isConnected) return;
+          r.querySelector('.ntsmap__rownote').textContent = `Played ${p.track}${p.date ? ` · ${p.date}` : ''}`;
+          const b = el('span', 'ntsmap__hear', '▶');
+          b.setAttribute('role', 'button'); b.tabIndex = 0;
+          b.title = `Hear ${p.track} on ${showName(i)}`;
+          const go = async (e) => { e.stopPropagation(); b.textContent = '…'; await Archive.playTrackIn(S(i)[0], p.episode, { uid: p.uid, title: p.track }); b.textContent = '▶'; markNow(); };
+          b.addEventListener('click', go);
+          b.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(e); });
+          r.append(b);
+        });
+      }).catch(() => {});
       const near = data.artists.map((r, j) => [j, (r[1] - a[1]) ** 2 + (r[2] - a[2]) ** 2]).filter(([j]) => j !== at.artist).sort((p, q) => p[1] - q[1]).slice(0, 8).map(([j]) => j);
       body.push(h('Artists nearby'), artistChips(near));
     } else if (at.sub >= 0) {
@@ -368,7 +429,7 @@ const NtsMap = (() => {
         el('p', 'ntsmap__meta', yi < 0
           ? `${data.shows.length} shows from ${span} in ${data.zones.length} zones, grouped by what they play. ■ is a show, ○ an artist. Step into a zone, or find an artist you like.`
           : `${activeIn(data.shows.map((_, i) => i))} of the ${data.shows.length} shows were on air. The zones stay put; what lights up is who was playing that year.`));
-      if (nowShow >= 0) body.push(button(`You’re listening to ${showName(nowShow)}. See where it is ›`, 'ntsmap__here', () => goShow(nowShow)));
+      body.push(...nowBox());
       body.push(h('Zones'));
       data.zones.map((z, zi) => [z, zi]).sort((p, q) => activeIn(showsIn.zone[q[1]]) - activeIn(showsIn.zone[p[1]]))
         .forEach(([z, zi]) => body.push(areaRow(z[4], yi < 0 ? (z[5] || artistsIn.zone[zi].slice(0, 3).map((a) => A(a)[0]).join(', ')) : `${yearCount(showsIn.zone[zi])} · ${ranked(artistsIn.zone[zi]).slice(0, 3).map((a) => A(a)[0]).join(', ')}`, () => goZone(zi), { kind: 'zone', i: zi })));
@@ -416,13 +477,83 @@ const NtsMap = (() => {
     bar.replaceChildren(all, ...ys, button('▶ Play the years', 'ntsmap__btn ntsmap__playyears', play));
   }
 
+  // ▶ Hear them: a show that played this artist, from that moment (the most recent such play)
+  async function hearArtist(ai, btn) {
+    const label = btn?.textContent;
+    if (btn) btn.textContent = 'Finding them…';
+    const plays = await Archive.artistPlays(A(ai)[0]).catch(() => new Map());
+    const mine = A(ai)[6].map((i) => S(i)[0]);
+    const pick = mine.map((sl) => [sl, plays.get(sl)?.[0]]).find(([, p]) => p) || [...plays].map(([sl, l]) => [sl, l[0]])[0];
+    if (pick?.[1]) {
+      await Archive.playTrackIn(pick[0], pick[1].episode, { uid: pick[1].uid, title: pick[1].track });
+      const i = nowIndex?.get(pick[0]);
+      status(`Playing ${pick[1].track} on ${data.info?.[pick[0]]?.[0] || pick[0]}`);
+      if (i != null) { nowShow = i; dirty = true; }
+    } else status(`Couldn’t find an episode with ${A(ai)[0]} in it`);
+    if (btn?.isConnected) btn.textContent = label;
+  }
+  const status = (text) => { const st = box?.querySelector('.ntsmap__found'); if (st) st.textContent = text; };
+
+  // Drift: next door. A neighbouring neighbourhood you haven't been to (through the shows that link
+  // them), a show there that's still on air, and its latest episode playing
+  async function drift(btn) {
+    const from = at.show >= 0 ? at.show : nowShow >= 0 ? nowShow : at.sub >= 0 ? showsIn.sub[at.sub][0] : at.zone >= 0 ? showsIn.zone[at.zone][0] : Math.floor(Math.random() * data.shows.length);
+    const here = S(from)[4];
+    visited.add(here);
+    const ways = new Map();                                    // neighbourhood -> links to it from here
+    showsIn.sub[here].forEach((i) => data.links.forEach(([a, b]) => {
+      const o = a === i ? b : b === i ? a : -1;
+      if (o >= 0 && S(o)[4] !== here) ways.set(S(o)[4], (ways.get(S(o)[4]) || 0) + 1);
+    }));
+    // next door means the same zone first; across the border once that's explored
+    const zone = S(from)[3], same = (sb) => (data.subs[sb][4] === zone ? 1 : 0);
+    let options = [...ways].filter(([sb]) => !visited.has(sb)).sort((p, q) => same(q[0]) - same(p[0]) || q[1] - p[1]);
+    if (options.some(([sb]) => same(sb))) options = options.filter(([sb]) => same(sb));
+    else {
+      // no link into the rest of this zone: the nearest unexplored neighbourhoods in it, on the map
+      const c = data.subs[here];
+      const near = data.subs.map((sb, k) => [k, (sb[0] - c[0]) ** 2 + (sb[1] - c[1]) ** 2]).filter(([k]) => k !== here && same(k) && !visited.has(k)).sort((p, q) => p[1] - q[1]);
+      if (near.length) options = near.slice(0, 2);
+    }
+    options = options.slice(0, 3).map(([sb]) => sb);
+    if (!options.length) options = [...ways.keys()];
+    if (!options.length) options = data.subs.map((_, k) => k).filter((k) => k !== here);
+    const sb = options[Math.floor(Math.random() * options.length)];
+    visited.add(sb);
+    const live = showsIn.sub[sb].filter((i) => data.active?.includes(S(i)[0]));
+    const pool = live.length ? live : showsIn.sub[sb];
+    const i = pool[Math.floor(Math.random() * pool.length)];
+    goShow(i);
+    status(`Drifted next door: ${subName(sb)}${S(i)[3] !== S(from)[3] ? `, in ${zoneName(S(i)[3])}` : ''}`);
+    await playLatest(S(i)[0], btn);
+  }
+
+  // What's playing: its show, and the artist of the track you're hearing (marked on the map)
+  function markNow() {
+    if (!box || !data || !nowIndex) return;
+    const cur = typeof source !== 'undefined' && source === 'archive' ? TrackNotify.currentTrack()?.track
+      : (typeof LiveNow !== 'undefined' && typeof playing !== 'undefined' && playing ? LiveNow.track : null);
+    const show = listeningTo(nowIndex);
+    const sig = `${show}|${cur?.artist}|${cur?.title}`;
+    if (sig === nowSig) return;
+    nowSig = sig;
+    nowShow = show;
+    const want = new Set(String(cur?.artist || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((x) => Chart.norm(x)).filter(Boolean));
+    want.add(Chart.norm(cur?.artist || ''));
+    nowArtists = cur ? data.artists.map((r, k) => (want.has(Chart.norm(r[0])) ? k : -1)).filter((k) => k >= 0) : [];
+    nowTrackInfo = cur ? { artist: cur.artist, title: cur.title } : null;
+    dirty = true;
+    if (level() === 0 || at.show === nowShow || nowArtists.includes(at.artist)) render();
+  }
+  let nowTrackInfo = null, nowTimer = 0;
+
   async function playLatest(slug, btn) {
     const label = btn?.textContent;
     if (btn) btn.textContent = 'Loading…';
     try {
       const res = await window.nts.api(`/api/v2/shows/${slug}/episodes?limit=1`);
       const ep = res.results?.[0];
-      if (ep) { await Archive.playFrom(slug, ep.episode_alias, 0); nowShow = data.shows.findIndex((r) => r[0] === slug); dirty = true; }
+      if (ep) { await Archive.playFrom(slug, ep.episode_alias, 0); nowShow = data.shows.findIndex((r) => r[0] === slug); dirty = true; setTimeout(markNow, 1500); }
     } catch {}
     if (btn?.isConnected) btn.textContent = label;
   }
@@ -543,6 +674,7 @@ const NtsMap = (() => {
     box.innerHTML = `<div class="ntsmap__top">
         <nav class="ntsmap__trail" aria-label="Where you are"></nav>
         <form class="ntsmap__find"><input type="search" placeholder="Find an artist or show" aria-label="Find an artist or show" spellcheck="false"></form>
+        <button class="ntsmap__btn ntsmap__drift" title="Next door: a neighbourhood next to here you haven’t been to, playing">Drift</button>
         <button class="ntsmap__btn ntsmap__up" title="Out one level (Esc)">↑ Out</button>
         <button class="ntsmap__close" aria-label="Close">×</button>
       </div>
@@ -556,6 +688,7 @@ const NtsMap = (() => {
     cv = box.querySelector('canvas'); ctx = cv.getContext('2d'); panel = box.querySelector('.ntsmap__panel');
     box.querySelector('.ntsmap__close').addEventListener('click', close);
     box.querySelector('.ntsmap__up').addEventListener('click', up);
+    box.querySelector('.ntsmap__drift').addEventListener('click', (e) => data && drift(e.currentTarget));
     box.querySelector('.ntsmap__find').addEventListener('submit', (e) => { e.preventDefault(); find(e.target.querySelector('input').value); });
     panel.append(el('p', 'ntsmap__meta', 'Loading the map…'));
     data = await window.nts.chart('map').catch(() => null);
@@ -568,7 +701,10 @@ const NtsMap = (() => {
     const index = new Map(data.shows.map((r, i) => [r[0], i]));
     onAir = ((typeof live !== 'undefined' && live?.results) || []).slice(0, 2).map((r, k) => ({ i: index.get(showInfo(r).show), ch: k + 1 })).filter((x) => x.i != null);
     follows = new Set((typeof Following !== 'undefined' ? Following.all() : []).map((s) => index.get(s)).filter((i) => i != null));
-    nowShow = listeningTo(index);
+    nowIndex = index;
+    nowSig = '';
+    markNow();
+    nowTimer = setInterval(markNow, 2000);               // follows the track changes while open
     yi = -1;
     timeBar();
     bind();
@@ -580,6 +716,7 @@ const NtsMap = (() => {
     if (ai >= 0) goArtist(ai);
     else if (si >= 0) goShow(si);
     else if (start.artist) { goOverview(); find(start.artist); }
+    else if (start.now && nowArtists.length) goArtist(nowArtists[0]);
     else if (nowShow >= 0) goShow(nowShow);
     else goOverview();
     raf = requestAnimationFrame(loop);
@@ -588,6 +725,7 @@ const NtsMap = (() => {
     if (!box) return;
     cancelAnimationFrame(raf);
     clearInterval(playTimer); playTimer = 0;
+    clearInterval(nowTimer); nowTimer = 0;
     document.removeEventListener('keydown', onKey, true);
     box.remove(); box = null; cv = ctx = panel = null; hover = null; target = null;
     if (opener?.isConnected) opener.focus();

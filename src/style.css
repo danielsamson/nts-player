@@ -2495,3 +2495,15 @@ button.ntsmap__step:hover { color: var(--white); text-decoration: underline; }
 #nowArt[role="button"], #nowText[role="button"] { cursor: pointer; }
 #nowText[role="button"]:hover #nowLabel, #nowText[role="button"]:focus-visible #nowLabel { text-decoration: underline; }
 #nowArt[role="button"]:focus-visible, #nowText[role="button"]:focus-visible { outline: 2px solid var(--white); outline-offset: -2px; }
+
+/* map: hearing, now playing */
+.ntsmap__row--track { grid-template-columns: 24px minmax(0, 1fr); }
+.ntsmap__row.is-busy { opacity: .5; }
+.ntsmap__playmark { font-size: 12px; color: var(--grey-1); text-align: center; }
+.ntsmap__row { position: relative; width: 100%; }
+.ntsmap__hear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--grey-3); background: #000; font-size: 11px; }
+.ntsmap__hear:hover, .ntsmap__hear:focus-visible { background: var(--white); color: #000; outline: none; }
+.ntsmap__row .ntsmap__rowtext { padding-right: 36px; }
+.ntsmap__now { border: 1px solid var(--white); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+.ntsmap__nowtrack { margin: 0; font: 700 16px/1.15 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.stage__mode--map { border-left: var(--rule); }

@@ -1266,6 +1266,9 @@ async function findLiveSaveTarget(t) {
   return m ? { show: m.show, episode: m.episode, title: m.title, date: m.date, offset: m.offset } : null;
 }
 
+// Now playing › On the map: opens on the artist you're hearing (else the show)
+$('stageMap').addEventListener('click', (e) => { e.stopPropagation(); NtsMap.open({ now: true }); });
+
 // ---- The bar takes you back to what's playing: the episode and its tracklist, or the live channel ----
 function goToNowPlaying() {
   const a = ArchivePlayer.state;
@@ -1338,14 +1341,14 @@ var NowSave = (() => {   // var: renderNowbar may ask before this line runs
 // ---- Stage modes: Now playing / Track web ----
 function setStageMode(mode) {
   document.body.classList.toggle('stage-web', mode === 'web');
-  document.querySelectorAll('.stage__mode').forEach((b) => {
+  document.querySelectorAll('.stage__mode[data-mode]').forEach((b) => {
     b.classList.toggle('active', b.dataset.mode === mode);
     b.setAttribute('aria-selected', String(b.dataset.mode === mode));
   });
   $('trackweb').hidden = mode !== 'web';
   if (mode === 'web') TrackWeb.show();
 }
-document.querySelectorAll('.stage__mode').forEach((b) => b.addEventListener('click', () => setStageMode(b.dataset.mode)));
+document.querySelectorAll('.stage__mode[data-mode]').forEach((b) => b.addEventListener('click', () => setStageMode(b.dataset.mode)));
 // Open the track web on a track (switches to the wide view if needed)
 function openTrackWeb(t, origin) {
   if (!window.matchMedia('(min-width: 720px)').matches) window.nts.setWide(true);

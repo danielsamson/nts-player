@@ -18,7 +18,7 @@ const KEEP_SHOWS = 8, KEEP_TRACKS = 6;
 const MIXED = /^(guests|dancing-\d{4}|nts-guests|supporter-radio.*|your-specialist-subject.*|coming-of-age.*|nts-.*-takeover.*)$/;
 const n = (x) => String(x || '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
-const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings', 'unknown', 'unknown artist', 'various', 'various artists']);
+const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings', 'guest', 'guests', 'unknown', 'unknown artist', 'various', 'various artists']);
 
 function load(out) {
   const dir = path.join(out, 'taste');
@@ -115,7 +115,7 @@ function similarTracks({ showsOf, trackName }) {
     }
     const me = main(k);
     const near = [...acc].filter(([o]) => via.get(o).length >= 2 && main(o) !== me)
-      .map(([o, x]) => [o, x / Math.sqrt(mass.get(k) * mass.get(o))]).sort((a, b) => b[1] - a[1]);
+      .map(([o, x]) => { const c = via.get(o).length; return [o, (x / Math.sqrt(mass.get(k) * mass.get(o))) * (c / (c + DAMP))]; }).sort((a, b) => b[1] - a[1]);
     const seen = new Set(), out = [];
     for (const [o] of near) {                      // one track per artist
       const a = main(o);
@@ -133,6 +133,7 @@ function similarTracks({ showsOf, trackName }) {
 // artists: where they're played most, who else those shows play, their most played tracks.
 // Written as charts/artists-<first letter>.json (a few hundred KB each, loaded as needed)
 const ARTIST_MIN_SHOWS = 3;
+let DAMP = 6;                          // how much more shows in common count (see artistPages)
 const shard = (k) => (/^[a-z]/.test(k) ? k[0] : /^[0-9]/.test(k) ? '0' : '_');
 function artistPages({ artistsOf, artistName, showsOf, trackName }) {
   const showsBy = new Map();           // artist -> Map(show -> plays)
@@ -165,7 +166,8 @@ function artistPages({ artistsOf, artistName, showsOf, trackName }) {
       let v = via.get(o); if (!v) via.set(o, (v = [])); v.push(s);
     }
     const like = [...acc].filter(([o]) => via.get(o).length >= 2)
-      .map(([o, x]) => [o, x / Math.sqrt(mass.get(a) * mass.get(o))]).sort((x, y) => y[1] - x[1]).slice(0, 8)
+      // cosine favours artists on two or three shows that happen to overlap; more shows in common counts for more
+      .map(([o, x]) => { const k = via.get(o).length; return [o, (x / Math.sqrt(mass.get(a) * mass.get(o))) * (k / (k + DAMP))]; }).sort((x, y) => y[1] - x[1]).slice(0, 8)
       .map(([o]) => [artistName.get(o), via.get(o).sort((x, y) => w.get(y) - w.get(x)).slice(0, 2)]);
     const top = [...mine].sort((x, y) => y[1] - x[1]).slice(0, 6);
     const tracks = (tracksBy.get(a) || []).sort((x, y) => y[2] - x[2]).slice(0, 6);
@@ -219,7 +221,7 @@ async function write(out, get) {
   console.log(`similar: ${Object.keys(shows).length} shows, ${Object.keys(tracks).length} tracks, from ${data.months.length} months`);
 }
 
-module.exports = { write, load, similarShows, similarTracks, artistPages };
+module.exports = { write, load, similarShows, similarTracks, artistPages, setDamp: (x) => { DAMP = x; } };
 if (require.main === module) {
   const i = process.argv.indexOf('--out');
   write(i > 0 ? process.argv[i + 1] : path.join(__dirname, '..', 'data'), (u) => fetch(u, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)))

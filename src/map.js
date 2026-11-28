@@ -13,6 +13,14 @@ const NtsMap = (() => {
   let raf = 0, t0 = 0, dirty = true, nowShow = -1;
   let onAir = [], follows = new Set();
   let showsIn = { zone: [], sub: [] }, artistsIn = { zone: [], sub: [] };
+  let yi = -1, playTimer = 0;                                // the year you're looking at (-1: all of them)
+  // activity in the year you're looking at: episodes for a show, shows for an artist
+  const eps = (i) => (yi < 0 ? 1 : data.showYear?.[i]?.[yi] || 0);
+  const aShows = (a) => (yi < 0 ? A(a)[5] : data.artistYear?.[a]?.[yi] || 0);
+  const yearName = () => (yi < 0 ? 'all years' : String(data.years[yi]));
+  // artists of a zone or neighbourhood, most played (that year) first
+  const ranked = (list) => (yi < 0 ? list : list.filter((a) => aShows(a) > 0).sort((p, q) => aShows(q) - aShows(p)));
+  const activeIn = (list) => list.filter((i) => eps(i) > 0).length;
   const pics = new Map();
   const PANEL = 340;
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -71,17 +79,20 @@ const NtsMap = (() => {
     if (!field) field = document.createElement('canvas');
     if (field.width !== w || field.height !== h) { field.width = w; field.height = h; fieldKey = ''; }
     const lit = hover?.kind === 'zone' ? hover.i : at.zone;
-    const key = `${view.x.toFixed(4)},${view.y.toFixed(4)},${view.z.toFixed(3)},${w},${h},${lit},${Math.floor(time / 120)}`;
+    const key = `${view.x.toFixed(4)},${view.y.toFixed(4)},${view.z.toFixed(3)},${w},${h},${lit},${yi},${Math.floor(time / 120)}`;
     if (key !== fieldKey) {
       fieldKey = key;
       const f = field.getContext('2d');
       f.clearRect(0, 0, w, h);
       const r = Math.max(6, Math.min(60, 0.03 * scale() / 4));
       f.globalCompositeOperation = 'lighter';
-      data.shows.forEach(([, x, y, zone]) => {
+      data.shows.forEach(([, x, y, zone], i) => {
+        const e = eps(i);
+        if (!e) return;
         const [sx, sy] = toScreen(x, y);
         const br = 1 + 0.12 * Math.sin(time / 2600 + zone * 1.7);
-        const a = lit >= 0 ? (zone === lit ? 0.12 : 0.025) : 0.06;
+        const strength = yi < 0 ? 1 : Math.min(1.6, 0.4 + e / 10);       // busier shows glow more that year
+        const a = (lit >= 0 ? (zone === lit ? 0.12 : 0.025) : 0.06) * strength;
         const g = f.createRadialGradient(sx / 4, sy / 4, 0, sx / 4, sy / 4, r * br);
         g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, 'rgba(255,255,255,0)');
         f.fillStyle = g; f.fillRect(sx / 4 - r * br, sy / 4 - r * br, r * br * 2, r * br * 2);
@@ -126,9 +137,10 @@ const NtsMap = (() => {
       const [sx, sy] = toScreen(x, y);
       if (sx < -40 || sx > W + 40 || sy < -40 || sy > H + 40) return;
       const strong = i === at.show || i === hs || sel.has(i) || i === nowShow;
-      const dim = !strong && !inFocus(zone, sub);
+      const off = !eps(i);                                   // not on air that year
+      const dim = !strong && (off || !inFocus(zone, sub));
       const size = tile >= 20 ? tile : Math.max(3, Math.min(tile, 2.5 + w / 3));
-      ctx.globalAlpha = dim ? 0.18 : 1;
+      ctx.globalAlpha = dim ? (off ? 0.07 : 0.18) : 1;
       const im = size >= 20 && !dim ? (target ? pics.get(slug) : pic(slug)) : null;
       if (im?.complete && im.naturalWidth) ctx.drawImage(im, sx - size / 2, sy - size / 2, size, size);
       else { ctx.fillStyle = strong ? '#fff' : 'rgba(255,255,255,.7)'; ctx.fillRect(sx - size / 2, sy - size / 2, size, size); }
@@ -141,13 +153,13 @@ const NtsMap = (() => {
     data.artists.forEach(([name, x, y, zone, sub, n], ai) => {
       const strong = ai === at.artist || ai === ha || selA.has(ai);
       if (!strong) {
-        if (!(L >= 1 || view.z > 2.2) || !inFocus(zone, sub)) return;
-        const rank = (close2 ? artistsIn.sub[sub] : artistsIn.zone[zone]).indexOf(ai);
+        if (!(L >= 1 || view.z > 2.2) || !inFocus(zone, sub) || !aShows(ai)) return;
+        const rank = ranked(close2 ? artistsIn.sub[sub] : artistsIn.zone[zone]).indexOf(ai);
         if (rank < 0 || rank >= (close2 ? 14 : 10)) return;
       }
       const [sx, sy] = toScreen(x, y);
       if (sx < -60 || sx > W + 60 || sy < -30 || sy > H + 30) return;
-      const r = 4 + Math.min(6, Math.sqrt(n) / 2);
+      const r = 4 + Math.min(6, Math.sqrt(yi < 0 ? n : aShows(ai) * 4) / 2);
       ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.fill();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = strong ? 2.5 : 1.5; ctx.beginPath(); ctx.arc(sx, sy, r, 0, 7); ctx.stroke();
       if (strong) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, r - 3), 0, 7); ctx.fill(); }
@@ -291,6 +303,14 @@ const NtsMap = (() => {
     return r;
   }
   const h = (text) => el('h3', 'ntsmap__h', text);
+  // "41 shows on air in 2019 (up 6 on 2018)"
+  function yearCount(list) {
+    if (yi < 0) return `${list.length} shows`;
+    const now = activeIn(list);
+    if (yi === 0) return `${now} on air in ${data.years[yi]}`;
+    const was = list.filter((i) => data.showYear[i][yi - 1] > 0).length, d = now - was;
+    return `${now} on air in ${data.years[yi]}${d ? ` (${d > 0 ? 'up' : 'down'} ${Math.abs(d)} on ${data.years[yi - 1]})` : ''}`;
+  }
   function render() {
     dirty = true;
     // the trail
@@ -311,6 +331,7 @@ const NtsMap = (() => {
       if (data.info?.[slug]?.[1]) im.src = picUrl(slug, 400); else im.hidden = true;
       body.push(el('p', 'ntsmap__kind', '■ Show'), im, el('h2', 'ntsmap__title2', showName(i)));
       if (!data.active?.includes(slug)) body.push(el('p', 'ntsmap__meta', 'Not on air lately: in the archive.'));
+      if (data.showYear?.[i] && data.years.length > 1) body.push(yearBars(data.showYear[i], 'episodes'));
       const acts = el('div', 'ntsmap__actions');
       acts.append(button('▶ Play the latest', 'ntsmap__btn ntsmap__btn--main', (e) => playLatest(slug, e.currentTarget)), button('Open show', 'ntsmap__btn', () => { close(); Archive.showShow(slug); }));
       body.push(acts);
@@ -320,7 +341,8 @@ const NtsMap = (() => {
     } else if (at.artist >= 0) {
       const a = A(at.artist);
       body.push(el('p', 'ntsmap__kind', '○ Artist'), el('h2', 'ntsmap__title2', a[0]),
-        el('p', 'ntsmap__meta', `Played on ${a[5]} shows. Lives in ${subName(a[4])}, where they’re played most.`));
+        el('p', 'ntsmap__meta', `Played on ${a[5]} shows${yi >= 0 ? ` (${aShows(at.artist)} in ${yearName()})` : ''}. Lives in ${subName(a[4])}, where they’re played most.`));
+      if (data.artistYear?.[at.artist] && data.years.length > 1) body.push(yearBars(data.artistYear[at.artist], 'shows'));
       const acts = el('div', 'ntsmap__actions');
       acts.append(button('Artist page', 'ntsmap__btn', () => { close(); Archive.showArtist(a[0]); }));
       body.push(acts, h('Shows that play them'));
@@ -329,26 +351,69 @@ const NtsMap = (() => {
       body.push(h('Artists nearby'), artistChips(near));
     } else if (at.sub >= 0) {
       const sb = data.subs[at.sub];
-      body.push(el('p', 'ntsmap__kind', `Neighbourhood · ${sb[3]} shows`), el('h2', 'ntsmap__title2', subName(at.sub)),
-        el('p', 'ntsmap__meta', `In ${zoneName(sb[4])}.`), h('Artists here'), artistChips(artistsIn.sub[at.sub].slice(0, 12)), h('Shows here'));
-      showsIn.sub[at.sub].slice().sort((p, q) => S(q)[5] - S(p)[5]).slice(0, 12).forEach((i) => body.push(showRow(i, '')));
+      body.push(el('p', 'ntsmap__kind', `Neighbourhood · ${yearCount(showsIn.sub[at.sub])}`), el('h2', 'ntsmap__title2', subName(at.sub)),
+        el('p', 'ntsmap__meta', `In ${zoneName(sb[4])}.`), h(yi < 0 ? 'Artists here' : `Artists here in ${yearName()}`), artistChips(ranked(artistsIn.sub[at.sub]).slice(0, 12)), h(yi < 0 ? 'Shows here' : `On air in ${yearName()}`));
+      showsIn.sub[at.sub].filter((i) => eps(i) > 0).sort((p, q) => (yi < 0 ? S(q)[5] - S(p)[5] : eps(q) - eps(p))).slice(0, 12)
+        .forEach((i) => body.push(showRow(i, yi < 0 ? '' : `${eps(i)} episode${eps(i) === 1 ? '' : 's'} in ${yearName()}`)));
     } else if (at.zone >= 0) {
       const z = data.zones[at.zone];
-      body.push(el('p', 'ntsmap__kind', `Zone · ${z[3]} shows`), el('h2', 'ntsmap__title2', z[4]));
+      body.push(el('p', 'ntsmap__kind', `Zone · ${yearCount(showsIn.zone[at.zone])}`), el('h2', 'ntsmap__title2', z[4]));
       if (z[5]) body.push(el('p', 'ntsmap__meta', z[5]));
-      body.push(h('Known for'), artistChips(artistsIn.zone[at.zone].slice(0, 10)), h('Neighbourhoods'));
-      data.subs.map((sb, si) => [sb, si]).filter(([sb]) => sb[4] === at.zone).sort((p, q) => q[0][3] - p[0][3])
-        .forEach(([sb, si]) => body.push(areaRow(subName(si), `${sb[3]} shows · ${artistsIn.sub[si].slice(0, 3).map((a) => A(a)[0]).join(', ')}`, () => goSub(si))));
+      body.push(h(yi < 0 ? 'Known for' : `Played most in ${yearName()}`), artistChips(ranked(artistsIn.zone[at.zone]).slice(0, 10)), h('Neighbourhoods'));
+      data.subs.map((sb, si) => [sb, si]).filter(([sb]) => sb[4] === at.zone).sort((p, q) => activeIn(showsIn.sub[q[1]]) - activeIn(showsIn.sub[p[1]]))
+        .forEach(([, si]) => body.push(areaRow(subName(si), `${yearCount(showsIn.sub[si])} · ${ranked(artistsIn.sub[si]).slice(0, 3).map((a) => A(a)[0]).join(', ')}`, () => goSub(si))));
     } else {
-      body.push(el('h2', 'ntsmap__title2', 'The NTS map'),
-        el('p', 'ntsmap__meta', `${data.shows.length} shows in ${data.zones.length} zones, grouped by what they play. ■ is a show, ○ an artist. Step into a zone, or find an artist you like.`));
+      const span = data.years?.length ? `${data.years[0]}–${data.years[data.years.length - 1]}` : '';
+      body.push(el('h2', 'ntsmap__title2', yi < 0 ? 'The NTS map' : `NTS in ${yearName()}`),
+        el('p', 'ntsmap__meta', yi < 0
+          ? `${data.shows.length} shows from ${span} in ${data.zones.length} zones, grouped by what they play. ■ is a show, ○ an artist. Step into a zone, or find an artist you like.`
+          : `${activeIn(data.shows.map((_, i) => i))} of the ${data.shows.length} shows were on air. The zones stay put; what lights up is who was playing that year.`));
       if (nowShow >= 0) body.push(button(`You’re listening to ${showName(nowShow)}. See where it is ›`, 'ntsmap__here', () => goShow(nowShow)));
       body.push(h('Zones'));
-      data.zones.map((z, zi) => [z, zi]).sort((p, q) => q[0][3] - p[0][3])
-        .forEach(([z, zi]) => body.push(areaRow(z[4], z[5] || artistsIn.zone[zi].slice(0, 3).map((a) => A(a)[0]).join(', '), () => goZone(zi), { kind: 'zone', i: zi })));
+      data.zones.map((z, zi) => [z, zi]).sort((p, q) => activeIn(showsIn.zone[q[1]]) - activeIn(showsIn.zone[p[1]]))
+        .forEach(([z, zi]) => body.push(areaRow(z[4], yi < 0 ? (z[5] || artistsIn.zone[zi].slice(0, 3).map((a) => A(a)[0]).join(', ')) : `${yearCount(showsIn.zone[zi])} · ${ranked(artistsIn.zone[zi]).slice(0, 3).map((a) => A(a)[0]).join(', ')}`, () => goZone(zi), { kind: 'zone', i: zi })));
     }
     panel.replaceChildren(...body);
     panel.scrollTop = 0;
+  }
+
+  // a small bar per year: when a show was on, or an artist was played; click a bar to go to that year
+  function yearBars(vals, what) {
+    const max = Math.max(1, ...vals);
+    const wrap = el('div', 'ntsmap__bars');
+    data.years.forEach((y, k) => {
+      const b = el('button', 'ntsmap__bar' + (k === yi ? ' is-on' : ''));
+      b.style.setProperty('--h', `${Math.round((vals[k] / max) * 100)}%`);
+      b.title = `${y}: ${vals[k]} ${what}`;
+      b.append(el('span', 'ntsmap__barfill'), el('span', 'ntsmap__barlabel', `’${String(y).slice(2)}`));
+      b.addEventListener('click', () => setYear(k));
+      wrap.append(b);
+    });
+    return wrap;
+  }
+  // the time slider: all years, or one
+  function setYear(k) {
+    yi = k;
+    box.querySelectorAll('.ntsmap__year').forEach((b) => b.classList.toggle('is-on', +b.dataset.k === k));
+    render();
+  }
+  function play() {
+    const btn = box.querySelector('.ntsmap__playyears');
+    if (playTimer) { clearInterval(playTimer); playTimer = 0; btn.textContent = '▶ Play the years'; return; }
+    btn.textContent = '■ Stop';
+    setYear(0);
+    playTimer = setInterval(() => {
+      if (!box) { clearInterval(playTimer); playTimer = 0; return; }
+      if (yi >= data.years.length - 1) { clearInterval(playTimer); playTimer = 0; btn.textContent = '▶ Play the years'; return; }
+      setYear(yi + 1);
+    }, 1800);
+  }
+  function timeBar() {
+    const bar = box.querySelector('.ntsmap__time');
+    if (!data.years || data.years.length < 2) { bar.hidden = true; return; }
+    const all = button('All years', 'ntsmap__year is-on', () => setYear(-1)); all.dataset.k = -1;
+    const ys = data.years.map((y, k) => { const b = button(String(y), 'ntsmap__year', () => setYear(k)); b.dataset.k = k; return b; });
+    bar.replaceChildren(all, ...ys, button('▶ Play the years', 'ntsmap__btn ntsmap__playyears', play));
   }
 
   async function playLatest(slug, btn) {
@@ -483,6 +548,7 @@ const NtsMap = (() => {
       </div>
       <div class="ntsmap__main"><canvas class="ntsmap__canvas"></canvas><aside class="ntsmap__panel"></aside>
         <p class="ntsmap__found" aria-live="polite"></p>
+        <div class="ntsmap__time" role="group" aria-label="Year"></div>
         <p class="ntsmap__key">■ show &nbsp; ○ artist &nbsp;·&nbsp; click to go in, Esc to go out, scroll to zoom</p></div>`;
     document.body.append(box);
     box.focus();
@@ -503,6 +569,8 @@ const NtsMap = (() => {
     onAir = ((typeof live !== 'undefined' && live?.results) || []).slice(0, 2).map((r, k) => ({ i: index.get(showInfo(r).show), ch: k + 1 })).filter((x) => x.i != null);
     follows = new Set((typeof Following !== 'undefined' ? Following.all() : []).map((s) => index.get(s)).filter((i) => i != null));
     nowShow = listeningTo(index);
+    yi = -1;
+    timeBar();
     bind();
     cv.width = Math.round(cv.clientWidth * dpr()); cv.height = Math.round(cv.clientHeight * dpr());
     view = { x: 0.5, y: 0.5, z: 1 };
@@ -519,6 +587,7 @@ const NtsMap = (() => {
   function close() {
     if (!box) return;
     cancelAnimationFrame(raf);
+    clearInterval(playTimer); playTimer = 0;
     document.removeEventListener('keydown', onKey, true);
     box.remove(); box = null; cv = ctx = panel = null; hover = null; target = null;
     if (opener?.isConnected) opener.focus();

@@ -2449,6 +2449,7 @@ button.ntsmap__step:hover { color: var(--white); text-decoration: underline; }
 .ntsmap__main { position: relative; min-height: 0; }
 .ntsmap__canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .ntsmap__panel { position: absolute; top: 0; right: 0; bottom: 0; width: 340px; overflow-y: auto; background: #000; border-left: var(--rule); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.ntsmap__panel > * { flex-shrink: 0; }
 .ntsmap__kind { margin: 0; font: 700 11px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; color: var(--grey-2); letter-spacing: .04em; }
 .ntsmap__title2 { margin: 0; font: 700 26px/1.02 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; overflow-wrap: anywhere; }
 .ntsmap__meta { margin: 0; font-size: 13px; line-height: 1.4; color: var(--grey-1); }
@@ -2471,9 +2472,21 @@ button.ntsmap__step:hover { color: var(--white); text-decoration: underline; }
 .ntsmap__key { position: absolute; left: 12px; bottom: 10px; margin: 0; font-size: 12px; color: var(--grey-2); pointer-events: none; }
 .ntsmap::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .08; mix-blend-mode: screen;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.ntsmap__time { position: absolute; left: 12px; bottom: 34px; right: 352px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ntsmap__time[hidden] { display: none; }
+.ntsmap__year { height: 28px; padding: 0 8px; border: 1px solid var(--grey-3); background: rgba(0,0,0,.8); color: var(--grey-1); font: 700 12px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.ntsmap__year:hover { border-color: var(--white); color: var(--white); }
+.ntsmap__year.is-on { background: var(--white); color: #000; border-color: var(--white); }
+.ntsmap__playyears { height: 28px; margin-left: 6px; }
+.ntsmap__bars { display: flex; gap: 3px; align-items: flex-end; height: 56px; margin: 4px 0; }
+.ntsmap__bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; background: none; border: 0; padding: 0; gap: 2px; }
+.ntsmap__barfill { display: block; height: calc(var(--h) * .75); min-height: 1px; background: var(--grey-2); }
+.ntsmap__bar:hover .ntsmap__barfill, .ntsmap__bar.is-on .ntsmap__barfill { background: var(--white); }
+.ntsmap__barlabel { font-size: 10px; color: var(--grey-2); text-align: center; }
 .artist-page__map { margin-top: 10px; }
 @media (max-width: 760px) {
   .ntsmap__panel { top: auto; left: 0; width: auto; height: 42%; border-left: 0; border-top: var(--rule); }
   .ntsmap__find { width: 34vw; }
   .ntsmap__key { display: none; }
+  .ntsmap__time { right: 12px; bottom: calc(42% + 8px); }
 }

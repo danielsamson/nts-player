@@ -82,7 +82,8 @@ function layout(n, edges, pos, { iters, temp }) {
 }
 
 function build(data, prev) {
-  const { shows, vec, byArtist } = showVectors(data);
+  // the map is the whole archive: every year counts the same (recommendations favour recent years; this doesn't)
+  const { shows, vec, byArtist } = showVectors({ tasteOf: data.artistsOf });
   const cos = cosines({ shows, vec, byArtist });
   const idx = new Map(shows.map((s, i) => [s, i]));
   // graph: each show to its K nearest, symmetric
@@ -165,7 +166,7 @@ function build(data, prev) {
   const fit = (p) => [Math.min(1, Math.max(0, 0.05 + 0.9 * ((p[0] - x0) / span + (1 - (x1 - x0) / span) / 2))), Math.min(1, Math.max(0, 0.05 + 0.9 * ((p[1] - y0) / span + (1 - (y1 - y0) / span) / 2)))];
   const xy = pos.map(fit);
   const r3 = (v) => Math.round(v * 1000) / 1000;
-  const weight = (s) => Math.round(Math.log(1 + [...data.tasteOf.get(s).values()].reduce((a, b) => a + b, 0)) * 10) / 10;
+  const weight = (s) => Math.round(Math.log(1 + [...data.artistsOf.get(s).values()].reduce((a, b) => a + b, 0)) * 10) / 10;
   // what defines a zone: artists played across many of its shows, and mostly there rather than everywhere
   const showsWith = new Map();
   for (const s of shows) for (const a of vec.get(s).keys()) showsWith.set(a, (showsWith.get(a) || 0) + 1);
@@ -251,8 +252,13 @@ function build(data, prev) {
   for (const [, si, ni] of subPairs.sort((p, q) => q[0] - p[0])) if (!subName.has(si) && !subUsed.has(ni)) { subName.set(si, nb[ni].name); subUsed.add(ni); }
   const centre = (members) => { const p = members.map((s) => xy[idx.get(s)]); return [r3(p.reduce((a, q) => a + q[0], 0) / p.length), r3(p.reduce((a, q) => a + q[1], 0) / p.length)]; };
   const majority = (members) => { const c = new Map(); members.forEach((s) => c.set(zoneOf.get(s), (c.get(zoneOf.get(s)) || 0) + 1)); return [...c].sort((a, b) => b[1] - a[1])[0][0]; };
+  // each year: episodes per show, and shows per artist (for the time slider)
+  const years = [...new Set(data.months.map((m) => +m.slice(0, 4)))].sort();
+  const showYear = shows.map((s) => years.map((y) => data.showYears.get(s)?.get(y) || 0));
+  const ay = data.artistsByYear(artists.map((r) => r[7]));
+  const artistYear = artists.map((r) => years.map((y) => ay.get(r[7])?.get(y)?.size || 0));
   return {
-    v: 2, generated: Date.now(), months: [data.months[0], data.months[data.months.length - 1]],
+    v: 3, generated: Date.now(), years, showYear, artistYear, months: [data.months[0], data.months[data.months.length - 1]],
     // [slug, x, y, zone, neighbourhood, weight, [its most played artists (indexes into artists)]]
     shows: shows.map((s, i) => [s, r3(xy[i][0]), r3(xy[i][1]), zoneOf.get(s), subOf.get(s), weight(s), showArtists[i]]),
     // [name, x, y, zone, neighbourhood, shows that play them, [the shows that play them most]]

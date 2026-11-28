@@ -69,12 +69,16 @@ function load(out) {
   });
   const creditsOf = artistSplitter(solo, whole);
   const together = new Map();          // artist key -> Set(artists credited on the same track)
+  const showYears = new Map();         // show -> Map(year -> episodes)
   for (const [f, d] of docs) {
     const wt = 0.5 ** ((newest - monthNo(f)) / HALF_LIFE);
+    const year = +f.slice(0, 4);
     for (const [si, day, list] of d.eps) {
       const s = d.showList[si];
       if (MIXED.test(s)) continue;
       if (!(lastDay.get(s) >= day)) lastDay.set(s, day);
+      let sy = showYears.get(s); if (!sy) showYears.set(s, (sy = new Map()));
+      sy.set(year, (sy.get(year) || 0) + 1);
       let am = artistsOf.get(s);
       if (!am) artistsOf.set(s, (am = new Map()));
       let tm = tasteOf.get(s);
@@ -103,7 +107,24 @@ function load(out) {
   }
   const latest = Math.max(...lastDay.values());
   const active = new Set([...lastDay].filter(([, d]) => d > latest - 365).map(([s]) => s));
-  return { months: files.map((f) => f.slice(0, 7)).sort(), artistsOf, tasteOf, active, artistName, showsOf, trackName, creditsOf, together };
+  // artistsByYear(keys): for those artists, year -> how many shows played them (one more pass)
+  const artistsByYear = (keys) => {
+    const want = new Set(keys), out = new Map([...want].map((a) => [a, new Map()]));
+    for (const [f, d] of docs) {
+      const year = +f.slice(0, 4);
+      for (const [si, , list] of d.eps) {
+        const s = d.showList[si];
+        if (MIXED.test(s)) continue;
+        for (const ti of new Set(list)) for (const a of creditsOf(d.tracks[ti][0])) {
+          const k = n(a);
+          if (!want.has(k)) continue;
+          let y = out.get(k).get(year); if (!y) out.get(k).set(year, (y = new Set())); y.add(s);
+        }
+      }
+    }
+    return out;
+  };
+  return { months: files.map((f) => f.slice(0, 7)).sort(), artistsOf, tasteOf, active, artistName, showsOf, trackName, creditsOf, together, showYears, artistsByYear };
 }
 
 // shows: TF-IDF over artists, cosine, then a correction for "hub" shows that are a bit

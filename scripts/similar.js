@@ -108,7 +108,8 @@ function load(out) {
 
 // shows: TF-IDF over artists, cosine, then a correction for "hub" shows that are a bit
 // like everyone (CSLS: subtract how close each is to its own nearest neighbours)
-function similarShows({ tasteOf: artistsOf, artistName }) {
+// each show as a unit vector over artists (TF-IDF): byArtist lists the shows that play each artist
+function showVectors({ tasteOf: artistsOf }) {
   const shows = [...artistsOf].filter(([, am]) => [...am.values()].reduce((a, b) => a + b, 0) >= SHOW_MIN_PLAYS).map(([s]) => s);
   const df = new Map();
   for (const s of shows) for (const a of artistsOf.get(s).keys()) df.set(a, (df.get(a) || 0) + 1);
@@ -121,12 +122,23 @@ function similarShows({ tasteOf: artistsOf, artistName }) {
     for (const [a, x] of v) { v.set(a, x / norm); let l = byArtist.get(a); if (!l) byArtist.set(a, (l = [])); l.push(s); }
     vec.set(s, v);
   }
+  return { shows, vec, byArtist };
+}
+// cosine of every show with the shows it shares an artist with
+function cosines({ shows, vec, byArtist }) {
   const cos = new Map();               // show -> Map(other -> cosine)
   for (const s of shows) {
     const acc = new Map();
     for (const [a, x] of vec.get(s)) for (const o of byArtist.get(a)) if (o !== s) acc.set(o, (acc.get(o) || 0) + x * vec.get(o).get(a));
     cos.set(s, acc);
   }
+  return cos;
+}
+
+function similarShows(data) {
+  const { artistName } = data;
+  const { shows, vec, byArtist } = showVectors(data);
+  const cos = cosines({ shows, vec, byArtist });
   const K = 10;
   const r = new Map(shows.map((s) => [s, [...cos.get(s).values()].sort((a, b) => b - a).slice(0, K).reduce((a, b) => a + b, 0) / K]));
   const res = {};
@@ -280,11 +292,15 @@ async function write(out, get) {
     written.add(f);
   }
   for (const f of fs.readdirSync(path.join(out, 'charts'))) if (/^artists-.+\.json$/.test(f) && !written.has(f)) fs.unlinkSync(path.join(out, 'charts', f));
+  // the map: every show placed by what it plays (needs the show names and pictures, so here)
+  const map = require('./map');
+  const forMap = get ? await showInfo(out, showVectors(data).shows, get) : all;
+  map.write(out, data, forMap);
   console.log(`artists: ${Object.values(artists).reduce((x, p) => x + Object.keys(p).length, 0)} pages`);
   console.log(`similar: ${Object.keys(shows).length} shows, ${Object.keys(tracks).length} tracks, from ${data.months.length} months`);
 }
 
-module.exports = { write, load, similarShows, similarTracks, artistPages, shard, setDamp: (x) => { DAMP = x; } };
+module.exports = { write, load, showVectors, cosines, similarShows, similarTracks, artistPages, shard, setDamp: (x) => { DAMP = x; } };
 if (require.main === module) {
   const i = process.argv.indexOf('--out');
   write(i > 0 ? process.argv[i + 1] : path.join(__dirname, '..', 'data'), (u) => fetch(u, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)))

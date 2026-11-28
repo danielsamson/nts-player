@@ -2431,3 +2431,33 @@ body.playing .channel .track__time { color: var(--grey-3); }
 .artist-page .archive__status { padding: 12px; }
 .track-page__artist-link { font: inherit; color: inherit; text-transform: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-bottom: 1px solid transparent; }
 .track-page__artist-link:hover, .track-page__artist-link:focus-visible { border-bottom-color: currentColor; outline: none; }
+
+/* ---- The NTS map ---- */
+.ntsmap { position: fixed; inset: 0; z-index: 200; background: #000; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.ntsmap__top { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: var(--rule); position: relative; z-index: 2; background: #000; }
+.ntsmap__title { font: 700 16px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; letter-spacing: .02em; margin-right: 8px; white-space: nowrap; }
+.ntsmap__find { flex: 1; min-width: 0; max-width: 360px; }
+.ntsmap__find input { width: 100%; height: var(--btn-m); background: #000; color: var(--white); border: var(--rule); padding: 0 10px; font: 700 12px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.ntsmap__btn { height: var(--btn-m); min-width: var(--btn-m); padding: 0 10px; border: var(--rule); background: #000; color: var(--white); font: 700 12px/1 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.ntsmap__btn:hover, .ntsmap__btn:focus-visible { background: var(--white); color: #000; outline: none; }
+.ntsmap__close { margin-left: auto; width: var(--btn-m); height: var(--btn-m); font-size: 22px; line-height: 1; }
+.ntsmap__canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.ntsmap__canvas:active { cursor: grabbing; }
+/* grain over the map, like the rest of NTS */
+.ntsmap::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .09; mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+.ntsmap__note, .ntsmap__found { position: absolute; left: 12px; margin: 0; font-size: 12px; color: var(--grey-2); pointer-events: none; z-index: 2; }
+.ntsmap__note { bottom: 12px; }
+.ntsmap__found { top: 64px; color: var(--white); font-weight: 700; text-transform: uppercase; font-family: "NTS Condensed", "Arial Narrow", Arial, sans-serif; }
+.ntsmap__card { position: absolute; right: 12px; bottom: 12px; z-index: 3; width: min(360px, calc(100vw - 24px)); display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 12px; background: #000; border: var(--rule); }
+.ntsmap__card[hidden] { display: none; }
+.ntsmap__card--nopic { grid-template-columns: minmax(0, 1fr); }
+.ntsmap__card--nopic img { display: none; }
+.ntsmap__card img { width: 96px; height: 96px; object-fit: cover; display: block; background: var(--grey-4); }
+.ntsmap__cardtext { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ntsmap__name { font: 700 18px/1.05 "NTS Condensed", "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+.ntsmap__zone { font-size: 12px; color: var(--grey-1); }
+.ntsmap__status { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); }
+.ntsmap__status:empty { display: none; }
+.ntsmap__actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+@media (max-width: 560px) { .ntsmap__title { display: none; } .ntsmap__zin, .ntsmap__zout { display: none; } }

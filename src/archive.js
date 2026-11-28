@@ -862,7 +862,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...onAirSection(), ...yearCard(), ...continueSection(), ...(await comingUpSection()), ...forYouSection(), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...onAirSection(), ...yearCard(), ...mapCard(), ...continueSection(), ...(await comingUpSection()), ...forYouSection(), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -1068,6 +1068,13 @@ const Archive = (() => {
     b.innerHTML = `<span class="year-card__kicker">The year on NTS</span><span class="year-card__title">NTS in ${thisYear}</span><span class="year-card__sub">The tracks, the shows, the moments. Take your time.</span><span class="year-card__go">Play ›</span>`;
     b.addEventListener('click', () => Year.open(thisYear));
     Chart.months().then((ms) => { if (!ms.some((m) => m.startsWith(`${thisYear}-`))) b.remove(); }).catch(() => b.remove());
+    return [b];
+  }
+  // The NTS map: a way into everything above
+  function mapCard() {
+    const b = el('button', 'year-card map-card');
+    b.innerHTML = '<span class="year-card__kicker">Explore</span><span class="year-card__title">The NTS map</span><span class="year-card__sub">Every show, placed by what it plays. Find the zones, drift between them.</span><span class="year-card__go">Open ›</span>';
+    b.addEventListener('click', () => NtsMap.open());
     return [b];
   }
   function chartSection() {
@@ -1523,6 +1530,7 @@ const Archive = (() => {
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
     showShow(show) { started = true; go({ type: 'show', show }); },
+    artist: (name) => Artists.get(name),
     showTrack(artist, title, { fromLive } = {}) {
       started = true;
       if (fromLive) { go({ type: 'track', artist, title, returnLive: true }); view = 'archive'; return; }

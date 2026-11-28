@@ -153,6 +153,15 @@ async function mockAccount() {
     await win.click('.archive__back-button');
   });
 
+  await test('The NTS map opens from Home and closes with Esc', async () => {
+    await win.evaluate(() => Archive.home());
+    await win.click('.map-card', { timeout: 15000 });
+    await win.waitForSelector('.ntsmap canvas', { timeout: 15000 });
+    await waitFor(() => /shows|ready/.test(document.querySelector('.ntsmap__note')?.textContent || ''), null, { timeout: 30000 });
+    await win.keyboard.press('Escape');
+    await waitFor(() => !document.querySelector('.ntsmap'), null, { timeout: 5000 });
+  });
+
   await test('Explore: a mood and a genre list episodes', async () => {
     await win.click('#homeBtn');
     await win.waitForSelector('.moods .mood', { timeout: 30000 });

@@ -2490,3 +2490,8 @@ button.ntsmap__step:hover { color: var(--white); text-decoration: underline; }
   .ntsmap__key { display: none; }
   .ntsmap__time { right: 12px; bottom: calc(42% + 8px); }
 }
+
+/* the bar's artwork and title go back to what's playing */
+#nowArt[role="button"], #nowText[role="button"] { cursor: pointer; }
+#nowText[role="button"]:hover #nowLabel, #nowText[role="button"]:focus-visible #nowLabel { text-decoration: underline; }
+#nowArt[role="button"]:focus-visible, #nowText[role="button"]:focus-visible { outline: 2px solid var(--white); outline-offset: -2px; }

@@ -1537,6 +1537,18 @@ const Archive = (() => {
     refresh() { if (started) render(); },
     open() { if (!started) { started = true; render(); } },
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
+    // from the bar: the episode playing, scrolled to the track you're hearing
+    showNowPlaying(show, episode) {
+      started = true;
+      if (!(current.type === 'episode' && current.show === show && current.episode === episode)) go({ type: 'episode', show, episode });
+      let tries = 0;
+      const find = () => {
+        const now = root.querySelector('.track--now');
+        if (now) now.scrollIntoView({ block: 'center' });
+        else if (tries++ < 40) setTimeout(find, 150);
+      };
+      find();
+    },
     showShow(show) { started = true; go({ type: 'show', show }); },
     artist: (name) => Artists.get(name),
     showArtist(name) { started = true; go({ type: 'artist', name }); },

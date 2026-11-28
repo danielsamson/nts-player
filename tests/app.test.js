@@ -130,6 +130,13 @@ async function mockAccount() {
     expect(await app.evaluate(() => global.__saved.has('sweetie izco remix')), 'track not saved in the account');
   });
 
+  await test('The bar takes you back to the episode playing and its tracklist', async () => {
+    await win.evaluate(() => Archive.home());
+    await win.waitForSelector('.year-card', { timeout: 15000 });
+    await win.click('#nowText');
+    await waitFor(() => !!document.querySelector('#archiveContent .track--now'), null, { timeout: 30000 });
+  });
+
   await test('Track details open from a tracklist row', async () => {
     await win.locator('#archiveContent .archive-tracks .track').nth(3).click();
     await win.waitForSelector('.track-page', { timeout: 30000 });
@@ -153,12 +160,14 @@ async function mockAccount() {
     await win.click('.archive__back-button');
   });
 
-  await test('The NTS map opens from Home and closes with Esc', async () => {
+  await test('The NTS map opens from Home; Esc steps out, then closes', async () => {
     await win.evaluate(() => Archive.home());
     await win.click('.map-card', { timeout: 15000 });
     await win.waitForSelector('.ntsmap canvas', { timeout: 15000 });
-    await waitFor(() => /shows|ready/.test(document.querySelector('.ntsmap__panel')?.textContent || ''), null, { timeout: 30000 });
-    await win.keyboard.press('Escape');
+    // it opens on what's playing if that's on the map, else the whole map; either way the panel fills
+    await waitFor(() => /shows|show|ready/i.test(document.querySelector('.ntsmap__panel')?.textContent || ''), null, { timeout: 30000 });
+    // Esc steps out a level at a time, then closes
+    for (let i = 0; i < 5 && await win.evaluate(() => !!document.querySelector('.ntsmap')); i++) { await win.keyboard.press('Escape'); await win.waitForTimeout(300); }
     await waitFor(() => !document.querySelector('.ntsmap'), null, { timeout: 5000 });
   });
 

@@ -290,6 +290,7 @@ function renderNowbar() {
     const t = live?.results?.[channel] ? showInfo(live.results[channel]).title : '';
     document.title = t ? `NTS ${channel + 1} · ${t}` : 'NTS Player';
   }
+  if (typeof paintNowTitle === 'function') paintNowTitle();
   // Tray menu / mini player know what's playing
   const label = archive ? `Archive · ${a.episode.title}` : `NTS ${channel + 1}${live?.results?.[channel] ? ' · ' + showInfo(live.results[channel]).title : ''}`;
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = active ? 'playing' : (archive || playing ? 'paused' : 'none');
@@ -384,7 +385,10 @@ const MyNTS = (() => {
   function getState(show, episode, force = false) {
     const k = `${show}/${episode}`;
     if (force || !states.has(k)) {
-      states.set(k, window.nts.account.episode(show, episode).catch(() => ({ available: false })));
+      const p = window.nts.account.episode(show, episode).catch(() => ({ available: false }));
+      states.set(k, p);
+      // a failed read isn't remembered: the next ask tries again (it used to stick for the session)
+      p.then((st) => { if ((!st?.available || st.error) && states.get(k) === p) states.delete(k); });
     }
     return states.get(k);
   }
@@ -1262,25 +1266,48 @@ async function findLiveSaveTarget(t) {
   return m ? { show: m.show, episode: m.episode, title: m.title, date: m.date, offset: m.offset } : null;
 }
 
+// ---- The bar takes you back to what's playing: the episode and its tracklist, or the live channel ----
+function goToNowPlaying() {
+  const a = ArchivePlayer.state;
+  if (source === 'archive' && a.episode) {
+    view = 'archive';
+    render();
+    Archive.showNowPlaying(a.episode.show, a.episode.episode);
+  } else { view = 'live'; render(); }
+}
+['nowArt', 'nowText'].forEach((id) => {
+  const e = $(id);
+  e.setAttribute('role', 'button'); e.tabIndex = 0;
+  e.addEventListener('click', goToNowPlaying);
+  e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); goToNowPlaying(); } });
+});
+function paintNowTitle() {
+  const t = source === 'archive' && ArchivePlayer.state.episode ? 'Back to this episode and its tracklist' : 'Back to the live channel';
+  $('nowArt').title = t; $('nowText').title = t;
+}
+
 // ---- Save the track you're hearing (now-playing bar), to My NTS ----
 var NowSave = (() => {   // var: renderNowbar may ask before this line runs
   const btn = $('nowSave');
   let sig = '';
   let current = null;   // { ep, t, saved }
+  let retried = false;
   async function update(force) {
     const a = ArchivePlayer.state;
     const lt = source === 'live' && playing ? LiveNow?.track : null;
     const cur = lt ? { track: lt } : source === 'archive' && a.episode ? TrackNotify.currentTrack() : null;
     const s = !cur ? '' : lt ? `live|${channel}|${lt.time}|${lt.title}` : `${a.episode.show}/${a.episode.episode}#${cur.idx}`;
     if (s === sig && !force) return;
+    if (s !== sig) retried = false;
     sig = s;
     current = null;
     paint();
-    if (!cur || !supporter) return;          // needs your NTS sign-in
+    if (!cur) return;                        // My NTS says whether you're signed in (any NTS account will do)
     const ep = lt ? await liveSaveTarget(lt) : a.episode;
     if (s !== sig || !ep) return;
     const st = await MyNTS.getState(ep.show, ep.episode);
     if (s !== sig) return;
+    if (!st?.available && !retried) { retried = true; setTimeout(() => { if (s === sig) update(true); }, 15000); return; }
     const tr = MyNTS.trackState(st, cur.track);
     if (!st?.signedIn || !tr?.canSave) return;
     current = { ep, t: { ...cur.track, offset: ep.offset ?? cur.track.offset, offset_estimate: cur.track.offset_estimate }, saved: !!tr.saved };
@@ -1302,7 +1329,7 @@ var NowSave = (() => {   // var: renderNowbar may ask before this line runs
     const res = await MyNTS.toggleTrack(ep.show, ep.episode, t, !saved,
       { show: ep.show, episode: ep.episode, title: ep.title, date: ep.date, offset: t.offset ?? t.offset_estimate });
     btn.classList.remove('mynts-btn--busy');
-    if (res && !res.error && current?.t === t) { current.saved = !saved; paint(); if (typeof Stage !== 'undefined') Stage.render(); }
+    if (res && !res.error && current?.t === t) { current.saved = !saved; paint(); if (typeof Stage !== 'undefined') Stage.render(true); }
   });
   ArchivePlayer.onChange(() => update());
   return { update, toggle: () => btn.click() };
@@ -1461,7 +1488,8 @@ const Stage = (() => {
   async function paintSave(epOrPromise, t, my) {
     const box = $('stageSave');
     box.replaceChildren();
-    if (!t || !supporter) return;
+    // Saving needs an NTS account (signed in), not a Supporter subscription: My NTS says which
+    if (!t) return;
     // Show it straight away (waiting), then enable once My NTS has answered
     const wait = document.createElement('button');
     wait.className = 'mynts-btn mynts-btn--busy';
@@ -1492,10 +1520,17 @@ const Stage = (() => {
     box.append(b);
   }
 
-  async function render() {
+  let drawn = '';            // the archive track on the stage now ("show/episode#index")
+  async function render(force) {
     if (!wideQuery.matches) return;
-    const my = ++token;
     const a = ArchivePlayer.state;
+    // Live updates ask for a redraw every few seconds; an archive track that hasn't changed
+    // stays as it is (redrawing cleared its bookmark before My NTS had answered)
+    const sig = source === 'archive' && a.episode ? `${a.episode.show}/${a.episode.episode}#${TrackNotify.currentTrack()?.idx ?? '-'}` : '';
+    document.body.classList.toggle('stage-spinning', source === 'archive' && !!a.episode && a.playing);
+    if (sig && sig === drawn && !force) return;
+    drawn = sig;
+    const my = ++token;
     // The record slides out and spins while an archive track plays
     document.body.classList.toggle('stage-spinning', source === 'archive' && !!a.episode && a.playing);
 

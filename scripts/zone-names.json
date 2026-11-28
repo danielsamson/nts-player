@@ -69,8 +69,8 @@
    ]
   },
   {
-   "name": "Broken techno & strange electronics",
-   "line": "Techno with the corners knocked off, dub techno, IDM and the odd machine.",
+   "name": "Techno, house & strange electronics",
+   "line": "Detroit and dub techno, house, IDM, cold synths and the odd machine.",
    "artists": [
     "Carrier",
     "K Wata",
@@ -84,7 +84,15 @@
     "XEXA",
     "SDEM",
     "Jeff Mills",
-    "Burnt Friedman"
+    "Burnt Friedman",
+    "Omar S",
+    "Carl Craig",
+    "Drexciya",
+    "Donato Dozzy",
+    "Demdike Stare",
+    "Muslimgauze",
+    "Actress",
+    "Objekt"
    ]
   },
   {
@@ -246,6 +254,55 @@
     "Kevin Ayers",
     "Johnny Cash"
    ]
+  },
+  {
+   "name": "Beats & boom bap",
+   "line": "Beat tapes, boom bap, 90s New York and the underground that grew from it.",
+   "artists": [
+    "Ohbliv",
+    "Swarvy",
+    "Madlib",
+    "J Dilla",
+    "MF Doom",
+    "Knxwledge.",
+    "mndsgn",
+    "Nas",
+    "Mobb Deep",
+    "Ras_G",
+    "Quasimoto",
+    "Madvillain"
+   ]
+  },
+  {
+   "name": "Ragas, Arab classics & cumbia",
+   "line": "Indian classical, Arabic golden-age records and Colombian cumbia, side by side.",
+   "artists": [
+    "Hariprasad Chaurasia",
+    "Zakir Hussain",
+    "Omar Khorshid",
+    "Fairuz",
+    "Aniceto Molina",
+    "Los Shapis",
+    "Los Angeles Azules",
+    "Lisandro Meza",
+    "Andrés Landero"
+   ]
+  },
+  {
+   "name": "Grime",
+   "line": "Eskibeat, instrumental grime and the sound of the early 2000s pirate stations.",
+   "artists": [
+    "Teddy Music",
+    "Dullahbeatz",
+    "Filthy Gears",
+    "Spooky",
+    "Sir Hiss",
+    "SIR SPYRO",
+    "Dexplicit",
+    "Preditah",
+    "Roll Deep",
+    "Youngstar"
+   ]
   }
  ],
  "neighbourhoods": [
@@ -265,7 +322,7 @@
    ]
   },
   {
-   "name": "Hazy electronics",
+   "name": "Dream pop & hazy electronics",
    "artists": [
     "Boards Of Canada",
     "Actress",
@@ -275,7 +332,11 @@
     "Malibu",
     "Detente",
     "Yawning Portal",
-    "Fatshaudi"
+    "Fatshaudi",
+    "Slowdive",
+    "James K",
+    "Astrid Sonne",
+    "Stina Nordenstam"
    ]
   },
   {
@@ -413,14 +474,19 @@
    ]
   },
   {
-   "name": "Quiet storm & sophisti-pop",
+   "name": "R&B & neo-soul",
    "artists": [
     "Sade",
     "Janet Jackson",
     "Grace Jones",
     "Prince",
     "Outkast",
-    "Julie Stapleton"
+    "Julie Stapleton",
+    "Solange",
+    "Lauryn Hill",
+    "Frank Ocean",
+    "Aaliyah",
+    "Erykah Badu"
    ]
   },
   {
@@ -662,11 +728,16 @@
     "Los Terricolas",
     "Jose Jose",
     "Toña La Negra",
-    "Grupo Kual?"
+    "Grupo Kual?",
+    "Aniceto Molina",
+    "Lisandro Meza",
+    "Andrés Landero",
+    "Los Diablos Rojos",
+    "Los Freddy's"
    ]
   },
   {
-   "name": "African grooves",
+   "name": "Brazil & African grooves",
    "artists": [
     "Ebo Taylor",
     "Pat Thomas",
@@ -675,7 +746,14 @@
     "Dorothy Masuka",
     "Tafese Tesfaye",
     "Mariem Hassan",
-    "Caiphus Semenya"
+    "Caiphus Semenya",
+    "Milton Nascimento",
+    "Jorge Ben",
+    "Manu Dibango",
+    "Letta Mbulu",
+    "Arthur Verocai",
+    "Caetano Veloso",
+    "Minnie Riperton"
    ]
   },
   {
@@ -977,6 +1055,393 @@
     "Dwarde",
     "Sully",
     "Mantra"
+   ]
+  },
+  {
+   "name": "Fourth world & strange ambient",
+   "artists": [
+    "Saphileaum",
+    "Hotspring",
+    "New World Science",
+    "Susumu Yokota",
+    "Ramzi",
+    "Moin",
+    "Yu Su",
+    "Bill Laswell",
+    "Khotin",
+    "I:Cube"
+   ]
+  },
+  {
+   "name": "Game & anime scores",
+   "artists": [
+    "Tetsukazu Nakanishi",
+    "Kow Otani",
+    "Motoi Sakuraba",
+    "Kenji Kawai",
+    "Akira Yamaoka"
+   ]
+  },
+  {
+   "name": "LA ambient & soft jazz",
+   "artists": [
+    "Nico Georis",
+    "The Growth Eternal",
+    "Emile Mosseri",
+    "Kaitlyn Aurelia Smith",
+    "Bibio",
+    "Nailah Hunter",
+    "Sam Wilkes",
+    "Chassol",
+    "Green-House",
+    "SFV acid"
+   ]
+  },
+  {
+   "name": "IDM & sound design",
+   "artists": [
+    "Emptyset",
+    "Convextion",
+    "Grischa Lichtenberger",
+    "Clark",
+    "B12",
+    "A Guy Called Gerald",
+    "Abul Mogard",
+    "Thom Yorke"
+   ]
+  },
+  {
+   "name": "Cold wave & dark disco",
+   "artists": [
+    "Fantastic Twins",
+    "Die Orangen",
+    "Borusiade",
+    "Chris & Cosey",
+    "Coil",
+    "Lena Platonos",
+    "Tolouse Low Trax",
+    "Alan Vega",
+    "LFO"
+   ]
+  },
+  {
+   "name": "Percussive club & grime instrumentals",
+   "artists": [
+    "Loom",
+    "DVA",
+    "Le Dom",
+    "Tsvi",
+    "DJ Lag",
+    "Leonce",
+    "Neana",
+    "Mr. Mitch",
+    "Scratcha DVA",
+    "Sinjin Hawke",
+    "Mumdance"
+   ]
+  },
+  {
+   "name": "Latin club & edits",
+   "artists": [
+    "Entranas",
+    "Tayhana",
+    "CRRDR",
+    "LSDXOXO",
+    "Kelman Duran",
+    "Nick León",
+    "Amor Satyr",
+    "UNIIQU3",
+    "Zutzut",
+    "Bored Lord"
+   ]
+  },
+  {
+   "name": "Drain & the dark internet",
+   "artists": [
+    "Kamixlo",
+    "Rules",
+    "Yantan Ministry",
+    "Bladee",
+    "Organ Tapes",
+    "Mechatok",
+    "Ecco2k",
+    "Salem",
+    "Lauren Duffus"
+   ]
+  },
+  {
+   "name": "Atlanta & the 2010s",
+   "artists": [
+    "Young Thug",
+    "Quavo",
+    "Offset",
+    "21 SAVAGE",
+    "Migos",
+    "Rick Ross",
+    "YG",
+    "A$AP Ferg",
+    "J Hus"
+   ]
+  },
+  {
+   "name": "Kanye’s children",
+   "artists": [
+    "Ragz Originale",
+    "P-Rallel",
+    "Kanye West",
+    "Travis Scott",
+    "Babyfather",
+    "Earl Sweatshirt",
+    "Kaytranada",
+    "A$AP Rocky",
+    "Sampha",
+    "Novelist"
+   ]
+  },
+  {
+   "name": "Musique concrète & the avant-garde",
+   "artists": [
+    "Michel Chion",
+    "Ruth White",
+    "Charlemagne Palestine",
+    "Luc Ferrari",
+    "Faust",
+    "Frank Zappa",
+    "Christian Clozier",
+    "Hellebore"
+   ]
+  },
+  {
+   "name": "Proto-punk & outsiders",
+   "artists": [
+    "Iggy Pop",
+    "Nick Cave & The Bad Seeds",
+    "The Soft Boys",
+    "Leonard Cohen",
+    "The Kinks",
+    "Silver Apples",
+    "The Stooges",
+    "Hawkwind",
+    "Captain Beefheart"
+   ]
+  },
+  {
+   "name": "Doom & metal",
+   "artists": [
+    "Death SS",
+    "Bathory",
+    "Saint Vitus",
+    "Black Sabbath",
+    "Earth",
+    "Om",
+    "Celtic Frost",
+    "Pentagram"
+   ]
+  },
+  {
+   "name": "Classical & electronic pioneers",
+   "artists": [
+    "London Symphony Orchestra",
+    "Mozart",
+    "Berliner Philharmoniker",
+    "Pauline Oliveros",
+    "Jonny Greenwood",
+    "Daphne Oram",
+    "Nils Frahm",
+    "Max Richter",
+    "Beethoven"
+   ]
+  },
+  {
+   "name": "Hardcore & no wave",
+   "artists": [
+    "The Abused",
+    "Crucifix",
+    "The Blood",
+    "Chrome",
+    "X",
+    "Swans",
+    "Boris",
+    "Crass",
+    "Big Black",
+    "Boredoms"
+   ]
+  },
+  {
+   "name": "Heavy psych & freak-outs",
+   "artists": [
+    "Hey Colossus",
+    "Bloody Head",
+    "Gum Takes Tooth",
+    "Funkadelic",
+    "Gong",
+    "Bruce Haack",
+    "Lydia Lunch",
+    "Yes",
+    "Death"
+   ]
+  },
+  {
+   "name": "Classic rock & prog",
+   "artists": [
+    "Little Feat",
+    "Bernice",
+    "Jackson Browne",
+    "Led Zeppelin",
+    "Kevin Ayers",
+    "Aphrodite's Child",
+    "Franco Battiato",
+    "George Harrison",
+    "Omega"
+   ]
+  },
+  {
+   "name": "New London jazz",
+   "artists": [
+    "Maisha",
+    "Ego Ella May",
+    "Oscar Jerome",
+    "Nubya Garcia",
+    "Alfa Mist",
+    "Wu-Lu",
+    "Sarathy Korwar",
+    "Dorian Concept"
+   ]
+  },
+  {
+   "name": "Boogie & 80s soul",
+   "artists": [
+    "Raw To The Core",
+    "Me-2-U",
+    "Giorge Pettus",
+    "Change",
+    "Bobby Caldwell",
+    "One Way",
+    "Kleeer",
+    "Alexander O'Neal",
+    "Frankie Beverly"
+   ]
+  },
+  {
+   "name": "Reggaeton & perreo",
+   "artists": [
+    "Arcángel",
+    "Ñejo",
+    "Nicky Jam",
+    "Florentino",
+    "Bad Bunny",
+    "BAMBII",
+    "Bad Gyal",
+    "J. Balvin",
+    "Tokischa"
+   ]
+  },
+  {
+   "name": "Afrobeats",
+   "artists": [
+    "SOMADINA",
+    "Felo Le Tee",
+    "Wande Coal",
+    "Wizkid",
+    "Rema",
+    "Mr Eazi",
+    "Tekno",
+    "Davido",
+    "Asake"
+   ]
+  },
+  {
+   "name": "90s & 00s dancehall",
+   "artists": [
+    "Frisco Kid",
+    "Spragga Benz",
+    "Lexxus",
+    "Beenie Man",
+    "Buju Banton",
+    "Sizzla",
+    "Mavado",
+    "Bounty Killer",
+    "Elephant Man"
+   ]
+  },
+  {
+   "name": "Soca & crossover",
+   "artists": [
+    "Kerwin Du Bois",
+    "Hypasounds",
+    "Machel Montano",
+    "Burna Boy",
+    "Popcaan",
+    "Sean Paul",
+    "Spice",
+    "Busy Signal",
+    "Lady Saw"
+   ]
+  },
+  {
+   "name": "90s New York rap",
+   "artists": [
+    "Inspectah Deck",
+    "Medina Green",
+    "Masta Killa",
+    "Busta Rhymes",
+    "Nas",
+    "Mos Def",
+    "Common",
+    "Mobb Deep",
+    "De La Soul",
+    "Ghostface Killah"
+   ]
+  },
+  {
+   "name": "Beat tapes",
+   "artists": [
+    "Opio",
+    "J Dilla",
+    "Madlib",
+    "MF Doom",
+    "Jay Dee",
+    "Madvillain",
+    "Quasimoto",
+    "Ras_G"
+   ]
+  },
+  {
+   "name": "Left-field soul & jazz-rap",
+   "artists": [
+    "Clark & The Community",
+    "Jon Bap",
+    "Standing On The Corner",
+    "B. Cool-Aid",
+    "Thundercat",
+    "Jazmine Sullivan",
+    "Adam Blackstone"
+   ]
+  },
+  {
+   "name": "West Coast & Southern rap",
+   "artists": [
+    "Funk Mobb",
+    "Young Droop",
+    "Mr. Doctor",
+    "Too $Hort",
+    "Chewy-C",
+    "Mac Shawn"
+   ]
+  },
+  {
+   "name": "Instrumental grime",
+   "artists": [
+    "Teddy Music",
+    "Dullahbeatz",
+    "Filthy Gears",
+    "Spooky",
+    "Sir Hiss",
+    "SIR SPYRO",
+    "Dexplicit",
+    "Trends",
+    "Preditah",
+    "Roll Deep"
    ]
   }
  ]

@@ -117,7 +117,7 @@ ipcMain.handle('nts:api', async (_e, apiPath) => {
 const CHARTS = 'https://raw.githubusercontent.com/danielsamson/nts-player/data/charts';
 const chartMem = new Map();
 ipcMain.handle('charts:get', async (_e, name) => {
-  if (typeof name !== 'string' || !/^(index|recent|similar|\d{4}-\d{2}|context-\d{4})$/.test(name)) throw new Error('Invalid chart');
+  if (typeof name !== 'string' || !/^(index|recent|similar|artists-[a-z0_]|\d{4}-\d{2}|context-\d{4})$/.test(name)) throw new Error('Invalid chart');
   const hit = chartMem.get(name);
   if (hit && (hit.data.complete || Date.now() - hit.at < 6 * 3600e3)) return hit.data;
   const file = path.join(app.getPath('userData'), 'charts', `${name}.json`);

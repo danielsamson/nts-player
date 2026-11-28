@@ -59,6 +59,7 @@ const Archive = (() => {
     else if (current.type === 'history') renderHistory();
     else if (current.type === 'genres') renderGenres();
     else if (current.type === 'explore') renderExplore(current);
+    else if (current.type === 'artist') renderArtist(current.name);
     else if (current.type === 'track') renderTrack({ artist: current.artist, title: current.title });
     else if (current.type === 'chart') renderChart(current.period, current.genre);
   }
@@ -430,6 +431,91 @@ const Archive = (() => {
     return { data, name, list, shows, tracks, forYou, nextTo };
   })();
 
+  // ---- Artists: charts/artists-<letter>.json, from the same daily tracklists ----
+  const Artists = (() => {
+    const parts = new Map();
+    const shard = (k) => (/^[a-z]/.test(k) ? k[0] : /^[0-9]/.test(k) ? '0' : '_');
+    const part = (k) => {
+      const f = shard(k);
+      if (!parts.has(f)) parts.set(f, window.nts.chart(`artists-${f}`).catch(() => null).then((d) => { if (!d) parts.delete(f); return d; }));
+      return parts.get(f);
+    };
+    async function get(name) {
+      const k = Chart.norm(name);
+      const d = k && (await part(k));
+      return d?.artists?.[k] ? { d, x: d.artists[k] } : null;
+    }
+    // artists whose name starts with what you typed (or has a word that does)
+    async function search(q) {
+      const k = Chart.norm(q);
+      if (k.length < 2) return [];
+      const d = await part(k);
+      if (!d) return [];
+      return Object.entries(d.artists).filter(([a]) => a === k || a.startsWith(k + ' ') || (k.length >= 4 && a.startsWith(k)))
+        .sort((a, b) => (b[0] === k) - (a[0] === k) || b[1].shows - a[1].shows).slice(0, 4).map(([, x]) => x);
+    }
+    const split = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((x) => x.trim()).filter(Boolean);
+    return { get, search, split };
+  })();
+
+  // ---- Artist page: their tracks on NTS, the shows that play them, who else those shows play ----
+  async function renderArtist(name) {
+    const wrap = el('div', 'artist-page');
+    const head = el('div', 'artist-page__head');
+    const h = el('h1', 'broadcast-heading', name);
+    const meta = el('p', 'detail__meta');
+    head.append(el('span', 'artist-page__kicker', 'Artist'), h, meta);
+    const tracks = el('div'), where = el('div'), like = el('div');
+    wrap.append(head, like, where, tracks);
+    root.replaceChildren(backBar('Artist'), wrap);
+    tracks.append(loader('Looking through the tracklists'));
+    const res = await Artists.get(name).catch(() => null);
+    if (current.type !== 'artist' || current.name !== name) return;
+    const x = res?.x;
+    const span = (ms) => { const f = (m) => monthLabel(m).replace(/^(\w{3})\w*/, '$1'); return ms ? (ms[0] === ms[1] ? f(ms[0]) : `${f(ms[0])} – ${f(ms[1])}`) : ''; };
+    if (x) {
+      h.textContent = x.name;
+      meta.textContent = `Played on ${x.shows} shows · ${x.plays} play${x.plays === 1 ? '' : 's'} · ${span(res.d.months)}`;
+    }
+    // tracks: from the daily data, or else straight from NTS track search
+    let list = x?.tracks.map(([artist, title, shows]) => ({ artist, title, note: `${shows} show${shows === 1 ? '' : 's'}` })) || [];
+    if (!list.length) {
+      const r = await api(`/api/v2/search?q=${enc(name)}&version=2&offset=0&limit=40&types[]=track`).catch(() => null);
+      const want = Chart.norm(name), seen = new Map();
+      (r?.results || []).forEach((t) => {
+        const artist = (t.artists || []).map((a) => a.name).join(', ');
+        if (!t.title || !Artists.split(artist).some((a) => Chart.norm(a) === want)) return;
+        const k = Chart.key(artist, t.title);
+        if (!seen.has(k)) seen.set(k, { artist, title: t.title, n: 0 });
+        seen.get(k).n++;
+      });
+      list = [...seen.values()].sort((a, b) => b.n - a.n).slice(0, 8).map((t) => ({ ...t, note: `${t.n}${t.n >= 40 ? '+' : ''} episode${t.n === 1 ? '' : 's'}` }));
+      if (current.type !== 'artist' || current.name !== name) return;
+    }
+    tracks.replaceChildren();
+    if (list.length) {
+      const ol = el('ol', 'tracks archive-tracks');
+      list.forEach((t) => {
+        const li = trackRow({ artist: t.artist, title: t.title }, { title: 'Open track', onClick: () => go({ type: 'track', artist: t.artist, title: t.title }) });
+        li.querySelector('.track__text').append(el('span', 'chart-row__count', t.note));
+        ol.append(li);
+      });
+      tracks.append(sectionTitle(x ? 'Most played on NTS' : 'On NTS'), ol);
+    } else tracks.append(el('p', 'archive__status', `No tracks by ${name} in NTS tracklists.`));
+    if (!x) {
+      if (list.length) like.append(el('p', 'archive__status', 'Not played on enough shows lately to say who else goes with them.'));
+      return;
+    }
+    const box = el('div', 'items');
+    x.top.forEach(([s, c]) => box.append(row({ img: res.d.info?.[s]?.[1], title: Similar.name(res.d, s), meta: `${c} play${c === 1 ? '' : 's'}`, onClick: () => go({ type: 'show', show: s }) })));
+    where.append(sectionTitle('Where they get played'), box);
+    if (x.like.length) {
+      const l = el('div', 'items artist-page__like');
+      x.like.forEach(([a, via]) => l.append(row({ title: a, noPic: true, meta: `Both played by ${Similar.list(via.map((s) => Similar.name(res.d, s)))}`, onClick: () => go({ type: 'artist', name: a }) })));
+      like.append(sectionTitle(`If you like ${x.name}`), l);
+    }
+  }
+
   function similarShowRow(d, [o, both], extra) {
     return row({
       img: d.info?.[o]?.[1], title: Similar.name(d, o),
@@ -482,7 +568,15 @@ const Archive = (() => {
     pic.append(img); picWrap.append(pic);
     const body = el('div', 'detail__body');
     const title = el('h1', 'broadcast-heading', t.title);
-    const artist = el('p', 'track-page__artist', t.artist);
+    const artist = el('p', 'track-page__artist');
+    Artists.split(t.artist).forEach((a, i, all) => {
+      const b = el('button', 'track-page__artist-link', a);
+      b.title = `More from ${a} on NTS`;
+      b.addEventListener('click', () => go({ type: 'artist', name: a }));
+      artist.append(b);
+      if (i < all.length - 1) artist.append(document.createTextNode(', '));
+    });
+    if (!artist.childNodes.length) artist.textContent = t.artist;
     const album = el('p', 'detail__meta');
     const playBox = el('div', 'track-page__playbox');     // Play from: first thing under the title
     const from = el('div', 'track-page__from');           // the episodes it was played on
@@ -811,8 +905,15 @@ const Archive = (() => {
       });
       tracksBox.replaceChildren(sectionTitle('Tracks'), ol, sectionTitle('Shows and episodes'));
     };
+    const artistsBox = el('div');
+    Artists.search(q).then((found) => {
+      if (!found.length || !artistsBox.isConnected) return;
+      const box = el('div', 'items');
+      found.forEach((x) => box.append(row({ title: x.name, noPic: true, kind: 'Artist', meta: `Played on ${x.shows} shows`, onClick: () => go({ type: 'artist', name: x.name }) })));
+      artistsBox.replaceChildren(sectionTitle('Artists'), box);
+    }).catch(() => {});
     try {
-      root.replaceChildren(backBar(`Search: ${q}`), tracksBox, list);
+      root.replaceChildren(backBar(`Search: ${q}`), artistsBox, tracksBox, list);
       await Promise.all([tracks(), more()]);
     } catch { root.replaceChildren(backBar(), failed('Search didn’t work.')); }
   }

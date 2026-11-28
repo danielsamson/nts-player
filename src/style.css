@@ -2422,3 +2422,12 @@ body.playing .channel .track__time { color: var(--grey-3); }
 /* the lighter tape, for machines that cannot draw the full one smoothly */
 .yp.is-lite .yp-bg__ghost, .yp.is-lite .yp-bg__band { display: none; }
 .yp.is-lite .yp-bg__head { animation: none; }
+
+/* artist page */
+.artist-page__head { padding: 16px 12px 12px; border-bottom: var(--rule); }
+.artist-page__kicker { display: block; font-size: 11px; line-height: 14px; font-weight: 700; text-transform: uppercase; color: var(--grey-2); margin-bottom: 4px; }
+.artist-page__head .broadcast-heading { margin: 0; overflow-wrap: anywhere; }
+.artist-page__head .detail__meta { margin: 6px 0 0; }
+.artist-page .archive__status { padding: 12px; }
+.track-page__artist-link { font: inherit; color: inherit; text-transform: inherit; background: none; border: 0; padding: 0; cursor: pointer; border-bottom: 1px solid transparent; }
+.track-page__artist-link:hover, .track-page__artist-link:focus-visible { border-bottom-color: currentColor; outline: none; }

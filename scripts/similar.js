@@ -3,6 +3,7 @@
 //   shows:  slug -> [[similar show, [artists both play]], ...]
 //   tracks: "artist|title" -> [[artist, title, [shows that play both]], ...]
 //   info:   slug -> [name, picture] for every show mentioned
+// and charts/artists-<letter>.json: artist -> where they're played, who else, their tracks
 // Shows are alike when they play the same artists, weighted so that artists everyone plays
 // count for little. Tracks are alike when the same shows play them, weighted so that shows
 // that play a bit of everything count for little.
@@ -129,6 +130,50 @@ function similarTracks({ showsOf, trackName }) {
   return res;
 }
 
+// artists: where they're played most, who else those shows play, their most played tracks.
+// Written as charts/artists-<first letter>.json (a few hundred KB each, loaded as needed)
+const ARTIST_MIN_SHOWS = 3;
+const shard = (k) => (/^[a-z]/.test(k) ? k[0] : /^[0-9]/.test(k) ? '0' : '_');
+function artistPages({ artistsOf, artistName, showsOf, trackName }) {
+  const showsBy = new Map();           // artist -> Map(show -> plays)
+  for (const [s, am] of artistsOf) for (const [a, c] of am) {
+    let m = showsBy.get(a); if (!m) showsBy.set(a, (m = new Map())); m.set(s, c);
+  }
+  const keys = [...showsBy].filter(([, m]) => m.size >= ARTIST_MIN_SHOWS).map(([a]) => a);
+  const keep = new Set(keys);
+  const artistsIn = new Map();         // show -> artists it plays (only ones with pages)
+  for (const a of keys) for (const s of showsBy.get(a).keys()) { let l = artistsIn.get(s); if (!l) artistsIn.set(s, (l = [])); l.push(a); }
+  const w = new Map([...artistsIn].map(([s, l]) => [s, 1 / Math.log(2 + l.length)]));
+  const mass = new Map(keys.map((a) => [a, [...showsBy.get(a).keys()].reduce((x, s) => x + w.get(s), 0)]));
+  // tracks by artist: how many shows played each
+  const tracksBy = new Map();
+  for (const [k, ss] of showsOf) {
+    const [artist, title] = trackName.get(k);
+    for (const part of splitArtists(artist)) {
+      const a = n(part);
+      if (!keep.has(a)) continue;
+      let l = tracksBy.get(a); if (!l) tracksBy.set(a, (l = [])); l.push([artist, title, ss.size]);
+    }
+  }
+  const out = {};
+  for (const a of keys) {
+    const mine = showsBy.get(a);
+    const acc = new Map(), via = new Map();
+    for (const s of mine.keys()) for (const o of artistsIn.get(s)) {
+      if (o === a) continue;
+      acc.set(o, (acc.get(o) || 0) + w.get(s));
+      let v = via.get(o); if (!v) via.set(o, (v = [])); v.push(s);
+    }
+    const like = [...acc].filter(([o]) => via.get(o).length >= 2)
+      .map(([o, x]) => [o, x / Math.sqrt(mass.get(a) * mass.get(o))]).sort((x, y) => y[1] - x[1]).slice(0, 8)
+      .map(([o]) => [artistName.get(o), via.get(o).sort((x, y) => w.get(y) - w.get(x)).slice(0, 2)]);
+    const top = [...mine].sort((x, y) => y[1] - x[1]).slice(0, 6);
+    const tracks = (tracksBy.get(a) || []).sort((x, y) => y[2] - x[2]).slice(0, 6);
+    (out[shard(a)] ||= {})[a] = { name: artistName.get(a), shows: mine.size, plays: [...mine.values()].reduce((x, y) => x + y, 0), top, like, tracks };
+  }
+  return out;
+}
+
 // names and pictures for the shows mentioned (kept between runs, so each is looked up once)
 async function showInfo(out, slugs, get) {
   const file = path.join(out, 'charts', 'show-info.json');
@@ -152,7 +197,11 @@ async function write(out, get) {
   if (!data) { console.log('similar: no tracklists in taste/ yet'); return; }
   const shows = similarShows(data);
   const tracks = similarTracks(data);
+  const artists = artistPages(data);
   const slugs = new Set(Object.keys(shows));
+  for (const part of Object.values(artists)) for (const x of Object.values(part)) {
+    x.top.forEach(([s]) => slugs.add(s)); x.like.forEach(([, v]) => v.forEach((s) => slugs.add(s)));
+  }
   for (const l of Object.values(shows)) l.forEach(([o]) => slugs.add(o));
   for (const l of Object.values(tracks)) l.forEach(([, , via]) => via.forEach((s) => slugs.add(s)));
   const all = get ? await showInfo(out, [...slugs], get) : {};
@@ -160,10 +209,17 @@ async function write(out, get) {
   for (const s of slugs) if (all[s]) info[s] = all[s];
   const res = { v: 1, generated: Date.now(), months: [data.months[0], data.months[data.months.length - 1]], shows, tracks, info };
   fs.writeFileSync(path.join(out, 'charts', 'similar.json'), JSON.stringify(res));
+  const months = res.months;
+  for (const [k, part] of Object.entries(artists)) {
+    const used = {};
+    for (const x of Object.values(part)) { x.top.forEach(([s]) => { if (all[s]) used[s] = all[s]; }); x.like.forEach(([, v]) => v.forEach((s) => { if (all[s]) used[s] = all[s]; })); }
+    fs.writeFileSync(path.join(out, 'charts', `artists-${k}.json`), JSON.stringify({ v: 1, months, artists: part, info: used }));
+  }
+  console.log(`artists: ${Object.values(artists).reduce((x, p) => x + Object.keys(p).length, 0)} pages`);
   console.log(`similar: ${Object.keys(shows).length} shows, ${Object.keys(tracks).length} tracks, from ${data.months.length} months`);
 }
 
-module.exports = { write, load, similarShows, similarTracks };
+module.exports = { write, load, similarShows, similarTracks, artistPages };
 if (require.main === module) {
   const i = process.argv.indexOf('--out');
   write(i > 0 ? process.argv[i + 1] : path.join(__dirname, '..', 'data'), (u) => fetch(u, { headers: { Accept: 'application/json' } }).then((r) => (r.ok ? r.json() : null)))

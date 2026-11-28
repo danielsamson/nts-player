@@ -564,6 +564,6 @@ const Chart = (() => {
     return out;
   }
 
-  return { get, peek, months, year, trend, spark, showName, key, shift, families,
+  return { get, peek, months, year, trend, spark, showName, key, norm: n, shift, families,
     reset() { mem.clear(); loading.clear(); } };      // tests
 })();

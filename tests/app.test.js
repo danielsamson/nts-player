@@ -144,6 +144,15 @@ async function mockAccount() {
     await win.click('.archive__back-button');
   });
 
+  await test('An artist page opens from a track page', async () => {
+    await win.evaluate(() => Archive.showTrack('Klein', 'Spiritual Warfare'));
+    await win.click('.track-page__artist-link', { timeout: 30000 });
+    await win.waitForSelector('.artist-page', { timeout: 15000 });
+    await waitFor(() => document.querySelectorAll('.artist-page .track').length > 0, null, { timeout: 60000 });
+    await win.click('.archive__back-button');
+    await win.click('.archive__back-button');
+  });
+
   await test('Explore: a mood and a genre list episodes', async () => {
     await win.click('#homeBtn');
     await win.waitForSelector('.moods .mood', { timeout: 30000 });

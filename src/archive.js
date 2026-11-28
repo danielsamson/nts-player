@@ -388,14 +388,15 @@ const Archive = (() => {
     const name = (d, s) => d.info?.[s]?.[0] || s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
     async function shows(alias) { const d = await data(); return d?.shows?.[alias] ? { d, near: d.shows[alias] } : null; }
-    async function tracks(t) { const d = await data(); const near = d?.tracks?.[Chart.key(t.artist, t.title)]; return near ? { d, near } : null; }
+    async function tracks(t) { const k = Chart.key(t.artist, t.title); const d = await Artists.part(k); const near = d?.tracks?.[k]; return near ? { d, near } : null; }
     // shows like the ones you follow: each followed show's neighbours, nearer ones counting more
     async function forYou(followed) {
       const d = await data();
       if (!d?.shows || !followed.length) return [];
       const mine = new Set(followed), score = new Map();
+      const active = d.active ? new Set(d.active) : null;      // only suggest shows still on air
       for (const f of followed) (d.shows[f] || []).forEach(([o, both], i) => {
-        if (mine.has(o)) return;
+        if (mine.has(o) || (active && !active.has(o))) return;
         const x = score.get(o) || { s: 0, from: [], both };
         x.s += 1 / (i + 1); x.from.push(f); score.set(o, x);
       });
@@ -434,7 +435,7 @@ const Archive = (() => {
   // ---- Artists: charts/artists-<letter>.json, from the same daily tracklists ----
   const Artists = (() => {
     const parts = new Map();
-    const shard = (k) => (/^[a-z]/.test(k) ? k[0] : /^[0-9]/.test(k) ? '0' : '_');
+    const shard = (k) => `${k}__`.slice(0, 2).replace(/[0-9]/g, '0').replace(/[^a-z0]/g, '_');   // as in scripts/similar.js
     const part = (k) => {
       const f = shard(k);
       if (!parts.has(f)) parts.set(f, window.nts.chart(`artists-${f}`).catch(() => null).then((d) => { if (!d) parts.delete(f); return d; }));
@@ -455,7 +456,7 @@ const Archive = (() => {
         .sort((a, b) => (b[0] === k) - (a[0] === k) || b[1].shows - a[1].shows).slice(0, 4).map(([, x]) => x);
     }
     const split = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((x) => x.trim()).filter(Boolean);
-    return { get, search, split };
+    return { get, search, split, part };
   })();
 
   // ---- Artist page: their tracks on NTS, the shows that play them, who else those shows play ----

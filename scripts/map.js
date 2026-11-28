@@ -182,7 +182,7 @@ function build(data, prev) {
   const pick = new Set();
   zones.forEach((z) => defining(z, 14).forEach((a) => pick.add(a)));
   subs.forEach((z) => defining(z, 6).forEach((a) => pick.add(a)));
-  for (const [a, k] of showsWith) if (k >= 8) pick.add(a);
+  [...showsWith].sort((p, q) => q[1] - p[1]).slice(0, 3000).forEach(([a, k]) => { if (k >= 4) pick.add(a); });   // and the most widely played
   const plays = (s, a) => data.artistsOf.get(s)?.get(a) || 0;
   const artists = [];
   for (const a of pick) {

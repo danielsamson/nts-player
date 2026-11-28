@@ -42,21 +42,30 @@
    ]
   },
   {
-   "name": "UK club & dancehall",
-   "line": "Grime, bass, dancehall and whatever London's clubs are playing this month.",
+   "name": "UK club & bass",
+   "line": "Grime, dubstep, bass, hard techno and whatever London’s clubs are playing this month.",
    "artists": [
     "OSSX",
     "Regal86",
     "JD REID",
     "T.NO",
-    "Vybz Kartel",
-    "Ahadadream",
-    "Skillibeng",
+    "INVT",
+    "TSVI",
+    "Piezo",
+    "Skream",
     "Kahn",
     "Commodo",
-    "Sarz",
+    "Joker",
+    "Two Shell",
+    "Ahadadream",
     "Entranas",
-    "Styn"
+    "Styn",
+    "Batu",
+    "Blawan",
+    "DJ Plead",
+    "Lurka",
+    "Amor Satyr",
+    "Pluralist"
    ]
   },
   {
@@ -182,6 +191,60 @@
     "Kloke",
     "Harmony",
     "DJ Sofa"
+   ]
+  },
+  {
+   "name": "Dancehall & Afrobeats",
+   "line": "Dancehall, Afrobeats, amapiano and the R&B that runs alongside.",
+   "artists": [
+    "Vybz Kartel",
+    "Ding Dong",
+    "Skillibeng",
+    "Popcaan",
+    "Sarz",
+    "Rema",
+    "Wizkid",
+    "Buju Banton",
+    "Burna Boy",
+    "Tems",
+    "Asake",
+    "Shenseea",
+    "Tokischa"
+   ]
+  },
+  {
+   "name": "Cumbia & Latin",
+   "line": "Cumbia, bolero, salsa and Latin pop, mostly old, mostly wonderful.",
+   "artists": [
+    "Grupo Kual?",
+    "Aniceto Molina",
+    "Los Terricolas",
+    "Bronco",
+    "Los Angeles Azules",
+    "SUPER GRUPO COLOMBIA",
+    "Jose Jose",
+    "Toña La Negra",
+    "Celia Cruz",
+    "Lucho Bermúdez"
+   ]
+  },
+  {
+   "name": "Library, psych & cosmic country",
+   "line": "Library music, soundtracks, psych, folk and country records: the crate-digger's attic.",
+   "artists": [
+    "The Byrds",
+    "Alessandro Alessandroni",
+    "Ennio Morricone",
+    "Dorothy Ashby",
+    "Love",
+    "Piero Umiliani",
+    "Gabor Szabo",
+    "Serge Gainsbourg",
+    "Linda Ronstadt",
+    "Bobbie Gentry",
+    "Stelvio Cipriani",
+    "Kevin Ayers",
+    "Johnny Cash"
    ]
   }
  ],

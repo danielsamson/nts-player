@@ -1,0 +1,920 @@
+{
+ "about": "Names for the NTS map's zones and neighbourhoods. The build gives each zone (and each neighbourhood) the name whose artists overlap its own most, two or more in common; one with no match is called after its leading artist. Hand-written: add or edit freely.",
+ "zones": [
+  {
+   "name": "Dream & drift",
+   "line": "Ambient, dream pop, new age and the quiet end of the archive.",
+   "artists": [
+    "Broadcast",
+    "Grouper",
+    "Susumu Yokota",
+    "The Durutti Column",
+    "Harold Budd",
+    "Brian Eno",
+    "Cocteau Twins",
+    "Slowdive",
+    "Fine",
+    "Hiroshi Yoshimura",
+    "Laraaji",
+    "Arthur Russell",
+    "Mary Lattimore",
+    "Loscil"
+   ]
+  },
+  {
+   "name": "Soul, jazz-funk & hip hop",
+   "line": "Soul, boogie, jazz-funk, rap and the deep house that grew out of them.",
+   "artists": [
+    "Roy Ayers",
+    "Erykah Badu",
+    "D'Angelo",
+    "The Alchemist",
+    "J Dilla",
+    "Stevie Wonder",
+    "Marvin Gaye",
+    "Curtis Mayfield",
+    "Prince",
+    "Madlib",
+    "MF DOOM",
+    "Theo Parrish",
+    "Ron Trent",
+    "Moodymann"
+   ]
+  },
+  {
+   "name": "UK club & dancehall",
+   "line": "Grime, bass, dancehall and whatever London's clubs are playing this month.",
+   "artists": [
+    "OSSX",
+    "Regal86",
+    "JD REID",
+    "T.NO",
+    "Vybz Kartel",
+    "Ahadadream",
+    "Skillibeng",
+    "Kahn",
+    "Commodo",
+    "Sarz",
+    "Entranas",
+    "Styn"
+   ]
+  },
+  {
+   "name": "Broken techno & strange electronics",
+   "line": "Techno with the corners knocked off, dub techno, IDM and the odd machine.",
+   "artists": [
+    "Carrier",
+    "K Wata",
+    "Al Wootton",
+    "Klein",
+    "Autechre",
+    "Rhythm & Sound",
+    "Monolake",
+    "John T. Gast",
+    "Skee Mask",
+    "XEXA",
+    "SDEM",
+    "Jeff Mills",
+    "Burnt Friedman"
+   ]
+  },
+  {
+   "name": "Jazz & the wider world",
+   "line": "Spiritual jazz, highlife, Brazil, cumbia and records from everywhere else.",
+   "artists": [
+    "John Coltrane",
+    "Dollar Brand",
+    "Abdullah Ibrahim",
+    "Sun Ra",
+    "Thelonious Monk",
+    "Pharoah Sanders",
+    "Ebo Taylor",
+    "Elis Regina",
+    "Gal Costa",
+    "Chico Buarque",
+    "Miles Davis",
+    "Delroy Wilson"
+   ]
+  },
+  {
+   "name": "Punk, goth & oddities",
+   "line": "Post-punk, hardcore, industrial, library music and country records in strange company.",
+   "artists": [
+    "Killing Joke",
+    "Bourbonese Qualk",
+    "Severed Heads",
+    "Wipers",
+    "Bad Brains",
+    "The Cramps",
+    "The Cure",
+    "Ramones",
+    "Piero Umiliani",
+    "Dolly Parton",
+    "Coil",
+    "Integrity"
+   ]
+  },
+  {
+   "name": "Rap now",
+   "line": "Trap, plugg, drill and the internet's rap.",
+   "artists": [
+    "Future",
+    "Chief Keef",
+    "Lil Uzi Vert",
+    "Playboi Carti",
+    "Young Thug",
+    "Vayda",
+    "Bladee",
+    "Ecco2k",
+    "Headie One",
+    "Ken Carson",
+    "Dj Love",
+    "B0yg1rl"
+   ]
+  },
+  {
+   "name": "House & disco",
+   "line": "House, disco and the long Saturday night.",
+   "artists": [
+    "Pancratio",
+    "Eden Burns",
+    "DJ Split",
+    "Inland Knights",
+    "DJ Sneak",
+    "MR G.",
+    "Pet Shop Boys",
+    "Wallace",
+    "Make A Dance",
+    "Smokin' Beats",
+    "Brett Dancer"
+   ]
+  },
+  {
+   "name": "South Asia & the Middle East",
+   "line": "Ragas and Bollywood, Arabic club music, Beirut and the diaspora.",
+   "artists": [
+    "Hariprasad Chaurasia",
+    "Shivkumar Sharma",
+    "Nikhil Banerjee",
+    "Asha Bhosle",
+    "Postdrone",
+    "Ziad Rahbani",
+    "Daphni",
+    "Ravi Shankar",
+    "Mohammad Adam",
+    "Dakn",
+    "Sary Moussa",
+    "Haykal",
+    "Julmud"
+   ]
+  },
+  {
+   "name": "Jungle & footwork",
+   "line": "Breakbeats at full speed: jungle, drum & bass, footwork.",
+   "artists": [
+    "Kid Lib",
+    "Nectax",
+    "Tim Reaper",
+    "DJ Manny",
+    "Dwarde",
+    "FFF",
+    "Bruk",
+    "Kloke",
+    "Harmony",
+    "DJ Sofa"
+   ]
+  }
+ ],
+ "neighbourhoods": [
+  {
+   "name": "Art pop & the dreamy canon",
+   "artists": [
+    "Broadcast",
+    "Cocteau Twins",
+    "Arthur Russell",
+    "Susumu Yokota",
+    "Björk",
+    "The Durutti Column",
+    "Aphex Twin",
+    "Duster",
+    "Lou Reed",
+    "Dean Blunt"
+   ]
+  },
+  {
+   "name": "Hazy electronics",
+   "artists": [
+    "Boards Of Canada",
+    "Actress",
+    "Oklou",
+    "Arca",
+    "HTRK",
+    "Malibu",
+    "Detente",
+    "Yawning Portal",
+    "Fatshaudi"
+   ]
+  },
+  {
+   "name": "Drone & the very quiet",
+   "artists": [
+    "Jürg Frey",
+    "Andrew Chalk",
+    "Richard Youngs",
+    "Harold Budd",
+    "Grouper",
+    "Meredith Monk",
+    "Coil",
+    "Jemima",
+    "Ulla",
+    "Eliana Glass"
+   ]
+  },
+  {
+   "name": "Scores & the 20th century",
+   "artists": [
+    "Alexandre Desplat",
+    "Luciano Berio",
+    "Toru Takemitsu",
+    "Oneohtrix Point Never",
+    "Mica Levi",
+    "Angelo Badalamenti",
+    "Julee Cruise",
+    "David Lynch"
+   ]
+  },
+  {
+   "name": "Ambient & new age",
+   "artists": [
+    "Loscil",
+    "Jefre Cantu-Ledesma",
+    "Brian Eno",
+    "Hiroshi Yoshimura",
+    "Laurel Halo",
+    "Seefeel",
+    "Sam Gendel",
+    "Joanne Robertson",
+    "Bitchin Bajas"
+   ]
+  },
+  {
+   "name": "Avant-garde & electroacoustic",
+   "artists": [
+    "MILKWEED",
+    "Phew",
+    "Dieter Moebius",
+    "Jon Hassell",
+    "Oliver Coates",
+    "Lucrecia Dalt",
+    "Swans",
+    "Moin",
+    "feeo"
+   ]
+  },
+  {
+   "name": "Downtempo & dream house",
+   "artists": [
+    "Donna Regina",
+    "Salon Music",
+    "William Orbit",
+    "The Starseeds",
+    "Psychic TV",
+    "Vanessa Daou",
+    "Bows"
+   ]
+  },
+  {
+   "name": "Fragile folk & lo-fi",
+   "artists": [
+    "Tara Clerkin Trio",
+    "Carla dal Forno",
+    "Troth",
+    "Thomas Bush",
+    "Maxine Funke",
+    "Blue Communications",
+    "Fergus Jones",
+    "Vox Populi!"
+   ]
+  },
+  {
+   "name": "Slow techno & nocturnal",
+   "artists": [
+    "Klein",
+    "ML Buch",
+    "Lolina",
+    "Space Afrika",
+    "Memotone",
+    "U.e.",
+    "BJ Holy",
+    "Abi Abisa"
+   ]
+  },
+  {
+   "name": "Deep house & broken beat",
+   "artists": [
+    "Ron Trent",
+    "Theo Parrish",
+    "Moodymann",
+    "Glenn Underground",
+    "Vick Lavender",
+    "Nathan Haines",
+    "Herbie Hancock",
+    "Sault"
+   ]
+  },
+  {
+   "name": "Soul & jazz-funk",
+   "artists": [
+    "Roy Ayers",
+    "Marvin Gaye",
+    "Curtis Mayfield",
+    "Aretha Franklin",
+    "Sly & The Family Stone",
+    "Donald Byrd",
+    "Patrice Rushen",
+    "Norman Connors"
+   ]
+  },
+  {
+   "name": "Boom bap & underground rap",
+   "artists": [
+    "J Dilla",
+    "The Alchemist",
+    "Madlib",
+    "Roc Marciano",
+    "Mobb Deep",
+    "Earl Sweatshirt",
+    "Mike",
+    "Chuck Strangers",
+    "Knxwledge."
+   ]
+  },
+  {
+   "name": "Quiet storm & sophisti-pop",
+   "artists": [
+    "Sade",
+    "Janet Jackson",
+    "Grace Jones",
+    "Prince",
+    "Outkast",
+    "Julie Stapleton"
+   ]
+  },
+  {
+   "name": "Soul's long shadow",
+   "artists": [
+    "Roberta Flack",
+    "Gil Scott-Heron",
+    "D'Angelo",
+    "Funkadelic",
+    "Leon Thomas",
+    "Michael Jackson",
+    "Coby Sey",
+    "Alicia Keys"
+   ]
+  },
+  {
+   "name": "Beats & loops",
+   "artists": [
+    "Stevie Wonder",
+    "Knxwledge.",
+    "Juls",
+    "Odeal",
+    "Nomi",
+    "El Michels Affair",
+    "Budgie"
+   ]
+  },
+  {
+   "name": "Modern funk",
+   "artists": [
+    "Dam-Funk",
+    "Sven Wunder",
+    "Devin Morrison",
+    "Toro Y Moi",
+    "Dexter Wansel",
+    "PROFESSOR CREEPSHOW",
+    "Devonwho"
+   ]
+  },
+  {
+   "name": "Dancehall, Afrobeats & R&B",
+   "artists": [
+    "Vybz Kartel",
+    "Popcaan",
+    "Skillibeng",
+    "Sarz",
+    "Rema",
+    "Kelela",
+    "Nick León",
+    "SZA",
+    "Rihanna",
+    "Doechii"
+   ]
+  },
+  {
+   "name": "Club pop & deconstructed",
+   "artists": [
+    "AYA",
+    "Nkisi",
+    "Ikonika",
+    "Entranas",
+    "Keiska",
+    "DJ GÄP",
+    "Jetty",
+    "DJ JM"
+   ]
+  },
+  {
+   "name": "UK bass & experimental club",
+   "artists": [
+    "DJ Plead",
+    "Blawan",
+    "Batu",
+    "TSVI",
+    "Priori",
+    "John Glacier",
+    "Regal86",
+    "RHR",
+    "Piezo"
+   ]
+  },
+  {
+   "name": "Dubstep & grime",
+   "artists": [
+    "Kahn",
+    "Commodo",
+    "Mala",
+    "Cimm",
+    "JD REID",
+    "Novelist",
+    "Om Unit",
+    "Facta"
+   ]
+  },
+  {
+   "name": "Hard techno",
+   "artists": [
+    "Rene Wise",
+    "Metapattern",
+    "Surgeon",
+    "Shed",
+    "James Bangura",
+    "Deetron",
+    "Maōh",
+    "Exos"
+   ]
+  },
+  {
+   "name": "Bass, jersey & baltimore",
+   "artists": [
+    "T.NO",
+    "Styn",
+    "Teddy Kitano",
+    "Lamsi",
+    "Shygirl",
+    "Kaval",
+    "Hodge",
+    "Petrus.Wav"
+   ]
+  },
+  {
+   "name": "Pop in the club",
+   "artists": [
+    "OSSX",
+    "Ahadadream",
+    "Tinashe",
+    "Beyoncé",
+    "Britney Spears",
+    "Jorja Smith",
+    "Victoria Monét",
+    "Dave Quam",
+    "Bored Lord"
+   ]
+  },
+  {
+   "name": "Detroit & dub techno",
+   "artists": [
+    "Rhythm & Sound",
+    "Monolake",
+    "Model 500",
+    "Jeff Mills",
+    "Robert Hood",
+    "As One",
+    "Terrence Dixon",
+    "AFX"
+   ]
+  },
+  {
+   "name": "Dub, drones & the Middle East",
+   "artists": [
+    "John T. Gast",
+    "Muslimgauze",
+    "Rat Heart",
+    "Kelman Duran",
+    "Abdullah Miniawy",
+    "Michael J. Blood"
+   ]
+  },
+  {
+   "name": "IDM & broken rhythm",
+   "artists": [
+    "Skee Mask",
+    "Loraine James",
+    "Buttechno",
+    "K Wata",
+    "KMRU",
+    "MPU101",
+    "Igor Dyachenko"
+   ]
+  },
+  {
+   "name": "Hard edges & noise",
+   "artists": [
+    "Autechre",
+    "Dopplereffekt",
+    "Mark Fell",
+    "Rashad Becker",
+    "Merzbow",
+    "SDEM",
+    "XEXA"
+   ]
+  },
+  {
+   "name": "Hypnotic techno",
+   "artists": [
+    "Carrier",
+    "Al Wootton",
+    "Donato Dozzy",
+    "YL. Hooi",
+    "Simo Cell",
+    "Burnt Friedman",
+    "Holy Tongue",
+    "Gareth Psaltis"
+   ]
+  },
+  {
+   "name": "Industrial club",
+   "artists": [
+    "Slikback",
+    "Rabit",
+    "Nazar",
+    "KAVARI",
+    "Throbbing Gristle",
+    "Fitnesss",
+    "Blood Of Aza"
+   ]
+  },
+  {
+   "name": "Jazz",
+   "artists": [
+    "Sun Ra",
+    "Miles Davis",
+    "John Coltrane",
+    "Thelonious Monk",
+    "Sonny Rollins",
+    "Joe Henderson",
+    "Duke Ellington",
+    "Mal Waldron"
+   ]
+  },
+  {
+   "name": "Reggae, rocksteady & dub",
+   "artists": [
+    "Tommy McCook",
+    "Alton Ellis",
+    "Delroy Wilson",
+    "Jackie Mittoo",
+    "Gregory Isaacs",
+    "Al Campbell",
+    "Bob Marley",
+    "The Techniques"
+   ]
+  },
+  {
+   "name": "Cumbia & Latin pop",
+   "artists": [
+    "Los Angeles Azules",
+    "SUPER GRUPO COLOMBIA",
+    "Los Terricolas",
+    "Jose Jose",
+    "Toña La Negra",
+    "Grupo Kual?"
+   ]
+  },
+  {
+   "name": "African grooves",
+   "artists": [
+    "Ebo Taylor",
+    "Pat Thomas",
+    "Tshala Muana",
+    "ORIENTAL BROTHERS",
+    "Dorothy Masuka",
+    "Tafese Tesfaye",
+    "Mariem Hassan",
+    "Caiphus Semenya"
+   ]
+  },
+  {
+   "name": "South American rock",
+   "artists": [
+    "Serú Girán",
+    "Sui Generis",
+    "Pacha Wakay Munan",
+    "El Congreso",
+    "Franco Battiato",
+    "Aylu"
+   ]
+  },
+  {
+   "name": "Brazil",
+   "artists": [
+    "Elis Regina",
+    "Chico Buarque",
+    "Gilberto Gil",
+    "Tim Maia",
+    "Leci Brandão",
+    "Maria Bethânia",
+    "Sessa",
+    "Tania Maria"
+   ]
+  },
+  {
+   "name": "Library & psych",
+   "artists": [
+    "Piero Umiliani",
+    "Mario Molino",
+    "Stelvio Cipriani",
+    "Gabor Szabo",
+    "Serge Gainsbourg",
+    "Donovan",
+    "Spirit"
+   ]
+  },
+  {
+   "name": "Synth & post-punk",
+   "artists": [
+    "Cabaret Voltaire",
+    "Severed Heads",
+    "Suicide",
+    "Depeche Mode",
+    "Bourbonese Qualk",
+    "Soft Cell",
+    "Thomas Leer",
+    "Fad Gadget"
+   ]
+  },
+  {
+   "name": "Hardcore & metal",
+   "artists": [
+    "Breakdown",
+    "Integrity",
+    "Steröid",
+    "Charged G.B.H",
+    "Slayer",
+    "At The Drive-In",
+    "Jesu"
+   ]
+  },
+  {
+   "name": "Country & cosmic Americana",
+   "artists": [
+    "Linda Ronstadt",
+    "Dolly Parton",
+    "The Everly Brothers",
+    "Johnny Cash",
+    "The Byrds",
+    "Bobbie Gentry",
+    "Kevin Ayers"
+   ]
+  },
+  {
+   "name": "Punk & goth",
+   "artists": [
+    "Ramones",
+    "Killing Joke",
+    "Danzig",
+    "The Damned",
+    "Siouxsie And The Banshees",
+    "Black Sabbath",
+    "Bad Brains",
+    "Gang Of Four",
+    "Godflesh"
+   ]
+  },
+  {
+   "name": "Hyperpop & the internet",
+   "artists": [
+    "Bladee",
+    "Ecco2k",
+    "Charli XCX",
+    "FKA Twigs",
+    "Misogi",
+    "Isabella Lovestory",
+    "Amil Raja"
+   ]
+  },
+  {
+   "name": "Trap & plugg",
+   "artists": [
+    "Future",
+    "Chief Keef",
+    "Young Thug",
+    "SlimeGetEm",
+    "Pz'",
+    "Fox Bd",
+    "Sexyy Red",
+    "Ice Spice"
+   ]
+  },
+  {
+   "name": "Footwork crossover & new rap",
+   "artists": [
+    "DJ Spinn",
+    "Vayda",
+    "MS BOOGIE",
+    "HiTech",
+    "Babydoom",
+    "Doss"
+   ]
+  },
+  {
+   "name": "UK drill & London rap",
+   "artists": [
+    "Headie One",
+    "67",
+    "Chy Cartier",
+    "S5",
+    "Jawnino",
+    "Jim Legxacy",
+    "James Massiah",
+    "Playboi Carti"
+   ]
+  },
+  {
+   "name": "Underground internet rap",
+   "artists": [
+    "Evilgiane",
+    "Surf Gang",
+    "Jadasea",
+    "B0yg1rl",
+    "Omari Lyseight",
+    "Caynes"
+   ]
+  },
+  {
+   "name": "Witch house & Memphis",
+   "artists": [
+    "Salem",
+    "Crim3s",
+    "SEMATARY",
+    "Gucci Mane",
+    "Triple Six Mafia",
+    "Ritualz"
+   ]
+  },
+  {
+   "name": "Soft electronics",
+   "artists": [
+    "James Blake",
+    "Jacques Greene",
+    "Shlohmo",
+    "Nosaj Thing",
+    "Ouri",
+    "Jonah Yano",
+    "Clara La San",
+    "Benja"
+   ]
+  },
+  {
+   "name": "Modern house",
+   "artists": [
+    "K-LONE",
+    "Ian Pooley",
+    "Ploy",
+    "Shanti Celeste",
+    "Frits Wentink",
+    "Make A Dance",
+    "K-HAND",
+    "Jay Tripwire"
+   ]
+  },
+  {
+   "name": "Balearic & slow disco",
+   "artists": [
+    "Andrew Weatherall",
+    "Tornado Wallace",
+    "Francis Bebey",
+    "Shit Robot",
+    "Courtney Bailey",
+    "ddwy",
+    "Froid Dub"
+   ]
+  },
+  {
+   "name": "Leftfield house",
+   "artists": [
+    "Will Hofbauer",
+    "Eden Burns",
+    "Malin Genie",
+    "Sam Goku",
+    "A.Wild",
+    "Leod",
+    "Tom Carruthers"
+   ]
+  },
+  {
+   "name": "Chicago & tough house",
+   "artists": [
+    "MR G.",
+    "DJ SNEAK",
+    "Paranoid London",
+    "Tony Price",
+    "Mark Imperial",
+    "Basic Soul Unit",
+    "Jaisiel"
+   ]
+  },
+  {
+   "name": "Synth-pop",
+   "artists": [
+    "Pet Shop Boys",
+    "Propaganda",
+    "Paul Haig",
+    "Answering Service",
+    "TWO OF A KIND"
+   ]
+  },
+  {
+   "name": "Garage & NY house",
+   "artists": [
+    "Romanthony",
+    "Mood II Swing",
+    "MJ Cole",
+    "Mateo & Matos",
+    "Smokin' Beats",
+    "Joi Cardwell",
+    "Hex Hector"
+   ]
+  },
+  {
+   "name": "Ragas & Indian classical",
+   "artists": [
+    "Hariprasad Chaurasia",
+    "Shivkumar Sharma",
+    "Dagar Brothers",
+    "Amjad Ali Khan",
+    "Kishore Kumar",
+    "Arushi Jain"
+   ]
+  },
+  {
+   "name": "Arab club & electronics",
+   "artists": [
+    "Postdrone",
+    "Dakn",
+    "Mohammad Adam",
+    "Haykal",
+    "Qow",
+    "WAJA33",
+    "8ULENTINA"
+   ]
+  },
+  {
+   "name": "Beirut & beyond",
+   "artists": [
+    "Sary Moussa",
+    "Charbel Haber",
+    "Daphni",
+    "Pional",
+    "Ela Minus"
+   ]
+  },
+  {
+   "name": "Footwork",
+   "artists": [
+    "DJ Rashad",
+    "Traxman",
+    "DJ Manny",
+    "RP Boo",
+    "DJ Phil",
+    "Eq Why",
+    "DJ Paypal"
+   ]
+  },
+  {
+   "name": "Jungle & drum & bass",
+   "artists": [
+    "Photek",
+    "Tim Reaper",
+    "Dillinja",
+    "Omni Trio",
+    "Adam F",
+    "Bruk",
+    "Dwarde",
+    "Sully",
+    "Mantra"
+   ]
+  }
+ ]
+}

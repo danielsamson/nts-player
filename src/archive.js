@@ -473,6 +473,10 @@ const Archive = (() => {
     const res = await Artists.get(name).catch(() => null);
     if (current.type !== 'artist' || current.name !== name) return;
     const x = res?.x;
+    const onMap = el('button', 'mynts-btn artist-page__map', 'On the NTS map');
+    onMap.title = 'Where they live on the map: the shows that play them and the artists around them';
+    onMap.addEventListener('click', () => NtsMap.open({ artist: x?.name || name }));
+    head.append(onMap);
     const span = (ms) => { const f = (m) => monthLabel(m).replace(/^(\w{3})\w*/, '$1'); return ms ? (ms[0] === ms[1] ? f(ms[0]) : `${f(ms[0])} – ${f(ms[1])}`) : ''; };
     if (x) {
       h.textContent = x.name;
@@ -942,6 +946,10 @@ const Archive = (() => {
       if (meta) body.append(el('p', 'detail__meta', meta));
       body.append(tagRow(show.genres));
       if (show.description) body.append(el('p', 'broadcast-description detail__desc', show.description));
+      const onMap = el('button', 'mynts-btn', 'On the NTS map');
+      onMap.title = 'Where this show sits: its neighbourhood, the shows nearby and the artists it plays';
+      onMap.addEventListener('click', () => NtsMap.open({ show: alias }));
+      body.append(onMap);
       head.append(picWrap, body);
 
       const list = el('div', 'items');
@@ -1531,6 +1539,7 @@ const Archive = (() => {
     showEpisode(show, episode) { go({ type: 'episode', show, episode }); },
     showShow(show) { started = true; go({ type: 'show', show }); },
     artist: (name) => Artists.get(name),
+    showArtist(name) { started = true; go({ type: 'artist', name }); },
     showTrack(artist, title, { fromLive } = {}) {
       started = true;
       if (fromLive) { go({ type: 'track', artist, title, returnLive: true }); view = 'archive'; return; }

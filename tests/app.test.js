@@ -157,7 +157,7 @@ async function mockAccount() {
     await win.evaluate(() => Archive.home());
     await win.click('.map-card', { timeout: 15000 });
     await win.waitForSelector('.ntsmap canvas', { timeout: 15000 });
-    await waitFor(() => /shows|ready/.test(document.querySelector('.ntsmap__note')?.textContent || ''), null, { timeout: 30000 });
+    await waitFor(() => /shows|ready/.test(document.querySelector('.ntsmap__panel')?.textContent || ''), null, { timeout: 30000 });
     await win.keyboard.press('Escape');
     await waitFor(() => !document.querySelector('.ntsmap'), null, { timeout: 5000 });
   });

@@ -169,18 +169,98 @@ function build(data, prev) {
   // what defines a zone: artists played across many of its shows, and mostly there rather than everywhere
   const showsWith = new Map();
   for (const s of shows) for (const a of vec.get(s).keys()) showsWith.set(a, (showsWith.get(a) || 0) + 1);
-  const label = (members) => {
+  const defining = (members, n) => {       // artist keys, most defining first
     const c = new Map();
     for (const s of members) for (const a of vec.get(s).keys()) c.set(a, (c.get(a) || 0) + 1);
-    return [...c].filter(([, k]) => k >= 2).map(([a, k]) => [a, k * Math.sqrt(k / showsWith.get(a))]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([a]) => data.artistName.get(a));
+    return [...c].filter(([, k]) => k >= 2).map(([a, k]) => [a, k * Math.sqrt(k / showsWith.get(a))]).sort((a, b) => b[1] - a[1]).slice(0, n).map(([a]) => a);
   };
+  const label = (members) => defining(members, 4).map((a) => data.artistName.get(a));
+
+  // artists: the ones that define each zone and neighbourhood, and any played widely. Each lives
+  // where it's played most: in that zone and neighbourhood, among the shows there that play it
+  const pick = new Set();
+  zones.forEach((z) => defining(z, 14).forEach((a) => pick.add(a)));
+  subs.forEach((z) => defining(z, 6).forEach((a) => pick.add(a)));
+  for (const [a, k] of showsWith) if (k >= 8) pick.add(a);
+  const plays = (s, a) => data.artistsOf.get(s)?.get(a) || 0;
+  const artists = [];
+  for (const a of pick) {
+    const by = byArtist.get(a) || [];
+    if (by.length < 2) continue;
+    const zc = new Map();
+    for (const s of by) zc.set(zoneOf.get(s), (zc.get(zoneOf.get(s)) || 0) + plays(s, a));
+    const zone = [...zc].sort((x, y) => y[1] - x[1])[0][0];
+    const inZone = by.filter((s) => zoneOf.get(s) === zone);
+    const sc = new Map();
+    for (const s of inZone) sc.set(subOf.get(s), (sc.get(subOf.get(s)) || 0) + plays(s, a));
+    const sub = [...sc].sort((x, y) => y[1] - x[1])[0][0];
+    const home = inZone.filter((s) => subOf.get(s) === sub);
+    const w = home.map((s) => plays(s, a) || 1), tw = w.reduce((x, y) => x + y, 0);
+    const jit = rand() * Math.PI * 2;                    // a little off the shows, so they don't sit on top
+    const x = home.reduce((acc, s, i) => acc + xy[idx.get(s)][0] * w[i], 0) / tw + Math.cos(jit) * 0.006;
+    const y = home.reduce((acc, s, i) => acc + xy[idx.get(s)][1] * w[i], 0) / tw + Math.sin(jit) * 0.006;
+    const top = by.slice().sort((p, q) => plays(q, a) - plays(p, a)).slice(0, 8).map((s) => idx.get(s));
+    artists.push([data.artistName.get(a), r3(x), r3(y), zone, sub, by.length, top, a]);
+  }
+  artists.sort((p, q) => q[5] - p[5]);
+  // spread them out: artists push apart until they don't sit on top of each other, while each is
+  // held towards where its shows are (and kept off the shows themselves)
+  {
+    const home = artists.map((r) => [r[1], r[2]]);
+    const gap = 0.016, cell = gap;
+    for (let it = 0; it < 120; it++) {
+      const grid = new Map();
+      const put = (k, i) => { let l = grid.get(k); if (!l) grid.set(k, (l = [])); l.push(i); };
+      artists.forEach((r, i) => put(`${Math.floor(r[1] / cell)},${Math.floor(r[2] / cell)}`, i));
+      artists.forEach((r, i) => {
+        const gx = Math.floor(r[1] / cell), gy = Math.floor(r[2] / cell);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const j of grid.get(`${gx + a},${gy + b}`) || []) {
+          if (j <= i) continue;
+          const o = artists[j], dx = o[1] - r[1], dy = o[2] - r[2], d = Math.hypot(dx, dy) || 1e-6;
+          if (d >= gap) continue;
+          const push = (gap - d) / 2 * 0.5;
+          r[1] -= (dx / d) * push; r[2] -= (dy / d) * push; o[1] += (dx / d) * push; o[2] += (dy / d) * push;
+        }
+        r[1] += (home[i][0] - r[1]) * 0.02; r[2] += (home[i][1] - r[2]) * 0.02;
+      });
+    }
+    artists.forEach((r) => { r[1] = r3(r[1]); r[2] = r3(r[2]); });
+  }
+  const ai = new Map(artists.map((r, i) => [r[7], i]));
+  // each show's most played artists that are on the map
+  const showArtists = shows.map((s) => [...(data.artistsOf.get(s) || [])].filter(([a]) => ai.has(a)).sort((p, q) => q[1] - p[1]).slice(0, 6).map(([a]) => ai.get(a)));
+
+  // names: hand-written ones (zone-names.json) go to the zone sharing most of their artists
+  let named = [];
+  try { named = JSON.parse(fs.readFileSync(path.join(__dirname, 'zone-names.json'), 'utf8')).zones || []; } catch {}
+  const nk = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  const pairs = [];
+  zones.forEach((z, zi) => { const mine = new Set(defining(z, 40)); named.forEach((nm, ni) => { const k = nm.artists.filter((a) => mine.has(nk(a))).length; if (k >= 2) pairs.push([k, zi, ni]); }); });
+  const zoneName = new Map(), used = new Set();
+  for (const [, zi, ni] of pairs.sort((p, q) => q[0] - p[0])) if (!zoneName.has(zi) && !used.has(ni)) { zoneName.set(zi, named[ni]); used.add(ni); }
+  const lead = (members, n) => defining(members, n).map((a) => data.artistName.get(a));
+  // and neighbourhoods the same way, by the artists that define them and the artists who live there
+  let nb = [];
+  try { nb = JSON.parse(fs.readFileSync(path.join(__dirname, 'zone-names.json'), 'utf8')).neighbourhoods || []; } catch {}
+  const subPairs = [];
+  subs.forEach((z, si) => {
+    const mine = new Set([...defining(z, 30), ...artists.filter((r) => r[4] === si).slice(0, 30).map((r) => r[7])]);
+    nb.forEach((nm, ni) => { const k = nm.artists.filter((a) => mine.has(nk(a))).length; if (k >= 2) subPairs.push([k, si, ni]); });
+  });
+  const subName = new Map(), subUsed = new Set();
+  for (const [, si, ni] of subPairs.sort((p, q) => q[0] - p[0])) if (!subName.has(si) && !subUsed.has(ni)) { subName.set(si, nb[ni].name); subUsed.add(ni); }
   const centre = (members) => { const p = members.map((s) => xy[idx.get(s)]); return [r3(p.reduce((a, q) => a + q[0], 0) / p.length), r3(p.reduce((a, q) => a + q[1], 0) / p.length)]; };
   const majority = (members) => { const c = new Map(); members.forEach((s) => c.set(zoneOf.get(s), (c.get(zoneOf.get(s)) || 0) + 1)); return [...c].sort((a, b) => b[1] - a[1])[0][0]; };
   return {
-    v: 1, generated: Date.now(), months: [data.months[0], data.months[data.months.length - 1]],
-    shows: shows.map((s, i) => [s, r3(xy[i][0]), r3(xy[i][1]), zoneOf.get(s), subOf.get(s), weight(s)]),
-    zones: zones.map((z) => [...centre(z), label(z), z.length]),
-    subs: subs.map((z) => [...centre(z), label(z), z.length, majority(z)]),
+    v: 2, generated: Date.now(), months: [data.months[0], data.months[data.months.length - 1]],
+    // [slug, x, y, zone, neighbourhood, weight, [its most played artists (indexes into artists)]]
+    shows: shows.map((s, i) => [s, r3(xy[i][0]), r3(xy[i][1]), zoneOf.get(s), subOf.get(s), weight(s), showArtists[i]]),
+    // [name, x, y, zone, neighbourhood, shows that play them, [the shows that play them most]]
+    artists: artists.map((r) => r.slice(0, 7)),
+    // [x, y, [defining artists], shows, name, line]
+    zones: zones.map((z, i) => [...centre(z), label(z), z.length, zoneName.get(i)?.name || `Around ${lead(z, 2).join(' & ')}`, zoneName.get(i)?.line || '']),
+    // [x, y, [defining artists], shows, zone, name]
+    subs: subs.map((z, i) => [...centre(z), label(z), z.length, majority(z), subName.get(i) || `Around ${lead(z, 1)[0] || 'here'}`]),
     links: edges.filter(([, , w]) => w > 0.3).map(([i, j]) => [i, j])
   };
 }
@@ -189,12 +269,12 @@ function write(out, data, info) {
   const file = path.join(out, 'charts', 'map.json');
   let prev = null;
   try { prev = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
-  const map = build(data, prev);
+  const map = build(data, prev?.v >= 1 ? prev : null);
   map.info = {};
   for (const [s] of map.shows) if (info[s]) map.info[s] = info[s];
   map.active = [...data.active].filter((s) => map.info[s]);
   fs.writeFileSync(file, JSON.stringify(map));
-  console.log(`map: ${map.shows.length} shows, ${map.zones.length} zones, ${map.subs.length} sub-zones`);
+  console.log(`map: ${map.shows.length} shows, ${map.artists.length} artists, ${map.zones.length} zones (${map.zones.map((z) => z[4]).join('; ')}), ${map.subs.length} neighbourhoods`);
 }
 
 module.exports = { build, write, louvain };

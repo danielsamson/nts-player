@@ -578,6 +578,14 @@ const Archive = (() => {
       if (i < all.length - 1) artist.append(document.createTextNode(', '));
     });
     if (!artist.childNodes.length) artist.textContent = t.artist;
+    // a band with "&" or "and" in its name (Simon & Garfunkel) is one link, if it has a page
+    if (artist.querySelectorAll('button').length > 1) Artists.get(t.artist).then((res) => {
+      if (!res || !artist.isConnected) return;
+      const b = el('button', 'track-page__artist-link', t.artist);
+      b.title = `More from ${t.artist} on NTS`;
+      b.addEventListener('click', () => go({ type: 'artist', name: t.artist }));
+      artist.replaceChildren(b);
+    }).catch(() => {});
     const album = el('p', 'detail__meta');
     const playBox = el('div', 'track-page__playbox');     // Play from: first thing under the title
     const from = el('div', 'track-page__from');           // the episodes it was played on

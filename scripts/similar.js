@@ -18,7 +18,8 @@ const SHOW_MIN_PLAYS = 40;     // plays a show needs before it gets a profile
 const TRACK_MIN_SHOWS = 3;     // shows a track needs before it gets neighbours
 const KEEP_SHOWS = 8, KEEP_TRACKS = 6;
 // shows that are a different guest every time, or play everything: they don't say much about taste
-const MIXED = /^(guests|dancing-\d{4}|nts-guests|supporter-radio.*|your-specialist-subject.*|coming-of-age.*|nts-.*-takeover.*)$/;
+// (yearly specials have the year in the address: dancing-2026, Supporter Radio's peace-2025)
+const MIXED = /^(guests|nts-guests|supporter-radio.*|your-specialist-subject.*|coming-of-age.*|nts-.*-takeover.*|.*-\d{4})$/;
 const n = (x) => String(x || '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings', 'guest', 'guests', 'unknown', 'unknown artist', 'various', 'various artists']);

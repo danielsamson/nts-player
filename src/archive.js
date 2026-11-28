@@ -377,6 +377,102 @@ const Archive = (() => {
     return { find, count, sameTrack };
   })();
 
+  // ---- Similar: shows and tracks that go together ----
+  // charts/similar.json is worked out daily from every NTS tracklist: shows are alike when they
+  // play the same artists, tracks when the same shows play them. "Played next to it" is live:
+  // the tracks either side of it in the episodes that played it.
+  const Similar = (() => {
+    let p = null;
+    const data = () => (p ||= window.nts.chart('similar').catch(() => null).then((d) => { if (!d) p = null; return d; }));
+    const name = (d, s) => d.info?.[s]?.[0] || s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const list = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0] || '');
+    async function shows(alias) { const d = await data(); return d?.shows?.[alias] ? { d, near: d.shows[alias] } : null; }
+    async function tracks(t) { const d = await data(); const near = d?.tracks?.[Chart.key(t.artist, t.title)]; return near ? { d, near } : null; }
+    // shows like the ones you follow: each followed show's neighbours, nearer ones counting more
+    async function forYou(followed) {
+      const d = await data();
+      if (!d?.shows || !followed.length) return [];
+      const mine = new Set(followed), score = new Map();
+      for (const f of followed) (d.shows[f] || []).forEach(([o, both], i) => {
+        if (mine.has(o)) return;
+        const x = score.get(o) || { s: 0, from: [], both };
+        x.s += 1 / (i + 1); x.from.push(f); score.set(o, x);
+      });
+      return [...score].sort((a, b) => b[1].s - a[1].s).map(([o, x]) => ({ show: o, name: name(d, o), pic: d.info?.[o]?.[1], like: x.from.map((f) => name(d, f)), both: x.both }));
+    }
+    // the tracks either side of this one, in up to 8 of the episodes that played it
+    async function nextTo(t, plays) {
+      const got = new Map(), me = Chart.key(t.artist, t.title);
+      const eps = plays.slice(0, 8);
+      let i = 0;
+      await Promise.all([0, 1, 2].map(async () => {
+        while (i < eps.length) {
+          const pl = eps[i++];
+          const ep = parsePath(pl.path);
+          if (!ep?.episode) continue;
+          const tl = (await api(`/api/v2/shows/${ep.show}/episodes/${ep.episode}/tracklist`).catch(() => null))?.results || [];
+          let at = pl.uid ? tl.findIndex((r) => r.uid === pl.uid) : -1;
+          if (at < 0) at = tl.findIndex((r) => Chart.key(r.artist, r.title) === me);
+          if (at < 0) continue;
+          for (const j of [at - 1, at + 1]) {
+            const r = tl[j];
+            if (!r?.artist || !r?.title) continue;
+            const k = Chart.key(r.artist, r.title);
+            if (k === me) continue;
+            const x = got.get(k) || { artist: r.artist, title: r.title, eps: [] };
+            if (!x.eps.some((e) => e.episode === ep.episode)) x.eps.push({ show: ep.show, episode: ep.episode, title: pl.title, offset: r.offset ?? r.offset_estimate, before: j < at });
+            got.set(k, x);
+          }
+        }
+      }));
+      return [...got.values()].sort((a, b) => b.eps.length - a.eps.length);
+    }
+    return { data, name, list, shows, tracks, forYou, nextTo };
+  })();
+
+  function similarShowRow(d, [o, both], extra) {
+    return row({
+      img: d.info?.[o]?.[1], title: Similar.name(d, o),
+      meta: extra || (both.length ? `Both play ${Similar.list(both)}` : ''),
+      onClick: () => go({ type: 'show', show: o })
+    });
+  }
+
+  // Track page: what goes with it
+  function discoverBox(t, plays) {
+    const box = el('div', 'track-page__discover');
+    const along = el('div'), alike = el('div');
+    box.append(along, alike);
+    if (plays.length) Similar.nextTo(t, plays).then((near) => {
+      if (!near.length || !box.isConnected) return;
+      const ol = el('ol', 'tracks archive-tracks similar-tracks');
+      near.slice(0, 6).forEach((x) => {
+        const e = x.eps[0];
+        const li = trackRow({ artist: x.artist, title: x.title }, {
+          title: 'Open track',
+          onClick: () => go({ type: 'track', artist: x.artist, title: x.title }),
+          onPlay: () => Archive.playFrom(e.show, e.episode, Number.isFinite(e.offset) ? e.offset : 0)
+        });
+        li.querySelector('.track__play').title = `Hear it in ${e.title}${e.before ? ', just before this one' : ', right after this one'}`;
+        li.querySelector('.track__text').append(el('span', 'chart-row__count',
+          x.eps.length > 1 ? `Next to it in ${x.eps.length} episodes` : `${e.before ? 'Before' : 'After'} it in ${e.title}`));
+        ol.append(li);
+      });
+      along.replaceChildren(sectionTitle('Played next to it'), ol);
+    }).catch(() => {});
+    Similar.tracks(t).then((res) => {
+      if (!res || !box.isConnected) return;
+      const ol = el('ol', 'tracks archive-tracks similar-tracks');
+      res.near.forEach(([artist, title, via]) => {
+        const li = trackRow({ artist, title }, { title: 'Open track', onClick: () => go({ type: 'track', artist, title }) });
+        li.querySelector('.track__text').append(el('span', 'chart-row__count', `Both played by ${Similar.list(via.slice(0, 2).map((s) => Similar.name(res.d, s)))}`));
+        ol.append(li);
+      });
+      alike.replaceChildren(sectionTitle('Shows that play this also play'), ol);
+    }).catch(() => {});
+    return box;
+  }
+
   // ---- Track page: big cover, details, links, where it was played ----
   async function renderTrack(t) {
     const wrap = el('div', 'detail track-page');
@@ -423,6 +519,7 @@ const Archive = (() => {
     const remembered = current.origin || MyNTS.originOf(t);
     const o = remembered?.show ? remembered : info.match;
     from.replaceChildren();
+    from.before(discoverBox(t, info.plays || []));
     if (o?.show && o?.episode && o.offset != null) {
       const playFrom = el('button', 'episode-play', `Play from ${fmtOffset(o.offset)}${o.title ? ' · ' + o.title : ''}`);
       playFrom.addEventListener('click', async () => {
@@ -541,6 +638,22 @@ const Archive = (() => {
     return [head, box];
   }
 
+  // Home: shows like the ones you follow (worked out here, from your follows and similar.json)
+  function forYouSection() {
+    if (!Following.any()) return [];
+    const box = el('div', 'items');
+    const head = sectionTitle('Shows like the ones you follow');
+    Similar.forYou(Following.all()).then((list) => {
+      if (!list.length) { head.remove(); box.remove(); return; }
+      list.slice(0, 4).forEach((x) => box.append(row({
+        img: x.pic, title: x.name,
+        meta: `Like ${Similar.list(x.like.slice(0, 2))}${x.both.length ? ` · plays ${Similar.list(x.both.slice(0, 2))}` : ''}`,
+        onClick: () => go({ type: 'show', show: x.show })
+      })));
+    }).catch(() => { head.remove(); box.remove(); });
+    return [head, box];
+  }
+
   // ---- Schedule: what's on, with reminders ----
   async function renderSchedule(ch) {
     const bar = backBar(`Schedule · NTS ${ch}`);
@@ -646,7 +759,7 @@ const Archive = (() => {
       if (offset < (res.metadata?.resultset?.count ?? 0)) list.after(loadMoreButton(more));
     };
     try {
-      root.replaceChildren(...onAirSection(), ...yearCard(), ...continueSection(), ...(await comingUpSection()), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
+      root.replaceChildren(...onAirSection(), ...yearCard(), ...continueSection(), ...(await comingUpSection()), ...forYouSection(), ...exploreSection(), ...chartSection(), ...myNtsSection(), sectionTitle('Recently added'), list);
       await more();
     } catch { root.replaceChildren(failed('Couldn’t load the archive.')); }
   }
@@ -731,7 +844,14 @@ const Archive = (() => {
         const total = res.metadata?.resultset?.count ?? 0;
         if (offset < total) list.after(loadMoreButton(more));
       };
-      root.replaceChildren(backBar('Show'), head, sectionTitle('Episodes'), list);
+      const alike = el('div');
+      root.replaceChildren(backBar('Show'), head, alike, sectionTitle('Episodes'), list);
+      Similar.shows(alias).then((res) => {
+        if (!res || !alike.isConnected) return;
+        const box = el('div', 'items');
+        res.near.slice(0, 4).forEach((x) => box.append(similarShowRow(res.d, x)));
+        alike.replaceChildren(sectionTitle('Similar shows'), box);
+      }).catch(() => {});
       await more();
     } catch { root.replaceChildren(backBar(), failed('Couldn’t load this show.')); }
   }

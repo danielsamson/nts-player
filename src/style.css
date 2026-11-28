@@ -743,6 +743,11 @@ body.playing .track__art { background: var(--grey-1); }
 .track-page__plays { margin: 0 -12px; border-top: 1px solid var(--grey-4); }
 .track-page__plays .item__pic { display: none; }
 .track-page .loader { padding: 4px 0; }
+/* what goes with it: played next to it, and shows that play this also play */
+.track-page__discover { margin: 12px -12px 0; }
+.track-page__discover:empty, .track-page__discover > div:empty { display: none; }
+.track-page__discover .archive__section { border-top: var(--rule); }
+.similar-tracks .chart-row__count { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* Stage info lines keep their height; if space runs out the links go first, not the title */
 .stage__info > * { flex-shrink: 0; }

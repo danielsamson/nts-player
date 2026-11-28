@@ -117,17 +117,20 @@ ipcMain.handle('nts:api', async (_e, apiPath) => {
 const CHARTS = 'https://raw.githubusercontent.com/danielsamson/nts-player/data/charts';
 const chartMem = new Map();
 ipcMain.handle('charts:get', async (_e, name) => {
-  if (typeof name !== 'string' || !/^(index|recent|\d{4}-\d{2}|context-\d{4})$/.test(name)) throw new Error('Invalid chart');
+  if (typeof name !== 'string' || !/^(index|recent|similar|\d{4}-\d{2}|context-\d{4})$/.test(name)) throw new Error('Invalid chart');
   const hit = chartMem.get(name);
   if (hit && (hit.data.complete || Date.now() - hit.at < 6 * 3600e3)) return hit.data;
   const file = path.join(app.getPath('userData'), 'charts', `${name}.json`);
+  let disk = null;
   try {
-    const disk = JSON.parse(fs.readFileSync(file, 'utf8'));
+    disk = JSON.parse(fs.readFileSync(file, 'utf8'));
     if (disk.complete) { chartMem.set(name, { at: Date.now(), data: disk }); return disk; }
   } catch {}
-  const res = await net.fetch(`${CHARTS}/${name}.json`);
+  const res = await net.fetch(`${CHARTS}/${name}.json`).catch(() => null);
+  if (!res && disk) return disk;                      // offline: the last copy will do
+  if (!res) throw new Error('Charts offline');
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Charts ${res.status}`);
+  if (!res.ok) { if (disk) return disk; throw new Error(`Charts ${res.status}`); }
   const data = await res.json();
   chartMem.set(name, { at: Date.now(), data });
   try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(data)); } catch {}

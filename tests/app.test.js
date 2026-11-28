@@ -137,6 +137,13 @@ async function mockAccount() {
     await win.click('.archive__back-button');
   });
 
+  await test('A track page lists what was played next to it', async () => {
+    await win.evaluate(() => Archive.showTrack('Klein', 'Spiritual Warfare'));
+    await win.waitForSelector('.track-page', { timeout: 30000 });
+    await waitFor(() => document.querySelectorAll('.track-page__discover .similar-tracks .track').length > 0, null, { timeout: 60000 });
+    await win.click('.archive__back-button');
+  });
+
   await test('Explore: a mood and a genre list episodes', async () => {
     await win.click('#homeBtn');
     await win.waitForSelector('.moods .mood', { timeout: 30000 });

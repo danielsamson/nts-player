@@ -14,10 +14,12 @@
 const fs = require('fs');
 const path = require('path');
 const sitemap = require('../sitemap');
+const similar = require('./similar');
 
 const API = 'https://www.nts.live/api/v2';
 const KEEP_TRACKS = 2000;            // per file, most played first (enough to merge into a year)
-const VERSION = 5;                   // bump when files gain data: older ones are rebuilt a year at a time
+const VERSION = 6;                   // bump when files gain data: older ones are rebuilt a year at a time
+                                     // v6: also writes taste/<month>.json (every episode's tracklist, for Similar)
 const DAY = 864e5;
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
 const n = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -84,6 +86,8 @@ async function build(period) {
   const famNames = await familyNames();
   const artists = new Map();           // artist -> { name, tracks: Set, shows: Set }
   let plays = 0, read = 0;
+  const running = [];                  // every episode's tracklist in order: { s, d, keys } (for Similar)
+  const names = new Map();             // track key -> [artist, title]
   await pool(refs, 3, async (r) => {
     showEps.set(r.show, (showEps.get(r.show) || 0) + 1);
     const [tl, ep] = await Promise.all([
@@ -96,11 +100,15 @@ async function build(period) {
     read++;
     if (read % 100 === 0) console.log(`  ${read} / ${refs.length}`);
     const seen = new Set();
+    const order = [];
+    running.push({ s: r.show, d: r.d, keys: order });
     for (const x of tl?.results || []) {
       const a = n(x.artist), t = n(x.title);
       if (!a || !t || JUNK.has(a) || JUNK.has(t)) continue;
       plays++;
       const k = `${a}|${t}`;
+      order.push(k);
+      if (!names.has(k)) names.set(k, [x.artist, x.title]);
       if (seen.has(k)) continue;                       // once per episode
       seen.add(k);
       let m = tracks.get(k);
@@ -138,17 +146,17 @@ async function build(period) {
   const debuts = period === 'recent' ? [] : [...showEps.keys()].filter((s) => { const d = firsts.get(s); return !CATCH_ALL.test(s) && d >= from && d < to; });
 
   // names and pictures for the shows the cards show
-  const names = {};
+  const showNames = {};
   await pool([...new Set([...busiest.slice(0, 12).map(([s]) => s), ...debuts.slice(0, 24)])], 4, async (s) => {
     const sh = await get(`${API}/shows/${s}`);
-    if (sh) names[s] = [sh.name || s, sh.media?.picture_small || '', sh.location_long || ''];
+    if (sh) showNames[s] = [sh.name || s, sh.media?.picture_small || '', sh.location_long || ''];
   });
 
   // Supporter Radio specials: addresses change, the name doesn't
-  const special = (s) => /^supporter radio/i.test((names[s] || [])[0] || '');
+  const special = (s) => /^supporter radio/i.test((showNames[s] || [])[0] || '');
   const realBusiest = busiest.filter(([s]) => !special(s));
   const realDebuts = debuts.filter((s) => !special(s));
-  return {
+  const res = {
     v: VERSION,
     period, from, to: Math.min(to, now), generated: now, complete: to <= now,
     episodes: refs.length, shows: showEps.size, plays, uniqueTracks: tracks.size,
@@ -165,10 +173,19 @@ async function build(period) {
     // artists with the most different tracks played (from every play): [name, tracks, [show indexes]]
     artists: [...artists.values()].sort((a, b) => b.tracks.size - a.tracks.size || b.shows.size - a.shows.size).slice(0, 150)
       .map((ar) => [ar.name, ar.tracks.size, [...ar.shows].map(si)]),
-    busiest: realBusiest, debuts: realDebuts, names,
+    busiest: realBusiest, debuts: realDebuts, names: showNames,
     // every show that broadcast, with its number of episodes (for the year's totals)
     showEps: [...showEps].sort((a, b) => b[1] - a[1])
   };
+  // not part of the chart file: every tracklist in full, written to taste/ for Similar
+  Object.defineProperty(res, 'taste', { enumerable: false, value: () => {
+    const tl = [], ti = new Map(), sl = [], sx = new Map();
+    const at = (k) => { if (!ti.has(k)) { ti.set(k, tl.length); tl.push(names.get(k)); } return ti.get(k); };
+    const sh = (s) => { if (!sx.has(s)) { sx.set(s, sl.length); sl.push(s); } return sx.get(s); };
+    const eps = running.filter((e) => e.keys.length).sort((a, b) => a.d - b.d).map((e) => [sh(e.s), Math.floor(e.d / DAY), e.keys.map(at)]);
+    return { v: 1, period, showList: sl, tracks: tl, eps };
+  } });
+  return res;
 }
 
 // ---- release years (MusicBrainz: the first release of each recording, not a reissue) ----
@@ -273,7 +290,7 @@ function periods() {
   const list = args.length ? args : ['auto'];
   const out = [];
   for (const p of list) {
-    if (p === 'years') continue;          // a separate step, after building
+    if (p === 'years' || p === 'similar') continue;          // separate steps, after building
     if (p === 'auto') {
       const d = new Date();
       out.push('recent', ym(d));
@@ -307,7 +324,12 @@ if (require.main === module) (async () => {
     if (!res.episodes) { console.log(`${p}: no episodes, skipped`); continue; }
     cachedYears(res);
     fs.writeFileSync(path.join(OUT, 'charts', `${p}.json`), JSON.stringify(res));
+    if (/^\d{4}-\d{2}$/.test(p)) {
+      fs.mkdirSync(path.join(OUT, 'taste'), { recursive: true });
+      fs.writeFileSync(path.join(OUT, 'taste', `${p}.json`), JSON.stringify(res.taste()));
+    }
   }
+  await similar.write(OUT, get).catch((e) => console.log(`similar: ${e.message}`));   // cheap: redone every run
   if (args.includes('years')) await fillYears().catch((e) => console.log(`years: ${e.message}`));
   const months = fs.readdirSync(path.join(OUT, 'charts')).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)).map((f) => f.slice(0, 7)).sort().reverse();
   fs.writeFileSync(path.join(OUT, 'charts', 'index.json'), JSON.stringify({ months, updated: Date.now() }));

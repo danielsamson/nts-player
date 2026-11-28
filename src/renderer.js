@@ -1100,6 +1100,7 @@ const Following = (() => {
   return {
     has: (alias) => aliases.has(alias),
     any: () => aliases.size > 0,
+    all: () => [...aliases],
     refresh,
     onChange: (fn) => listeners.add(fn)
   };

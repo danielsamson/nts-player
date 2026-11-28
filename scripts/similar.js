@@ -22,6 +22,25 @@ const KEEP_SHOWS = 8, KEEP_TRACKS = 6;
 const MIXED = /^(guests|nts-guests|supporter-radio.*|your-specialist-subject.*|coming-of-age.*|nts-.*-takeover.*|.*-\d{4})$/;
 const n = (x) => String(x || '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/ß/g, 'ss').normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const splitArtists = (a) => String(a || '').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\band\b)\s*/i).map((s) => s.trim()).filter(Boolean);
+// "Duval Timothy, CJ Mirra" is two artists, "Simon & Garfunkel" and "Earth, Wind & Fire" are one:
+// split a credit where at least two of its names are artists in their own right (3+ tracks alone), and
+// the credit as a whole isn't far more common than they are (there's a band called Earth, but EW&F is the
+// name). feat. always splits
+function artistSplitter(solo, whole) {
+  const memo = new Map();
+  return (credit) => {
+    if (memo.has(credit)) return memo.get(credit);
+    const out = [];
+    for (const piece of String(credit || '').split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)) {
+      const parts = splitArtists(piece);
+      const known = parts.map((x) => solo.get(n(x)) || 0).filter((c) => c >= 3);
+      if (parts.length > 1 && !solo.has(n(piece)) && known.length >= 2 && (whole.get(n(piece)) || 0) < 3 * Math.min(...known)) out.push(...parts);
+      else if (piece.trim()) out.push(piece.trim());
+    }
+    memo.set(credit, out);
+    return out;
+  };
+}
 const NOT_ARTISTS = new Set(['excerpt', 'excerpts', 'dialogue', 'interview', 'intro', 'outro', 'speech', 'spoken word', 'jingle', 'ident', 'nts', 'nts radio', 'traditional', 'trad', 'anonymous', 'field recording', 'field recordings', 'guest', 'guests', 'unknown', 'unknown artist', 'various', 'various artists']);
 
 function load(out) {
@@ -37,8 +56,20 @@ function load(out) {
   const artistName = new Map();        // artist key -> how it's written most
   const showsOf = new Map();           // track key -> Set(show)
   const trackName = new Map();
-  for (const f of files) {
+  // first, every credit as written, to tell bands from collaborations
+  const solo = new Map(), whole = new Map();          // credit -> tracks credited exactly so
+  const docs = files.map((f) => {
     const d = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+    for (const [artist] of d.tracks) {
+      const k = n(artist);
+      const m = /,|&|\bx\b|\bfeat|\bft\b|\band\b/i.test(artist) ? whole : solo;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return [f, d];
+  });
+  const creditsOf = artistSplitter(solo, whole);
+  const together = new Map();          // artist key -> Set(artists credited on the same track)
+  for (const [f, d] of docs) {
     const wt = 0.5 ** ((newest - monthNo(f)) / HALF_LIFE);
     for (const [si, day, list] of d.eps) {
       const s = d.showList[si];
@@ -55,7 +86,12 @@ function load(out) {
         let ss = showsOf.get(k);
         if (!ss) showsOf.set(k, (ss = new Set()));
         ss.add(s);
-        for (const a of splitArtists(artist)) {
+        const credited = creditsOf(artist);
+        if (credited.length > 1) for (const a of credited) {
+          let t = together.get(n(a)); if (!t) together.set(n(a), (t = new Set()));
+          credited.forEach((b) => { if (b !== a) t.add(n(b)); });
+        }
+        for (const a of credited) {
           const ak = n(a);
           if (!ak || NOT_ARTISTS.has(ak)) continue;
           am.set(ak, (am.get(ak) || 0) + 1);
@@ -67,7 +103,7 @@ function load(out) {
   }
   const latest = Math.max(...lastDay.values());
   const active = new Set([...lastDay].filter(([, d]) => d > latest - 365).map(([s]) => s));
-  return { months: files.map((f) => f.slice(0, 7)).sort(), artistsOf, tasteOf, active, artistName, showsOf, trackName };
+  return { months: files.map((f) => f.slice(0, 7)).sort(), artistsOf, tasteOf, active, artistName, showsOf, trackName, creditsOf, together };
 }
 
 // shows: TF-IDF over artists, cosine, then a correction for "hub" shows that are a bit
@@ -109,7 +145,7 @@ function similarShows({ tasteOf: artistsOf, artistName }) {
 
 // tracks: shows in common, each show weighted 1/log(2 + tracks it played), cosine;
 // a neighbour needs at least two shows in common, so one DJ's taste isn't the whole story
-function similarTracks({ showsOf, trackName }) {
+function similarTracks({ showsOf, trackName, creditsOf }) {
   const keys = [...showsOf].filter(([, ss]) => ss.size >= 2).map(([k]) => k);
   const played = new Map(), tracksOf = new Map();
   for (const k of keys) for (const s of showsOf.get(k)) {
@@ -118,7 +154,7 @@ function similarTracks({ showsOf, trackName }) {
   }
   const w = (s) => 1 / Math.log(2 + played.get(s));
   const mass = new Map(keys.map((k) => [k, [...showsOf.get(k)].reduce((a, s) => a + w(s), 0)]));
-  const main = (k) => n(splitArtists(trackName.get(k)[0])[0] || k.split('|')[0]);
+  const main = (k) => n(creditsOf(trackName.get(k)[0])[0] || k.split('|')[0]);
   const res = {};
   for (const k of keys) {
     if (showsOf.get(k).size < TRACK_MIN_SHOWS) continue;
@@ -150,7 +186,7 @@ function similarTracks({ showsOf, trackName }) {
 const ARTIST_MIN_SHOWS = 3;
 let DAMP = 6;                          // how much more shows in common count (see artistPages)
 const shard = (k) => `${k}__`.slice(0, 2).replace(/[0-9]/g, '0').replace(/[^a-z0]/g, '_');   // same in the app
-function artistPages({ artistsOf, artistName, showsOf, trackName }) {
+function artistPages({ artistsOf, artistName, showsOf, trackName, creditsOf, together }) {
   const showsBy = new Map();           // artist -> Map(show -> plays)
   for (const [s, am] of artistsOf) for (const [a, c] of am) {
     let m = showsBy.get(a); if (!m) showsBy.set(a, (m = new Map())); m.set(s, c);
@@ -165,7 +201,7 @@ function artistPages({ artistsOf, artistName, showsOf, trackName }) {
   const tracksBy = new Map();
   for (const [k, ss] of showsOf) {
     const [artist, title] = trackName.get(k);
-    for (const part of splitArtists(artist)) {
+    for (const part of creditsOf(artist)) {
       const a = n(part);
       if (!keep.has(a)) continue;
       let l = tracksBy.get(a); if (!l) tracksBy.set(a, (l = [])); l.push([artist, title, ss.size]);
@@ -180,7 +216,9 @@ function artistPages({ artistsOf, artistName, showsOf, trackName }) {
       acc.set(o, (acc.get(o) || 0) + w.get(s));
       let v = via.get(o); if (!v) via.set(o, (v = [])); v.push(s);
     }
-    const like = [...acc].filter(([o]) => via.get(o).length >= 2)
+    const withThem = together.get(a);      // collaborators played them *with* them, not instead
+    const own = new RegExp(`(^| )${a}( |$)`);   // "Duval Timothy & CJ Mirra" isn't a suggestion for Duval Timothy
+    const like = [...acc].filter(([o]) => via.get(o).length >= 2 && !withThem?.has(o) && !own.test(o) && !new RegExp(`(^| )${o}( |$)`).test(a))
       // cosine favours artists on two or three shows that happen to overlap; more shows in common counts for more
       .map(([o, x]) => { const k = via.get(o).length; return [o, (x / Math.sqrt(mass.get(a) * mass.get(o))) * (k / (k + DAMP))]; }).sort((x, y) => y[1] - x[1]).slice(0, 8)
       .map(([o]) => [artistName.get(o), via.get(o).sort((x, y) => w.get(y) - w.get(x)).slice(0, 2)]);

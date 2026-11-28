@@ -17,6 +17,7 @@ const HALF_LIFE = 36;           // months: a show's plays from three years ago c
 const SHOW_MIN_PLAYS = 40;     // plays a show needs before it gets a profile
 const TRACK_MIN_SHOWS = 3;     // shows a track needs before it gets neighbours
 const KEEP_SHOWS = 8, KEEP_TRACKS = 6;
+const HUB_TRACKS = 1500;       // see similarTracks
 // shows that are a different guest every time, or play everything: they don't say much about taste
 // (yearly specials have the year in the address: dancing-2026, Supporter Radio's peace-2025)
 const MIXED = /^(guests|nts-guests|supporter-radio.*|your-specialist-subject.*|coming-of-age.*|nts-.*-takeover.*|.*-\d{4})$/;
@@ -186,13 +187,16 @@ function similarTracks({ showsOf, trackName, creditsOf }) {
     let l = tracksOf.get(s); if (!l) tracksOf.set(s, (l = [])); l.push(k);
   }
   const w = (s) => 1 / Math.log(2 + played.get(s));
-  const mass = new Map(keys.map((k) => [k, [...showsOf.get(k)].reduce((a, s) => a + w(s), 0)]));
+  // shows that have played thousands of these tracks over the years say little about any one pair
+  // and would make every track compare with everything: leave them out of this
+  const hub = (s) => played.get(s) > HUB_TRACKS;
+  const mass = new Map(keys.map((k) => [k, [...showsOf.get(k)].reduce((a, s) => a + (hub(s) ? 0 : w(s)), 0) || 1e-9]));
   const main = (k) => n(creditsOf(trackName.get(k)[0])[0] || k.split('|')[0]);
   const res = {};
   for (const k of keys) {
     if (showsOf.get(k).size < TRACK_MIN_SHOWS) continue;
     const acc = new Map(), via = new Map();
-    for (const s of showsOf.get(k)) for (const o of tracksOf.get(s)) {
+    for (const s of showsOf.get(k)) if (!hub(s)) for (const o of tracksOf.get(s)) {
       if (o === k) continue;
       acc.set(o, (acc.get(o) || 0) + w(s));
       let v = via.get(o); if (!v) via.set(o, (v = [])); v.push(s);
